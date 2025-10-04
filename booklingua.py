@@ -408,6 +408,7 @@ def main():
     parser.add_argument("--deepseek", action="store_true", help="Use DeepSeek API")
     parser.add_argument("--lmstudio", action="store_true", help="Use LM Studio local server")
     parser.add_argument("--together", action="store_true", help="Use Together AI API")
+    parser.add_argument("--openrouter", action="store_true", help="Use OpenRouter AI API")
     
     args = parser.parse_args()
     
@@ -441,6 +442,11 @@ def main():
         model = model or "Qwen/Qwen2.5-72B-Instruct-Turbo"
         if not api_key:
             api_key = os.environ.get('TOGETHER_API_KEY')
+    elif args.openrouter:
+        base_url = base_url or "https://openrouter.ai/api/v1"
+        model = model or "openai/gpt-4o"
+        if not api_key:
+            api_key = os.environ.get('OPENROUTER_API_KEY')
     
     # Use environment variable as fallback for API key
     if not api_key:
