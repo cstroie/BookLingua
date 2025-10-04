@@ -294,7 +294,7 @@ Translation rules:
                 "model": self.model,
                 "messages": messages,
                 "temperature": 0.3,  # Lower temperature for more consistent translations
-                "max_tokens": 8000
+                "max_tokens": 4096
             }
             
             response = requests.post(
