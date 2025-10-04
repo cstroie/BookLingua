@@ -453,7 +453,7 @@ class EPUBTranslator:
             - Uses OpenAI-compatible chat completions endpoint
             - Supports custom base URLs for different providers (OpenAI, Ollama, Mistral, etc.)
             - Handles API key authentication when provided
-            - Uses temperature=0.3 for consistent translations
+            - Uses temperature=0.5 for balanced creativity and consistency
             
         Translation Context:
             - Maintains conversation history for each language pair
@@ -533,7 +533,7 @@ Translation rules:
             payload = {
                 "model": self.model,
                 "messages": messages,
-                "temperature": 0.3,  # Lower temperature for more consistent translations
+                "temperature": 0.5,  # Balanced temperature for creativity and consistency
                 "max_tokens": 4096
             }
             
@@ -585,7 +585,7 @@ Translation rules:
             - Maintains translation context for consistency across multiple calls
             - Handles both single paragraphs and longer documents
             - Preserves Markdown formatting and document structure
-            - Uses temperature=0.3 for consistent, accurate translations
+            - Uses temperature=0.5 for balanced creativity and accuracy
             
         Example:
             >>> translator = EPUBTranslator()
@@ -624,7 +624,7 @@ Translation rules:
             - Step 2: Translate pivot → target language
             - Maintains separate translation contexts for each language pair
             - Preserves formatting and document structure in both steps
-            - Uses temperature=0.3 for consistent translations
+            - Uses temperature=0.5 for balanced creativity and consistency
             
         Use cases:
             - When direct translation quality is poor for certain language pairs
@@ -781,6 +781,7 @@ Translation rules:
             - Preserves Markdown formatting and document structure
             - Generates comparison HTML for analysis (both mode)
             - Supports paragraph-level translation for better quality
+            - Uses temperature=0.5 for balanced creativity and accuracy
             - Verbose progress reporting when enabled
             
         Example:
@@ -1178,6 +1179,7 @@ def main():
         - Direct and pivot translation modes
         - Comparison mode for analyzing translation quality
         - Preserves EPUB structure and formatting
+        - Uses temperature=0.5 for balanced creativity and accuracy
         - Verbose progress reporting
         - Environment variable support for API keys
         - Preset configurations for common services
