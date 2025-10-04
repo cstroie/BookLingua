@@ -65,6 +65,11 @@ python epub_translator.py input.epub \
   --target-lang Spanish
 ```
 
+Or using short options:
+```bash
+python epub_translator.py input.epub -s German -p English -t Spanish
+```
+
 ### Specify Output Directory
 
 ```bash
@@ -116,6 +121,11 @@ python epub_translator.py input.epub \
   --base-url https://api.openai.com/v1 \
   --api-key YOUR_API_KEY \
   --model gpt-4o
+```
+
+Or using short options:
+```bash
+python epub_translator.py input.epub -u https://api.openai.com/v1 --api-key YOUR_API_KEY -m gpt-4o
 ```
 
 ### Environment Variables

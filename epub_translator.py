@@ -391,15 +391,15 @@ def main():
     parser = argparse.ArgumentParser(description="Translate EPUB books using various AI models")
     parser.add_argument("input", help="Input EPUB file path")
     parser.add_argument("-o", "--output", default="output", help="Output directory (default: output)")
-    parser.add_argument("-m", "--mode", choices=["direct", "pivot", "both"], default="both",
+    parser.add_argument("-M", "--mode", choices=["direct", "pivot", "both"], default="both",
                         help="Translation mode (default: both)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
-    parser.add_argument("--source-lang", default="English", help="Source language (default: English)")
-    parser.add_argument("--pivot-lang", default="French", help="Pivot language (default: French)")
-    parser.add_argument("--target-lang", default="Romanian", help="Target language (default: Romanian)")
+    parser.add_argument("-s", "--source-lang", default="English", help="Source language (default: English)")
+    parser.add_argument("-p", "--pivot-lang", default="French", help="Pivot language (default: French)")
+    parser.add_argument("-t", "--target-lang", default="Romanian", help="Target language (default: Romanian)")
+    parser.add_argument("-u", "--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
+    parser.add_argument("-m", "--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
     parser.add_argument("--api-key", help="API key for the translation service")
-    parser.add_argument("--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
-    parser.add_argument("--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
     
     # Preset configurations for common services
     parser.add_argument("--openai", action="store_true", help="Use OpenAI API")
