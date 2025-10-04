@@ -381,7 +381,7 @@ class EPUBTranslator:
         
         return text
     
-    def translate_text(self, text: str, target_lang: str, source_lang: str = "English", 
+    def translate_text(self, text: str, source_lang: str, target_lang: str = "Romanian", 
                        chunk_size: int = 3000) -> str:
         """Translate text in chunks using OpenAI-compatible API.
         
@@ -410,7 +410,7 @@ class EPUBTranslator:
         Example:
             >>> translator = EPUBTranslator()
             >>> text = "This is a paragraph.\\n\\nThis is another paragraph."
-            >>> translated = translator.translate_text(text, "Romanian")
+            >>> translated = translator.translate_text(text, "English", "Romanian")
             >>> print(translated)
             'Acesta este un paragraf.\\n\\nAcesta este alt paragraf.'
         """
@@ -434,7 +434,7 @@ class EPUBTranslator:
         
         return '\n\n'.join(translated_paragraphs)
     
-    def _translate_chunk(self, text: str, target_lang: str, source_lang: str) -> str:
+    def _translate_chunk(self, text: str, source_lang: str, target_lang: str) -> str:
         """Translate a single chunk of text using OpenAI-compatible API.
         
         This method handles the actual API call to translate a chunk of text
@@ -474,8 +474,8 @@ class EPUBTranslator:
             >>> translator = EPUBTranslator()
             >>> result = translator._translate_chunk(
             ...     "Hello, how are you?",
-            ...     "Romanian",
-            ...     "English"
+            ...     "English",
+            ...     "Romanian"
             ... )
             >>> print(result)
             'Salut, cum ești?'
@@ -564,7 +564,7 @@ Translation rules:
             print(f"Error during translation: {e}")
             raise
     
-    def translate_direct(self, text: str, source_lang: str = "English", target_lang: str = "Romanian") -> str:
+    def translate_direct(self, text: str, source_lang: str, target_lang: str = "Romanian") -> str:
         """Direct translation from source to target language using AI models.
         
         This method performs a direct translation of text from the source language
@@ -599,7 +599,7 @@ Translation rules:
         """
         return self.translate_text(text, target_lang, source_lang)
     
-    def translate_pivot(self, text: str, source_lang: str = "English", pivot_lang: str = "French", 
+    def translate_pivot(self, text: str, source_lang: str, pivot_lang: str = "French", 
                        target_lang: str = "Romanian") -> Dict[str, str]:
         """Pivot translation from source to target language via intermediate language.
         
@@ -635,7 +635,7 @@ Translation rules:
             >>> translator = EPUBTranslator()
             >>> result = translator.translate_pivot(
             ...     "Hello, how are you?",
-            ...     source_lang="English",
+            ...     "English",
             ...     pivot_lang="French",
             ...     target_lang="Romanian"
             ... )
@@ -879,7 +879,7 @@ Translation rules:
                         if paragraph.strip():
                             if self.verbose:
                                 print(f"{source_lang.upper()}: {paragraph}")
-                            translated_paragraph = self._translate_chunk(paragraph, target_lang, source_lang)
+                            translated_paragraph = self._translate_chunk(paragraph, source_lang, target_lang)
                             translated_paragraphs.append(translated_paragraph)
                             if self.verbose:
                                 print(f"{target_lang.upper()}: {translated_paragraph}")
@@ -903,12 +903,12 @@ Translation rules:
                             if self.verbose:
                                 print(f"{source_lang.upper()}: {paragraph}")
                             # Source -> Pivot
-                            intermediate = self._translate_chunk(paragraph, pivot_lang, source_lang)
+                            intermediate = self._translate_chunk(paragraph, source_lang, pivot_lang)
                             intermediate_paragraphs.append(intermediate)
                             if self.verbose:
                                 print(f"{pivot_lang.upper()}: {intermediate}")
                             # Pivot -> Target
-                            final = self._translate_chunk(intermediate, target_lang, pivot_lang)
+                            final = self._translate_chunk(intermediate, pivot_lang, target_lang)
                             final_paragraphs.append(final)
                             if self.verbose:
                                 print(f"{target_lang.upper()}: {final}")
