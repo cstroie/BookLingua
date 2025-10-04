@@ -42,7 +42,7 @@ class EPUBTranslator:
         self.base_url = base_url or "https://api.openai.com/v1"
         self.model = model
         self.verbose = verbose
-        self.translation_context = []  # Store last 5 user-assistant pairs
+        self.translation_contexts = {}  # Store contexts for different language pairs
         print(f"Initialized with model: {model}")
         if base_url:
             print(f"Using API endpoint: {base_url}")
@@ -277,8 +277,13 @@ Translation rules:
                 }
             ]
             
-            # Add context from previous translations
-            for user_msg, assistant_msg in self.translation_context:
+            # Create context key for this language pair
+            context_key = f"{source_lang.lower()}_{target_lang.lower()}"
+            if context_key not in self.translation_contexts:
+                self.translation_contexts[context_key] = []
+            
+            # Add context from previous translations for this language pair
+            for user_msg, assistant_msg in self.translation_contexts[context_key]:
                 messages.append({"role": "user", "content": user_msg})
                 messages.append({"role": "assistant", "content": assistant_msg})
             
@@ -308,11 +313,11 @@ Translation rules:
             import re
             translation = re.sub(r'<think>.*?</think>', '', translation, flags=re.DOTALL).strip()
 
-            # Update translation context with this exchange
-            self.translation_context.append((text, translation))
+            # Update translation context for this language pair
+            self.translation_contexts[context_key].append((text, translation))
             # Keep only the last 5 exchanges
-            if len(self.translation_context) > 5:
-                self.translation_context.pop(0)
+            if len(self.translation_contexts[context_key]) > 5:
+                self.translation_contexts[context_key].pop(0)
             
             return translation
         except Exception as e:
