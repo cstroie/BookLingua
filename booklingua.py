@@ -53,14 +53,23 @@ class EPUBTranslator:
         for item in book.get_items():
             if item.get_type() == ebooklib.ITEM_DOCUMENT:
                 soup = BeautifulSoup(item.get_content(), 'html.parser')
-                text = soup.get_text(separator='\n', strip=True)
+                # Extract paragraphs as separate elements
+                paragraphs = []
+                for p in soup.find_all('p'):
+                    text = p.get_text(separator='\n', strip=True)
+                    if text:  # Only include non-empty paragraphs
+                        paragraphs.append(text)
+                
+                # Join paragraphs with double newlines to preserve paragraph breaks
+                text = '\n\n'.join(paragraphs)
                 
                 if text:  # Only include non-empty chapters
                     chapters.append({
                         'id': item.get_id(),
                         'name': item.get_name(),
                         'content': text,
-                        'html': item.get_content()
+                        'html': item.get_content(),
+                        'paragraphs': paragraphs
                     })
         
         return chapters
@@ -68,34 +77,25 @@ class EPUBTranslator:
     def translate_text(self, text: str, target_lang: str, source_lang: str = "English", 
                        chunk_size: int = 3000) -> str:
         """Translate text in chunks using OpenAI-compatible API"""
-        if len(text) <= chunk_size:
+        # Split into paragraphs (separated by double newlines)
+        paragraphs = text.split('\n\n')
+        
+        # If we have only one paragraph or the total text is small enough, translate as one chunk
+        if len(paragraphs) <= 1 or len(text) <= chunk_size:
             return self._translate_chunk(text, target_lang, source_lang)
         
-        # Split into chunks at paragraph boundaries
-        paragraphs = text.split('\n\n')
-        translated_parts = []
-        current_chunk = []
-        current_length = 0
-        
-        for para in paragraphs:
-            para_length = len(para)
-            
-            if current_length + para_length > chunk_size and current_chunk:
-                # Translate current chunk
-                chunk_text = '\n\n'.join(current_chunk)
-                translated_parts.append(self._translate_chunk(chunk_text, target_lang, source_lang))
-                current_chunk = [para]
-                current_length = para_length
+        # Otherwise, process each paragraph as a separate chunk
+        translated_paragraphs = []
+        for i, paragraph in enumerate(paragraphs):
+            if self.verbose:
+                print(f"Translating paragraph {i+1}/{len(paragraphs)}")
+            if paragraph.strip():  # Only translate non-empty paragraphs
+                translated_paragraphs.append(self._translate_chunk(paragraph, target_lang, source_lang))
             else:
-                current_chunk.append(para)
-                current_length += para_length
+                # Preserve empty paragraphs (section breaks)
+                translated_paragraphs.append(paragraph)
         
-        # Translate remaining chunk
-        if current_chunk:
-            chunk_text = '\n\n'.join(current_chunk)
-            translated_parts.append(self._translate_chunk(chunk_text, target_lang, source_lang))
-        
-        return '\n\n'.join(translated_parts)
+        return '\n\n'.join(translated_paragraphs)
     
     def _translate_chunk(self, text: str, target_lang: str, source_lang: str) -> str:
         """Translate a single chunk of text"""
