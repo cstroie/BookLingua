@@ -270,26 +270,31 @@ Text to translate:
             print(f"✓ Chapter {i+1} complete")
         
         # Finalize books
-        self._finalize_book(direct_book, direct_chapters)
-        self._finalize_book(pivot_book, pivot_chapters)
+        if direct_book:
+            self._finalize_book(direct_book, direct_chapters)
+        if pivot_book:
+            self._finalize_book(pivot_book, pivot_chapters)
         
         # Save outputs
-        direct_path = os.path.join(output_dir, "direct_translation.epub")
-        pivot_path = os.path.join(output_dir, "pivot_translation.epub")
-        comparison_path = os.path.join(output_dir, "comparison.html")
-        
         print(f"\n{'='*60}")
         print("Saving output files...")
-        epub.write_epub(direct_path, direct_book)
-        print(f"✓ Direct translation saved: {direct_path}")
         
-        epub.write_epub(pivot_path, pivot_book)
-        print(f"✓ Pivot translation saved: {pivot_path}")
+        if direct_book:
+            direct_path = os.path.join(output_dir, "direct_translation.epub")
+            epub.write_epub(direct_path, direct_book)
+            print(f"✓ Direct translation saved: {direct_path}")
         
-        comparison_html += "</body></html>"
-        with open(comparison_path, 'w', encoding='utf-8') as f:
-            f.write(comparison_html)
-        print(f"✓ Comparison document saved: {comparison_path}")
+        if pivot_book:
+            pivot_path = os.path.join(output_dir, "pivot_translation.epub")
+            epub.write_epub(pivot_path, pivot_book)
+            print(f"✓ Pivot translation saved: {pivot_path}")
+        
+        if mode == "both":
+            comparison_path = os.path.join(output_dir, "comparison.html")
+            comparison_html += "</body></html>"
+            with open(comparison_path, 'w', encoding='utf-8') as f:
+                f.write(comparison_html)
+            print(f"✓ Comparison document saved: {comparison_path}")
         
         print(f"\n{'='*60}")
         print("Translation complete! 🎉")
