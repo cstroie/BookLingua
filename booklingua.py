@@ -42,6 +42,7 @@ class EPUBTranslator:
         self.base_url = base_url or "https://api.openai.com/v1"
         self.model = model
         self.verbose = verbose
+        self.translation_context = []  # Store last 5 user-assistant pairs
         print(f"Initialized with model: {model}")
         if base_url:
             print(f"Using API endpoint: {base_url}")
@@ -248,12 +249,11 @@ class EPUBTranslator:
             if self.api_key and self.api_key != 'dummy-key':
                 headers["Authorization"] = f"Bearer {self.api_key}"
             
-            payload = {
-                "model": self.model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": f"""You are a professional translator specializing in {source_lang} to {target_lang} translation. 
+            # Build messages with context
+            messages = [
+                {
+                    "role": "system",
+                    "content": f"""You are a professional translator specializing in {source_lang} to {target_lang} translation. 
 Your task is to translate the provided text while preserving its meaning, tone, and structure.
 
 Formatting guidelines:
@@ -268,12 +268,20 @@ Translation rules:
 - Use natural, fluent {target_lang} expressions
 - Keep proper nouns, technical terms, and titles as appropriate
 - Preserve emphasis formatting (bold, italic, etc.)"""
-                    },
-                    {
-                        "role": "user",
-                        "content": text
-                    }
-                ],
+                }
+            ]
+            
+            # Add context from previous translations
+            for user_msg, assistant_msg in self.translation_context:
+                messages.append({"role": "user", "content": user_msg})
+                messages.append({"role": "assistant", "content": assistant_msg})
+            
+            # Add current text to translate
+            messages.append({"role": "user", "content": text})
+            
+            payload = {
+                "model": self.model,
+                "messages": messages,
                 "temperature": 0.3,  # Lower temperature for more consistent translations
                 "max_tokens": 8000
             }
