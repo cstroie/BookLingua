@@ -22,6 +22,7 @@ import requests
 import json
 import os
 import argparse
+import re
 from typing import List, Dict
 from datetime import datetime
 
@@ -52,27 +53,139 @@ class EPUBTranslator:
         
         for item in book.get_items():
             if item.get_type() == ebooklib.ITEM_DOCUMENT:
-                soup = BeautifulSoup(item.get_content(), 'html.parser')
-                # Extract paragraphs as separate elements
-                paragraphs = []
-                for p in soup.find_all('p'):
-                    text = p.get_text(separator='\n', strip=True)
-                    if text:  # Only include non-empty paragraphs
-                        paragraphs.append(text)
+                html_content = item.get_content()
+                soup = BeautifulSoup(html_content, 'html.parser')
                 
-                # Join paragraphs with double newlines to preserve paragraph breaks
-                text = '\n\n'.join(paragraphs)
+                # Convert HTML to Markdown
+                markdown_content = self._html_to_markdown(soup)
                 
-                if text:  # Only include non-empty chapters
+                # Extract paragraphs from Markdown
+                paragraphs = [p.strip() for p in markdown_content.split('\n\n') if p.strip()]
+                
+                if markdown_content.strip():  # Only include non-empty chapters
                     chapters.append({
                         'id': item.get_id(),
                         'name': item.get_name(),
-                        'content': text,
-                        'html': item.get_content(),
+                        'content': markdown_content,
+                        'html': html_content,
                         'paragraphs': paragraphs
                     })
         
         return chapters
+    
+    def _html_to_markdown(self, soup) -> str:
+        """Convert HTML to Markdown format"""
+        # Remove script and style elements
+        for script in soup(["script", "style"]):
+            script.decompose()
+        
+        markdown_lines = []
+        
+        # Process each element
+        for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'br']):
+            # Process inline tags within the element
+            processed_element = self._process_inline_tags(element)
+            text = processed_element.get_text(separator=' ', strip=True)
+            if not text:
+                continue
+                
+            # Add appropriate Markdown formatting
+            if element.name.startswith('h'):
+                level = int(element.name[1])
+                markdown_lines.append('#' * level + ' ' + text)
+            elif element.name == 'li':
+                markdown_lines.append('- ' + text)
+            else:
+                markdown_lines.append(text)
+        
+        # Join with double newlines for paragraph separation
+        return '\n\n'.join(markdown_lines)
+    
+    def _process_inline_tags(self, element) -> BeautifulSoup:
+        """Process inline HTML tags and convert them to Markdown-style formatting"""
+        # Create a copy to avoid modifying the original
+        element_copy = BeautifulSoup(str(element), 'html.parser')
+        
+        # Process each inline tag
+        for tag in element_copy.find_all(['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span']):
+            text = tag.get_text()
+            if not text:
+                continue
+                
+            # Replace with appropriate Markdown formatting
+            if tag.name in ['i', 'em']:
+                replacement = f'*{text}*'
+            elif tag.name in ['b', 'strong']:
+                replacement = f'**{text}**'
+            elif tag.name in ['u', 'ins']:
+                replacement = f'__{text}__'
+            elif tag.name in ['s', 'del']:
+                replacement = f'~~{text}~~'
+            elif tag.name == 'code':
+                replacement = f'`{text}`'
+            else:  # span and other tags
+                replacement = text  # Just keep the text for span and other inline tags
+            
+            # Replace the tag with formatted text
+            tag.replace_with(replacement)
+        
+        return element_copy
+    
+    def _markdown_to_html(self, markdown_text: str) -> str:
+        """Convert Markdown back to HTML"""
+        lines = markdown_text.split('\n')
+        html_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Handle headers
+            if line.startswith('###### '):
+                content = self._process_markdown_inline_formatting(line[7:])
+                html_lines.append(f'<h6>{content}</h6>')
+            elif line.startswith('##### '):
+                content = self._process_markdown_inline_formatting(line[6:])
+                html_lines.append(f'<h5>{content}</h5>')
+            elif line.startswith('#### '):
+                content = self._process_markdown_inline_formatting(line[5:])
+                html_lines.append(f'<h4>{content}</h4>')
+            elif line.startswith('### '):
+                content = self._process_markdown_inline_formatting(line[4:])
+                html_lines.append(f'<h3>{content}</h3>')
+            elif line.startswith('## '):
+                content = self._process_markdown_inline_formatting(line[3:])
+                html_lines.append(f'<h2>{content}</h2>')
+            elif line.startswith('# '):
+                content = self._process_markdown_inline_formatting(line[2:])
+                html_lines.append(f'<h1>{content}</h1>')
+            # Handle lists
+            elif line.startswith('- '):
+                content = self._process_markdown_inline_formatting(line[2:])
+                html_lines.append(f'<li>{content}</li>')
+            # Handle regular paragraphs
+            else:
+                content = self._process_markdown_inline_formatting(line)
+                html_lines.append(f'<p>{content}</p>')
+        
+        return '\n'.join(html_lines)
+    
+    def _process_markdown_inline_formatting(self, text: str) -> str:
+        """Convert Markdown inline formatting back to HTML tags"""
+        # Process formatting in order of precedence
+        # Code (highest precedence)
+        text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
+        # Strikethrough
+        text = re.sub(r'~~([^~]+)~~', r'<s>\1</s>', text)
+        # Strong/Bold
+        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+        # Emphasis/Italic
+        text = re.sub(r'\*([^*]+)\*', r'<em>\1</em>', text)
+        # Underline
+        text = re.sub(r'__([^_]+)__', r'<u>\1</u>', text)
+        
+        return text
     
     def translate_text(self, text: str, target_lang: str, source_lang: str = "English", 
                        chunk_size: int = 3000) -> str:
@@ -421,10 +534,15 @@ Text to translate:
         book.spine = ['nav'] + chapters
     
     def _text_to_html(self, text: str) -> str:
-        """Convert plain text to HTML paragraphs"""
-        paragraphs = text.split('\n\n')
-        html_paragraphs = [f'<p>{p.replace(chr(10), "<br/>")}</p>' for p in paragraphs if p.strip()]
-        return '\n'.join(html_paragraphs)
+        """Convert text to HTML paragraphs"""
+        # First try to convert from Markdown, fallback to plain text
+        if '#' in text or '- ' in text or '*' in text or '_' in text or '~' in text or '`' in text:
+            return self._markdown_to_html(text)
+        else:
+            # Plain text conversion
+            paragraphs = text.split('\n\n')
+            html_paragraphs = [f'<p>{p.replace(chr(10), "<br/>")}</p>' for p in paragraphs if p.strip()]
+            return '\n'.join(html_paragraphs)
 
 def main():
     parser = argparse.ArgumentParser(description="BookLingua - Translate EPUB books using various AI models")
