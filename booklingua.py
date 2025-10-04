@@ -178,7 +178,41 @@ class EPUBTranslator:
         return '\n\n'.join(markdown_lines)
     
     def _process_inline_tags(self, element) -> BeautifulSoup:
-        """Process inline HTML tags and convert them to Markdown-style formatting"""
+        """Process inline HTML tags and convert them to Markdown-style formatting.
+        
+        This method processes inline HTML elements within a BeautifulSoup object and
+        converts them to equivalent Markdown formatting. It handles various HTML tags
+        and CSS styling to preserve text formatting during the HTML-to-Markdown conversion.
+        
+        Args:
+            element (BeautifulSoup): BeautifulSoup element containing inline HTML tags
+            
+        Returns:
+            BeautifulSoup: Modified BeautifulSoup object with inline tags converted
+                          to Markdown-style text formatting
+            
+        Supported conversions:
+            - <i>, <em> → *italic*
+            - <b>, <strong> → **bold**
+            - <u>, <ins> → __underline__
+            - <s>, <del> → ~~strikethrough~~
+            - <code> → `monospace`
+            - <span> with CSS classes/styles → appropriate Markdown formatting
+            
+        CSS style detection:
+            - font-weight: bold → **bold**
+            - font-style: italic → *italic*
+            - text-decoration: underline → __underline__
+            - text-decoration: line-through → ~~strikethrough~~
+            - font-family: monospace/courier → `monospace`
+            
+        Example:
+            >>> html = '<p>This is <strong>bold</strong> and <em>italic</em> text</p>'
+            >>> soup = BeautifulSoup(html, 'html.parser')
+            >>> processed = translator._process_inline_tags(soup.p)
+            >>> print(processed.get_text())
+            'This is **bold** and *italic* text'
+        """
         # Create a copy to avoid modifying the original
         element_copy = BeautifulSoup(str(element), 'html.parser')
         
