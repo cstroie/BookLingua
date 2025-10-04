@@ -223,41 +223,49 @@ Text to translate:
             
             original_text = chapter['content']
             
+            direct_translation = None
+            pivot_result = None
+            
             # Direct translation
-            print("Direct translation (English → Romanian)...")
-            direct_translation = self.translate_direct(original_text)
+            if mode in ["direct", "both"]:
+                print("Direct translation (English → Romanian)...")
+                direct_translation = self.translate_direct(original_text)
             
             # Pivot translation
-            print("Pivot translation (English → French → Romanian)...")
-            pivot_result = self.translate_pivot(original_text)
+            if mode in ["pivot", "both"]:
+                print("Pivot translation (English → French → Romanian)...")
+                pivot_result = self.translate_pivot(original_text)
             
-            # Add to comparison HTML
-            comparison_html += self.create_comparison_html(
-                i + 1, 
-                original_text, 
-                direct_translation,
-                pivot_result['french'],
-                pivot_result['romanian']
-            )
+            # Add to comparison HTML (only in "both" mode)
+            if mode == "both":
+                comparison_html += self.create_comparison_html(
+                    i + 1, 
+                    original_text, 
+                    direct_translation,
+                    pivot_result['french'],
+                    pivot_result['romanian']
+                )
             
-            # Create chapters for both books
-            direct_chapter = epub.EpubHtml(
-                title=f'Chapter {i+1}',
-                file_name=f'chapter_{i+1}.xhtml',
-                lang='ro'
-            )
-            direct_chapter.content = f'<html><body>{self._text_to_html(direct_translation)}</body></html>'
-            direct_book.add_item(direct_chapter)
-            direct_chapters.append(direct_chapter)
+            # Create chapters for books
+            if direct_book and direct_translation:
+                direct_chapter = epub.EpubHtml(
+                    title=f'Chapter {i+1}',
+                    file_name=f'chapter_{i+1}.xhtml',
+                    lang='ro'
+                )
+                direct_chapter.content = f'<html><body>{self._text_to_html(direct_translation)}</body></html>'
+                direct_book.add_item(direct_chapter)
+                direct_chapters.append(direct_chapter)
             
-            pivot_chapter = epub.EpubHtml(
-                title=f'Chapter {i+1}',
-                file_name=f'chapter_{i+1}.xhtml',
-                lang='ro'
-            )
-            pivot_chapter.content = f'<html><body>{self._text_to_html(pivot_result["romanian"])}</body></html>'
-            pivot_book.add_item(pivot_chapter)
-            pivot_chapters.append(pivot_chapter)
+            if pivot_book and pivot_result:
+                pivot_chapter = epub.EpubHtml(
+                    title=f'Chapter {i+1}',
+                    file_name=f'chapter_{i+1}.xhtml',
+                    lang='ro'
+                )
+                pivot_chapter.content = f'<html><body>{self._text_to_html(pivot_result["romanian"])}</body></html>'
+                pivot_book.add_item(pivot_chapter)
+                pivot_chapters.append(pivot_chapter)
             
             print(f"✓ Chapter {i+1} complete")
         
