@@ -147,19 +147,36 @@ Text to translate:
         """
         return html
     
-    def translate_epub_with_comparison(self, input_path: str, output_dir: str = "output"):
-        """Translate EPUB using both methods and create comparison"""
+    def translate_epub_with_comparison(self, input_path: str, output_dir: str = "output", 
+                                       mode: str = "both"):
+        """
+        Translate EPUB using direct, pivot, or both methods
+        
+        Args:
+            input_path: Path to input EPUB file
+            output_dir: Directory for output files
+            mode: "direct", "pivot", or "both" (default: "both")
+        """
+        if mode not in ["direct", "pivot", "both"]:
+            raise ValueError("mode must be 'direct', 'pivot', or 'both'")
+        
         os.makedirs(output_dir, exist_ok=True)
         
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path)
         chapters = self.extract_text_from_epub(input_path)
         
-        print(f"Found {len(chapters)} chapters to translate\n")
+        print(f"Found {len(chapters)} chapters to translate")
+        print(f"Translation mode: {mode.upper()}\n")
         
-        # Prepare output books
-        direct_book = self._create_book_template(book, "Direct Translation")
-        pivot_book = self._create_book_template(book, "Pivot Translation")
+        # Prepare output books based on mode
+        direct_book = None
+        pivot_book = None
+        
+        if mode in ["direct", "both"]:
+            direct_book = self._create_book_template(book, "Direct Translation")
+        if mode in ["pivot", "both"]:
+            pivot_book = self._create_book_template(book, "Pivot Translation")
         
         # HTML comparison document
         comparison_html = """
