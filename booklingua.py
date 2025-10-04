@@ -77,7 +77,28 @@ class EPUBTranslator:
             print(f"Using API endpoint: {base_url}")
     
     def extract_text_from_epub(self, epub_path: str) -> List[dict]:
-        """Extract text content from EPUB file"""
+        """Extract text content from EPUB file and convert to structured format.
+        
+        This method reads an EPUB file, extracts all document items (HTML content),
+        converts them to Markdown format, and structures the data for translation.
+        
+        Args:
+            epub_path (str): Path to the input EPUB file
+            
+        Returns:
+            List[dict]: A list of chapter dictionaries, each containing:
+                - id (str): Chapter identifier from EPUB
+                - name (str): Chapter name/filename
+                - content (str): Full chapter content in Markdown format
+                - html (str): Original HTML content
+                - paragraphs (List[str]): Individual paragraphs extracted from content
+                
+        Example:
+            >>> translator = EPUBTranslator()
+            >>> chapters = translator.extract_text_from_epub("book.epub")
+            >>> print(f"Found {len(chapters)} chapters")
+            >>> print(f"First chapter title: {chapters[0]['name']}")
+        """
         book = epub.read_epub(epub_path)
         chapters = []
         
