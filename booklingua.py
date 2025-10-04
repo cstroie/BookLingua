@@ -991,7 +991,33 @@ Translation rules:
         print(f"{'='*60}")
     
     def _create_book_template(self, original_book, method_name: str):
-        """Create a new EPUB book with metadata from original"""
+        """Create a new EPUB book template with metadata copied from original book.
+        
+        This method creates a new EPUB book object and copies essential metadata
+        from the original book, then modifies the title to indicate the translation
+        method used. This ensures the translated book maintains the original's
+        identifying information while clearly showing it's been translated.
+        
+        Args:
+            original_book: The original EPUB book object (ebooklib.epub.EpubBook)
+            method_name (str): Description of the translation method to include
+                in the new book title (e.g., "Direct Translation", "Pivot Translation")
+                
+        Returns:
+            epub.EpubBook: A new EPUB book object with copied metadata and modified title
+            
+        Metadata copied:
+            - Identifier: Preserved from original book
+            - Title: Modified to include translation method (e.g., "Original Title (Română - Direct Translation)")
+            - Language: Set to target language code ('ro' for Romanian)
+            - Authors: Copied from original book's creator metadata
+            
+        Example:
+            >>> original_book = epub.read_epub("book.epub")
+            >>> new_book = translator._create_book_template(original_book, "Direct Translation")
+            >>> print(new_book.get_title())
+            'Original Title (Română - Direct Translation)'
+        """
         new_book = epub.EpubBook()
         new_book.set_identifier(original_book.get_metadata('DC', 'identifier')[0][0])
         
