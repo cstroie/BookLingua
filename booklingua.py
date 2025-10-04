@@ -253,7 +253,7 @@ class EPUBTranslator:
             messages = [
                 {
                     "role": "system",
-                    "content": f"""You are a professional translator specializing in {source_lang.upper()} to {target_lang.upper()} translation. 
+                    "content": f"""/no_think You are a professional translator specializing in {source_lang.upper()} to {target_lang.upper()} translation. 
 Your task is to translate the provided text while preserving its meaning, tone, and structure.
 
 CRITICAL INSTRUCTIONS:
