@@ -265,9 +265,7 @@ Text to translate:
             
             if self.verbose:
                 print(f"\n--- Translating chunk ---")
-                print(f"Source language: {source_lang}")
-                print(f"Target language: {target_lang}")
-                print(f"Text to translate:\n{text}\n")
+                print(f"ENGLISH: {text}\n")
             
             response = requests.post(
                 f"{self.base_url}/chat/completions",
@@ -286,7 +284,7 @@ Text to translate:
             translation = re.sub(r'<think>.*?</think>', '', translation, flags=re.DOTALL).strip()
             
             if self.verbose:
-                print(f"Translation:\n{translation}\n")
+                print(f"ROMANIAN: {translation}\n")
                 print("--- End of chunk translation ---\n")
             
             return translation
