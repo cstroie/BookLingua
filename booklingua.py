@@ -565,12 +565,85 @@ Translation rules:
             raise
     
     def translate_direct(self, text: str, source_lang: str = "English", target_lang: str = "Romanian") -> str:
-        """Direct translation from source to target language"""
+        """Direct translation from source to target language using AI models.
+        
+        This method performs a direct translation of text from the source language
+        to the target language in a single step. It uses the configured AI model
+        and maintains translation context for consistency.
+        
+        Args:
+            text (str): The text content to translate
+            source_lang (str, optional): Source language code. Defaults to "English"
+            target_lang (str, optional): Target language code. Defaults to "Romanian"
+            
+        Returns:
+            str: Translated text in the target language, preserving original
+                 formatting, structure, and paragraph breaks.
+                 
+        Translation process:
+            - Uses OpenAI-compatible API for translation
+            - Maintains translation context for consistency across multiple calls
+            - Handles both single paragraphs and longer documents
+            - Preserves Markdown formatting and document structure
+            - Uses temperature=0.3 for consistent, accurate translations
+            
+        Example:
+            >>> translator = EPUBTranslator()
+            >>> result = translator.translate_direct(
+            ...     "Hello, how are you?",
+            ...     source_lang="English",
+            ...     target_lang="Romanian"
+            ... )
+            >>> print(result)
+            'Salut, cum ești?'
+        """
         return self.translate_text(text, target_lang, source_lang)
     
     def translate_pivot(self, text: str, source_lang: str = "English", pivot_lang: str = "French", 
                        target_lang: str = "Romanian") -> Dict[str, str]:
-        """Pivot translation: source -> pivot -> target"""
+        """Pivot translation from source to target language via intermediate language.
+        
+        This method performs a two-step translation process where text is first
+        translated from the source language to an intermediate (pivot) language,
+        then from the pivot language to the final target language. This approach
+        can sometimes improve translation quality for certain language pairs.
+        
+        Args:
+            text (str): The text content to translate
+            source_lang (str, optional): Source language code. Defaults to "English"
+            pivot_lang (str, optional): Intermediate language code. Defaults to "French"
+            target_lang (str, optional): Target language code. Defaults to "Romanian"
+            
+        Returns:
+            Dict[str, str]: A dictionary containing:
+                - 'intermediate': Text translated to pivot language
+                - 'final': Text translated from pivot to target language
+                
+        Translation process:
+            - Step 1: Translate source → pivot language
+            - Step 2: Translate pivot → target language
+            - Maintains separate translation contexts for each language pair
+            - Preserves formatting and document structure in both steps
+            - Uses temperature=0.3 for consistent translations
+            
+        Use cases:
+            - When direct translation quality is poor for certain language pairs
+            - When the AI model performs better with specific intermediate languages
+            - For testing different translation approaches and comparing results
+            
+        Example:
+            >>> translator = EPUBTranslator()
+            >>> result = translator.translate_pivot(
+            ...     "Hello, how are you?",
+            ...     source_lang="English",
+            ...     pivot_lang="French",
+            ...     target_lang="Romanian"
+            ... )
+            >>> print(result['intermediate'])
+            'Bonjour, comment allez-vous?'
+            >>> print(result['final'])
+            'Salut, cum ești?'
+        """
         print(f"  - Translating to {pivot_lang.upper()}...")
         intermediate = self.translate_text(text, pivot_lang, source_lang)
         print(f"  - Translating {pivot_lang.upper()} to {target_lang.upper()}...")
