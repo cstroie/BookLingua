@@ -23,17 +23,18 @@ import json
 import os
 import argparse
 import re
-from typing import List, Dict
+import sqlite3
+from typing import List, Dict, Optional
 from datetime import datetime
 
 class EPUBTranslator:
-    def __init__(self, api_key: str = None, base_url: str = None, model: str = "gpt-4o", verbose: bool = False):
+    def __init__(self, api_key: str = None, base_url: str = None, model: str = "gpt-4o", verbose: bool = False, epub_path: str = None):
         """
         Initialize the EPUBTranslator with an OpenAI-compatible API.
         
         This class provides functionality to translate EPUB books using various AI models
         through OpenAI-compatible APIs. It supports both direct translation and pivot
-        translation through an intermediate language.
+        translation through an intermediate language, with database caching for reliability.
         
         Args:
             api_key (str, optional): API key for the translation service. 
@@ -50,6 +51,8 @@ class EPUBTranslator:
                 Defaults to "gpt-4o".
             verbose (bool, optional): Whether to print detailed progress information
                 during translation. Defaults to False.
+            epub_path (str, optional): Path to the EPUB file. Used to determine the
+                database name for caching translations.
                 
         Attributes:
             api_key (str): The API key used for authentication
@@ -58,13 +61,16 @@ class EPUBTranslator:
             verbose (bool): Whether verbose output is enabled
             translation_contexts (dict): Cache for translation contexts to maintain
                 consistency across multiple translations
+            db_path (str): Path to the SQLite database file
+            conn (sqlite3.Connection): Database connection
                 
         Example:
             >>> translator = EPUBTranslator(
             ...     api_key="your-api-key",
             ...     base_url="https://api.openai.com/v1",
             ...     model="gpt-4o",
-            ...     verbose=True
+            ...     verbose=True,
+            ...     epub_path="book.epub"
             ... )
         """
         self.api_key = api_key or os.environ.get('OPENAI_API_KEY', 'dummy-key')
@@ -72,9 +78,20 @@ class EPUBTranslator:
         self.model = model
         self.verbose = verbose
         self.translation_contexts = {}  # Store contexts for different language pairs
+        
+        # Initialize database
+        self.epub_path = epub_path
+        self.db_path = None
+        self.conn = None
+        if epub_path:
+            self.db_path = os.path.splitext(epub_path)[0] + '.db'
+            self._init_database()
+        
         print(f"Initialized with model: {model}")
         if base_url:
             print(f"Using API endpoint: {base_url}")
+        if self.db_path:
+            print(f"Using database: {self.db_path}")
     
     def extract_text_from_epub(self, epub_path: str) -> List[dict]:
         """Extract text content from EPUB file and convert to structured format.
@@ -434,11 +451,84 @@ class EPUBTranslator:
         
         return '\n\n'.join(translated_paragraphs)
     
+    def _init_database(self):
+        """Initialize the SQLite database for storing translations."""
+        try:
+            self.conn = sqlite3.connect(self.db_path)
+            self.conn.execute('''
+                CREATE TABLE IF NOT EXISTS translations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_lang TEXT NOT NULL,
+                    target_lang TEXT NOT NULL,
+                    source_text TEXT NOT NULL,
+                    translated_text TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(source_lang, target_lang, source_text, model)
+                )
+            ''')
+            self.conn.commit()
+        except Exception as e:
+            print(f"Warning: Could not initialize database: {e}")
+            self.conn = None
+    
+    def _get_translation_from_db(self, text: str, source_lang: str, target_lang: str) -> Optional[str]:
+        """Check if a translation exists in the database.
+        
+        Args:
+            text (str): Source text to look up
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            str: Cached translation if found, None otherwise
+        """
+        if not self.conn:
+            return None
+            
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT translated_text FROM translations 
+                WHERE source_lang = ? AND target_lang = ? AND source_text = ?
+            ''', (source_lang, target_lang, text))
+            result = cursor.fetchone()
+            return result[0] if result else None
+        except Exception as e:
+            if self.verbose:
+                print(f"Database lookup failed: {e}")
+            return None
+    
+    def _save_translation_to_db(self, text: str, translation: str, source_lang: str, target_lang: str):
+        """Save a translation to the database.
+        
+        Args:
+            text (str): Source text
+            translation (str): Translated text
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+        """
+        if not self.conn:
+            return
+            
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                INSERT OR REPLACE INTO translations 
+                (source_lang, target_lang, source_text, translated_text, model)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (source_lang, target_lang, text, translation, self.model))
+            self.conn.commit()
+        except Exception as e:
+            if self.verbose:
+                print(f"Database save failed: {e}")
+    
     def _translate_chunk(self, text: str, source_lang: str, target_lang: str) -> str:
-        """Translate a single chunk of text using OpenAI-compatible API.
+        """Translate a single chunk of text using OpenAI-compatible API with database caching.
         
         This method handles the actual API call to translate a chunk of text
-        from the source language to the target language. It manages the API
+        from the source language to the target language. It first checks the database
+        for existing translations, then makes the API call if needed. It manages the API
         request, error handling, and maintains translation context for consistency.
         
         Args:
@@ -448,6 +538,12 @@ class EPUBTranslator:
             
         Returns:
             str: Translated text in the target language
+            
+        Database Caching:
+            - First checks database for existing translation
+            - If found, returns cached translation
+            - If not found, translates via API and stores result
+            - Handles database connection failures gracefully
             
         API Configuration:
             - Uses OpenAI-compatible chat completions endpoint
@@ -471,7 +567,7 @@ class EPUBTranslator:
             - Processes all text as content to be translated
             
         Example:
-            >>> translator = EPUBTranslator()
+            >>> translator = EPUBTranslator(epub_path="book.epub")
             >>> result = translator._translate_chunk(
             ...     "Hello, how are you?",
             ...     "English",
@@ -480,6 +576,13 @@ class EPUBTranslator:
             >>> print(result)
             'Salut, cum ești?'
         """
+        # Check database first
+        cached_translation = self._get_translation_from_db(text, source_lang, target_lang)
+        if cached_translation:
+            if self.verbose:
+                print("✓ Using cached translation")
+            return cached_translation
+
         try:
             headers = {
                 "Content-Type": "application/json"
@@ -534,7 +637,9 @@ Translation rules:
                 "model": self.model,
                 "messages": messages,
                 "temperature": 0.5,  # Balanced temperature for creativity and consistency
-                "max_tokens": 4096
+                "max_tokens": 4096,
+                "keep_alive": "30m",
+                "stream": False
             }
             
             response = requests.post(
@@ -552,6 +657,9 @@ Translation rules:
             # Remove any text between <think> and </think> tags
             import re
             translation = re.sub(r'<think>.*?</think>', '', translation, flags=re.DOTALL).strip()
+
+            # Save to database
+            self._save_translation_to_db(text, translation, source_lang, target_lang)
 
             # Update translation context for this language pair
             self.translation_contexts[context_key].append((text, translation))
@@ -783,6 +891,7 @@ Translation rules:
             - Supports paragraph-level translation for better quality
             - Uses temperature=0.5 for balanced creativity and accuracy
             - Verbose progress reporting when enabled
+            - Database caching for reliability and resume capability
             
         Example:
             >>> translator = EPUBTranslator()
@@ -797,6 +906,11 @@ Translation rules:
             # Creates: translations/pivot_translation.epub  
             # Creates: translations/comparison.html
         """
+        # Update database path if not set during initialization
+        if not self.db_path and input_path:
+            self.db_path = os.path.splitext(input_path)[0] + '.db'
+            self._init_database()
+
         if mode not in ["direct", "pivot", "both"]:
             raise ValueError("mode must be 'direct', 'pivot', or 'both'")
         
@@ -1183,11 +1297,13 @@ def main():
         - Verbose progress reporting
         - Environment variable support for API keys
         - Preset configurations for common services
+        - Database caching for reliability and resume capability
         
     Output:
         - direct_translation.epub: Direct translation result
         - pivot_translation.epub: Pivot translation result  
         - comparison.html: Side-by-side comparison document
+        - book.db: SQLite database with all translations (same name as EPUB)
     """
     parser = argparse.ArgumentParser(description="BookLingua - Translate EPUB books using various AI models")
     parser.add_argument("input", help="Input EPUB file path")
@@ -1258,7 +1374,8 @@ def main():
         api_key=api_key,
         base_url=base_url,
         model=model,
-        verbose=args.verbose
+        verbose=args.verbose,
+        epub_path=args.input
     )
     
     # Run translation

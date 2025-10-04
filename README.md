@@ -133,8 +133,50 @@ python booklingua.py input.epub \
 
 Adjust parameters in the code:
 - `chunk_size`: Max characters per request (default: 3000)
-- `temperature`: Translation randomness (default: 0.3)
-- `max_tokens`: Max tokens per response (default: 8000)
+- `temperature`: Translation randomness (default: 0.5)
+- `max_tokens`: Max tokens per response (default: 4096)
+
+### Database Caching
+
+BookLingua uses SQLite database caching to improve reliability and performance:
+
+- **Database Location**: Creates a `.db` file with the same name as your input EPUB (e.g., `book.epub` → `book.db`)
+- **Caching Strategy**: Stores all translations with source language, target language, and source text as unique keys
+- **Benefits**: 
+  - Resume interrupted translations
+  - Avoid re-translating identical content
+  - Faster subsequent translations of the same content
+- **Automatic**: Enabled by default when an EPUB path is provided
+- **Persistence**: Database remains after translation for future use
+
+### Context Length Management
+
+The tool manages translation context to maintain consistency:
+
+- **Context Window**: Maintains the last 10 translation exchanges for each language pair
+- **Context Key Format**: `{source_lang}_{target_lang}` (e.g., "english_romanian")
+- **Benefits**: 
+  - Consistent terminology across chapters
+  - Better handling of repeated phrases
+  - Improved coherence in long documents
+- **Per-Language Pair**: Separate context for each translation combination
+- **Automatic**: Context is built incrementally during translation
+
+### Temperature Control
+
+Temperature controls the randomness/creativity of AI translations:
+
+- **Default Value**: 0.5 (balanced between creativity and consistency)
+- **Range**: 0.0 to 1.0
+- **Effects**:
+  - **Low (0.0-0.3)**: More deterministic, factual translations
+  - **Medium (0.4-0.6)**: Balanced creativity and accuracy (default)
+  - **High (0.7-1.0)**: More creative, varied translations
+- **Use Cases**:
+  - Technical content: Lower temperature for precision
+  - Literary content: Higher temperature for natural flow
+  - Consistency needs: Lower temperature
+- **Adjustment**: Modify the `temperature` parameter in the `_translate_chunk` method
 
 ## License
 
