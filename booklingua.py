@@ -657,7 +657,54 @@ Translation rules:
                               direct: str, pivot_intermediate: str, pivot_final: str,
                               source_lang: str = "English", pivot_lang: str = "French", 
                               target_lang: str = "Romanian") -> str:
-        """Create HTML comparison of translations"""
+        """Create HTML comparison of translations for side-by-side analysis.
+        
+        This method generates an HTML section that displays the original text,
+        direct translation, and pivot translation (both intermediate and final)
+        in a formatted comparison layout. This is useful for analyzing the
+        differences between translation methods.
+        
+        Args:
+            chapter_num (int): Chapter number for display purposes
+            original (str): Original text in the source language
+            direct (str): Text translated directly from source to target language
+            pivot_intermediate (str): Text translated from source to pivot language
+            pivot_final (str): Text translated from pivot to target language
+            source_lang (str, optional): Source language name. Defaults to "English"
+            pivot_lang (str, optional): Pivot language name. Defaults to "French"
+            target_lang (str, optional): Target language name. Defaults to "Romanian"
+            
+        Returns:
+            str: HTML formatted comparison section with CSS styling
+            
+        HTML Structure:
+            - Container div with class "chapter-comparison"
+            - Chapter title header
+            - Four translation blocks with distinct styling:
+              * Original text (neutral styling)
+              * Direct translation (green accent)
+              * Pivot intermediate (blue accent)
+              * Pivot final (red accent)
+            - Horizontal separator between chapters
+            
+        Styling Features:
+            - Responsive layout with proper spacing
+            - Color-coded translation blocks for easy identification
+            - Line break conversion for proper text display
+            - Professional typography and visual hierarchy
+            
+        Example:
+            >>> translator = EPUBTranslator()
+            >>> html = translator.create_comparison_html(
+            ...     chapter_num=1,
+            ...     original="Hello world",
+            ...     direct="Salut lume",
+            ...     pivot_intermediate="Bonjour monde",
+            ...     pivot_final="Salut lume"
+            ... )
+            >>> print(html[:100])  # First 100 characters
+            '<div class="chapter-comparison"><h2>Chapter 1 Comparison</h2><div class="translation-block">'
+        """
         html = f"""
         <div class="chapter-comparison">
             <h2>Chapter {chapter_num} Comparison</h2>
