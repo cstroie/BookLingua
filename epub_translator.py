@@ -178,37 +178,39 @@ Text to translate:
         if mode in ["pivot", "both"]:
             pivot_book = self._create_book_template(book, "Pivot Translation")
         
-        # HTML comparison document
-        comparison_html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>Translation Comparison</title>
-            <style>
-                body { font-family: Georgia, serif; line-height: 1.6; max-width: 1400px; margin: 0 auto; padding: 20px; }
-                h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-                h3 { color: #34495e; margin-top: 20px; }
-                .chapter-comparison { margin-bottom: 50px; }
-                .translation-block { margin: 20px 0; padding: 15px; border-radius: 5px; }
-                .translation-block h3 { margin-top: 0; }
-                .text-content { background: #f8f9fa; padding: 15px; border-left: 4px solid #ccc; }
-                .direct { border-left-color: #27ae60; }
-                .french { border-left-color: #3498db; }
-                .pivot { border-left-color: #e74c3c; }
-                hr { margin: 40px 0; border: none; border-top: 2px dashed #ccc; }
-            </style>
-        </head>
-        <body>
-            <h1>English to Romanian Translation Comparison</h1>
-            <p><strong>Generated:</strong> """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + """</p>
-            <p><strong>Model:</strong> """ + self.model + """</p>
-            <p><strong>Method Comparison:</strong></p>
-            <ul>
-                <li><span style="color: #27ae60;">●</span> <strong>Direct:</strong> English → Romanian (single step)</li>
-                <li><span style="color: #e74c3c;">●</span> <strong>Pivot:</strong> English → French → Romanian (two steps)</li>
-            </ul>
-        """
+        # HTML comparison document (only for "both" mode)
+        comparison_html = None
+        if mode == "both":
+            comparison_html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Translation Comparison</title>
+                <style>
+                    body { font-family: Georgia, serif; line-height: 1.6; max-width: 1400px; margin: 0 auto; padding: 20px; }
+                    h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+                    h3 { color: #34495e; margin-top: 20px; }
+                    .chapter-comparison { margin-bottom: 50px; }
+                    .translation-block { margin: 20px 0; padding: 15px; border-radius: 5px; }
+                    .translation-block h3 { margin-top: 0; }
+                    .text-content { background: #f8f9fa; padding: 15px; border-left: 4px solid #ccc; }
+                    .direct { border-left-color: #27ae60; }
+                    .french { border-left-color: #3498db; }
+                    .pivot { border-left-color: #e74c3c; }
+                    hr { margin: 40px 0; border: none; border-top: 2px dashed #ccc; }
+                </style>
+            </head>
+            <body>
+                <h1>English to Romanian Translation Comparison</h1>
+                <p><strong>Generated:</strong> """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + """</p>
+                <p><strong>Model:</strong> """ + self.model + """</p>
+                <p><strong>Method Comparison:</strong></p>
+                <ul>
+                    <li><span style="color: #27ae60;">●</span> <strong>Direct:</strong> English → Romanian (single step)</li>
+                    <li><span style="color: #e74c3c;">●</span> <strong>Pivot:</strong> English → French → Romanian (two steps)</li>
+                </ul>
+            """
         
         direct_chapters = []
         pivot_chapters = []
