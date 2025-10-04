@@ -1,4 +1,4 @@
-#!/usr/bun/env python
+#!/usr/bin/env python
 #import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
