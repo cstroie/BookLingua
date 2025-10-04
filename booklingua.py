@@ -253,7 +253,7 @@ class EPUBTranslator:
             messages = [
                 {
                     "role": "system",
-                    "content": f"""You are a professional translator specializing in {source_lang.upper()} to {target_lang.upper()} translation. 
+                    "content": f"""/no_think You are a professional translator specializing in {source_lang.upper()} to {target_lang.upper()} translation. 
 Your task is to translate the provided text while preserving its meaning, tone, and structure.
 
 Formatting guidelines:
@@ -287,7 +287,6 @@ Translation rules:
             }
             
             if self.verbose:
-                print(f"\n--- Translating chunk ---")
                 print(f"{source_lang.upper()}: {text}\n")
             
             response = requests.post(
@@ -314,7 +313,6 @@ Translation rules:
 
             if self.verbose:
                 print(f"{target_lang.upper()}: {translation}\n")
-                print("--- End of chunk translation ---\n")
             
             return translation
         except Exception as e:
