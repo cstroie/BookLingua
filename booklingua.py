@@ -305,7 +305,13 @@ Translation rules:
             # Remove any text between <think> and </think> tags
             import re
             translation = re.sub(r'<think>.*?</think>', '', translation, flags=re.DOTALL).strip()
-            
+
+            # Update translation context with this exchange
+            self.translation_context.append((text, translation))
+            # Keep only the last 5 exchanges
+            if len(self.translation_context) > 5:
+                self.translation_context.pop(0)
+
             if self.verbose:
                 print(f"ROMANIAN: {translation}\n")
                 print("--- End of chunk translation ---\n")
