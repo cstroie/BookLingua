@@ -141,6 +141,10 @@ Text to translate:
             result = response.json()
             translation = result["choices"][0]["message"]["content"].strip()
             
+            # Remove any text between <think> and </think> tags
+            import re
+            translation = re.sub(r'<think>.*?</think>', '', translation, flags=re.DOTALL).strip()
+            
             if self.verbose:
                 print(f"Translation:\n{translation}\n")
                 print("--- End of chunk translation ---\n")
