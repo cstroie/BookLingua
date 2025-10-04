@@ -269,7 +269,36 @@ class EPUBTranslator:
         return element_copy
     
     def _markdown_to_html(self, markdown_text: str) -> str:
-        """Convert Markdown back to HTML"""
+        """Convert Markdown text back to HTML format.
+        
+        This method converts Markdown-formatted text back to HTML tags, preserving
+        the document structure and inline formatting. It handles various Markdown
+        elements including headers, lists, and inline formatting.
+        
+        Args:
+            markdown_text (str): Markdown-formatted text to convert
+            
+        Returns:
+            str: HTML formatted text with appropriate tags
+            
+        Supported conversions:
+            - Headers (# ## ### etc.) → <h1>, <h2>, <h3> etc.
+            - Bullet lists (- item) → <li> items
+            - Paragraphs → <p> tags
+            - Inline formatting (**bold**, *italic*, __underline__, ~~strikethrough~, `code`) → HTML tags
+            
+        Processing details:
+            - Handles line-by-line conversion
+            - Preserves paragraph breaks with <p> tags
+            - Processes inline formatting after structural elements
+            - Maintains original text content while adding HTML markup
+            
+        Example:
+            >>> markdown = "# Title\\n\\nThis is **bold** text"
+            >>> html = translator._markdown_to_html(markdown)
+            >>> print(html)
+            '<h1>Title</h1>\\n\\n<p>This is <strong>bold</strong> text</p>'
+        """
         lines = markdown_text.split('\n')
         html_lines = []
         
