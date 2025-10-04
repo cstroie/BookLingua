@@ -123,8 +123,35 @@ class EPUBTranslator:
                 replacement = f'~~{text}~~'
             elif tag.name == 'code':
                 replacement = f'`{text}`'
-            else:  # span and other tags
-                replacement = text  # Just keep the text for span and other inline tags
+            elif tag.name == 'span':
+                # Check for styling that mimics other tags
+                style = tag.get('style', '').lower()
+                css_class = tag.get('class', [])
+                if isinstance(css_class, list):
+                    css_class = ' '.join(css_class).lower()
+                else:
+                    css_class = css_class.lower()
+                
+                # Check for bold styling
+                if ('font-weight' in style and 'bold' in style) or any(cls in css_class for cls in ['bold', 'strong']):
+                    replacement = f'**{text}**'
+                # Check for italic styling
+                elif ('font-style' in style and 'italic' in style) or any(cls in css_class for cls in ['italic', 'em']):
+                    replacement = f'*{text}*'
+                # Check for underline styling
+                elif ('text-decoration' in style and 'underline' in style) or any(cls in css_class for cls in ['underline']):
+                    replacement = f'__{text}__'
+                # Check for strikethrough styling
+                elif ('text-decoration' in style and 'line-through' in style) or any(cls in css_class for cls in ['strikethrough', 'line-through']):
+                    replacement = f'~~{text}~~'
+                # Check for monospace styling
+                elif ('font-family' in style and ('monospace' in style or 'courier' in style)) or any(cls in css_class for cls in ['code', 'monospace']):
+                    replacement = f'`{text}`'
+                else:
+                    # Default to plain text for other spans
+                    replacement = text
+            else:  # other tags
+                replacement = text
             
             # Replace the tag with formatted text
             tag.replace_with(replacement)
