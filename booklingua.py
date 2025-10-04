@@ -1031,7 +1031,34 @@ Translation rules:
         return new_book
     
     def _finalize_book(self, book, chapters):
-        """Add navigation and finalize book structure"""
+        """Add navigation elements and finalize EPUB book structure.
+        
+        This method completes the EPUB book by adding essential navigation components
+        and setting up the table of contents and spine structure. This ensures the
+        generated EPUB file is properly formatted and compatible with e-readers.
+        
+        Args:
+            book (epub.EpubBook): The EPUB book object to finalize
+            chapters (List[epub.EpubHtml]): List of chapter objects to include in navigation
+            
+        Navigation Components Added:
+            - Table of Contents (TOC): Sets up hierarchical navigation structure
+            - NCX (Navigation Control XML): Required EPUB navigation file
+            - Navigation Document: HTML-based navigation for e-readers
+            - Spine: Defines the reading order and includes all content
+            
+        Structure Setup:
+            - book.toc: Sets the table of contents using the provided chapters
+            - book.spine: Defines reading order starting with navigation, then chapters
+            - Adds required navigation items (NCX and Nav documents)
+            
+        Example:
+            >>> book = epub.EpubBook()
+            >>> chapters = [epub.EpubHtml(title='Chapter 1'), epub.EpubHtml(title='Chapter 2')]
+            >>> translator._finalize_book(book, chapters)
+            >>> print(book.spine)
+            ['nav', <EpubHtml: 'Chapter 1'>, <EpubHtml: 'Chapter 2'>]
+        """
         book.toc = tuple(chapters)
         book.add_item(epub.EpubNcx())
         book.add_item(epub.EpubNav())
