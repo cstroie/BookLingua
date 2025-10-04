@@ -1117,6 +1117,76 @@ Translation rules:
             return '\n'.join(html_paragraphs)
 
 def main():
+    """Command-line interface for BookLingua EPUB translation tool.
+    
+    This function provides a comprehensive command-line interface for translating
+    EPUB books using various AI models and translation methods. It supports multiple
+    AI providers, translation modes, and configuration options.
+    
+    Command-line Arguments:
+        input (str): Path to the input EPUB file (required)
+        -o, --output (str): Output directory for translated files (default: "output")
+        -M, --mode (str): Translation mode - "direct", "pivot", or "both" (default: "direct")
+        -v, --verbose: Enable detailed progress output during translation
+        -s, --source-lang (str): Source language code (default: "English")
+        -p, --pivot-lang (str): Intermediate language for pivot translation (default: "French")
+        -t, --target-lang (str): Target language code (default: "Romanian")
+        -u, --base-url (str): Custom API endpoint URL
+        -m, --model (str): AI model name to use for translation
+        -k, --api-key (str): API key for authentication
+        
+    Preset Configurations:
+        --openai: Use OpenAI API (https://api.openai.com/v1)
+        --ollama: Use Ollama local server (http://localhost:11434/v1)
+        --mistral: Use Mistral AI API (https://api.mistral.ai/v1)
+        --deepseek: Use DeepSeek API (https://api.deepseek.com/v1)
+        --lmstudio: Use LM Studio local server (http://localhost:1234/v1)
+        --together: Use Together AI API (https://api.together.xyz/v1)
+        --openrouter: Use OpenRouter AI API (https://openrouter.ai/api/v1)
+        
+    Environment Variables:
+        OPENAI_API_KEY: Default API key if not provided via command line
+        MISTRAL_API_KEY: API key for Mistral AI preset
+        DEEPSEEK_API_KEY: API key for DeepSeek preset
+        TOGETHER_API_KEY: API key for Together AI preset
+        OPENROUTER_API_KEY: API key for OpenRouter preset
+        
+    Usage Examples:
+        # Basic direct translation
+        python booklingua.py book.epub
+        
+        # Direct translation with custom languages
+        python booklingua.py book.epub -s English -t Spanish -v
+        
+        # Pivot translation with French as intermediate language
+        python booklingua.py book.epub -M pivot -p French
+        
+        # Both methods with comparison output
+        python booklingua.py book.epub -M both -o translations
+        
+        # Using OpenAI API with custom model
+        python booklingua.py book.epub --openai -m gpt-4-turbo
+        
+        # Using Ollama local server
+        python booklingua.py book.epub --ollama -m qwen2.5:72b
+        
+        # Using custom API endpoint
+        python booklingua.py book.epub -u https://api.example.com/v1 -k your-api-key
+        
+    Features:
+        - Supports multiple AI providers and models
+        - Direct and pivot translation modes
+        - Comparison mode for analyzing translation quality
+        - Preserves EPUB structure and formatting
+        - Verbose progress reporting
+        - Environment variable support for API keys
+        - Preset configurations for common services
+        
+    Output:
+        - direct_translation.epub: Direct translation result
+        - pivot_translation.epub: Pivot translation result  
+        - comparison.html: Side-by-side comparison document
+    """
     parser = argparse.ArgumentParser(description="BookLingua - Translate EPUB books using various AI models")
     parser.add_argument("input", help="Input EPUB file path")
     parser.add_argument("-o", "--output", default="output", help="Output directory (default: output)")
