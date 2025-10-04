@@ -736,16 +736,65 @@ Translation rules:
     def translate_epub_with_comparison(self, input_path: str, output_dir: str = "output", 
                                        mode: str = "both", source_lang: str = "English",
                                        pivot_lang: str = "French", target_lang: str = "Romanian"):
-        """
-        Translate EPUB using direct, pivot, or both methods
+        """Translate EPUB books using direct, pivot, or both translation methods with comparison output.
+        
+        This method provides a comprehensive translation workflow for EPUB books,
+        supporting three translation modes: direct translation, pivot translation,
+        or both with side-by-side comparison. It processes each chapter individually,
+        preserves document structure, and generates multiple output formats.
         
         Args:
-            input_path: Path to input EPUB file
-            output_dir: Directory for output files
-            mode: "direct", "pivot", or "both" (default: "both")
-            source_lang: Source language (default: "English")
-            pivot_lang: Intermediate language for pivot translation (default: "French")
-            target_lang: Target language (default: "Romanian")
+            input_path (str): Path to the input EPUB file to be translated
+            output_dir (str, optional): Directory where output files will be saved.
+                Defaults to "output". The directory will be created if it doesn't exist.
+            mode (str, optional): Translation mode to use. Options:
+                - "direct": Single-step translation from source to target language
+                - "pivot": Two-step translation via intermediate language
+                - "both": Both methods with comparison output
+                Defaults to "both".
+            source_lang (str, optional): Source language code. Defaults to "English".
+            pivot_lang (str, optional): Intermediate language code for pivot translation.
+                Defaults to "French".
+            target_lang (str, optional): Target language code. Defaults to "Romanian".
+                
+        Returns:
+            None: Results are saved to files in the specified output directory.
+                
+        Output Files:
+            - direct_translation.epub: EPUB with direct translation (if mode includes direct)
+            - pivot_translation.epub: EPUB with pivot translation (if mode includes pivot)
+            - comparison.html: HTML comparison document (if mode is "both")
+                
+        Translation Process:
+            1. Extracts text content from EPUB file
+            2. Processes each chapter individually
+            3. For each chapter:
+               - Performs direct translation (if enabled)
+               - Performs pivot translation (if enabled)
+               - Maintains translation context for consistency
+               - Preserves document structure and formatting
+            4. Generates output files based on selected mode
+            
+        Features:
+            - Handles both single paragraphs and multi-chapter documents
+            - Maintains translation context across chapters for consistency
+            - Preserves Markdown formatting and document structure
+            - Generates comparison HTML for analysis (both mode)
+            - Supports paragraph-level translation for better quality
+            - Verbose progress reporting when enabled
+            
+        Example:
+            >>> translator = EPUBTranslator()
+            >>> translator.translate_epub_with_comparison(
+            ...     input_path="book.epub",
+            ...     output_dir="translations",
+            ...     mode="both",
+            ...     source_lang="English",
+            ...     target_lang="Romanian"
+            ... )
+            # Creates: translations/direct_translation.epub
+            # Creates: translations/pivot_translation.epub  
+            # Creates: translations/comparison.html
         """
         if mode not in ["direct", "pivot", "both"]:
             raise ValueError("mode must be 'direct', 'pivot', or 'both'")
