@@ -112,7 +112,7 @@ class EPUBTranslator:
                 "model": self.model,
                 "messages": [{
                     "role": "user",
-                    "content": f"""Translate the following {source_lang} text to {target_lang}. 
+                    "content": f"""/no_think Translate the following {source_lang} text to {target_lang}. 
 Maintain the original formatting, paragraph breaks, and tone. 
 Only provide the translation, no explanations.
 
