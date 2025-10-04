@@ -391,8 +391,8 @@ def main():
     parser = argparse.ArgumentParser(description="BookLingua - Translate EPUB books using various AI models")
     parser.add_argument("input", help="Input EPUB file path")
     parser.add_argument("-o", "--output", default="output", help="Output directory (default: output)")
-    parser.add_argument("-M", "--mode", choices=["direct", "pivot", "both"], default="both",
-                        help="Translation mode (default: both)")
+    parser.add_argument("-M", "--mode", choices=["direct", "pivot", "both"], default="direct",
+                        help="Translation mode (default: direct)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("-s", "--source-lang", default="English", help="Source language (default: English)")
     parser.add_argument("-p", "--pivot-lang", default="French", help="Pivot language (default: French)")

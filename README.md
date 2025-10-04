@@ -40,26 +40,24 @@ pip install ebooklib beautifulsoup4 requests
 ### Basic Usage
 
 ```bash
-python epub_translator.py input.epub
+python booklingua.py input.epub
 ```
 
-This will translate the EPUB file using both direct and pivot methods with default languages (English → Romanian) and generate:
+This will translate the EPUB file using direct translation method with default languages (English → Romanian) and generate:
 - `direct_translation.epub` - Direct translation
-- `pivot_translation.epub` - Pivot translation
-- `comparison.html` - Side-by-side comparison
 
 ### Verbose Mode
 
 To see each chunk being translated along with its translation:
 
 ```bash
-python epub_translator.py input.epub --verbose
+python booklingua.py input.epub --verbose
 ```
 
 ### Custom Languages
 
 ```bash
-python epub_translator.py input.epub \
+python booklingua.py input.epub \
   --source-lang German \
   --pivot-lang English \
   --target-lang Spanish
@@ -67,27 +65,27 @@ python epub_translator.py input.epub \
 
 Or using short options:
 ```bash
-python epub_translator.py input.epub -s German -p English -t Spanish
+python booklingua.py input.epub -s German -p English -t Spanish
 ```
 
 ### Specify Output Directory
 
 ```bash
-python epub_translator.py input.epub -o /path/to/output
+python booklingua.py input.epub -o /path/to/output
 ```
 
 ### Translation Modes
 
 Choose a specific translation mode:
 ```bash
-# Direct translation only
-python epub_translator.py input.epub --mode direct
+# Direct translation only (default)
+python booklingua.py input.epub --mode direct
 
 # Pivot translation only
-python epub_translator.py input.epub --mode pivot
+python booklingua.py input.epub --mode pivot
 
-# Both methods (default)
-python epub_translator.py input.epub --mode both
+# Both methods
+python booklingua.py input.epub --mode both
 ```
 
 ### API Configuration
@@ -96,28 +94,28 @@ python epub_translator.py input.epub --mode both
 
 ```bash
 # OpenAI
-python epub_translator.py input.epub --openai -k YOUR_API_KEY
+python booklingua.py input.epub --openai -k YOUR_API_KEY
 
 # Ollama (local)
-python epub_translator.py input.epub --ollama
+python booklingua.py input.epub --ollama
 
 # Mistral AI
-python epub_translator.py input.epub --mistral -k YOUR_API_KEY
+python booklingua.py input.epub --mistral -k YOUR_API_KEY
 
 # DeepSeek
-python epub_translator.py input.epub --deepseek -k YOUR_API_KEY
+python booklingua.py input.epub --deepseek -k YOUR_API_KEY
 
 # Together AI
-python epub_translator.py input.epub --together -k YOUR_API_KEY
+python booklingua.py input.epub --together -k YOUR_API_KEY
 
 # LM Studio (local)
-python epub_translator.py input.epub --lmstudio
+python booklingua.py input.epub --lmstudio
 ```
 
 #### Manual Configuration
 
 ```bash
-python epub_translator.py input.epub \
+python booklingua.py input.epub \
   --base-url https://api.openai.com/v1 \
   --api-key YOUR_API_KEY \
   --model gpt-4o
@@ -125,7 +123,7 @@ python epub_translator.py input.epub \
 
 Or using short options:
 ```bash
-python epub_translator.py input.epub -u https://api.openai.com/v1 -k YOUR_API_KEY -m gpt-4o
+python booklingua.py input.epub -u https://api.openai.com/v1 -k YOUR_API_KEY -m gpt-4o
 ```
 
 ### Environment Variables
@@ -151,10 +149,16 @@ export TOGETHER_API_KEY=your_together_key
 
 ## Output Files
 
-When using `--mode both` (default), the tool generates:
+When using `--mode both`, the tool generates:
 - `direct_translation.epub`: Book translated directly from source to target language
 - `pivot_translation.epub`: Book translated via intermediate language
 - `comparison.html`: Side-by-side comparison of original text, direct translation, and pivot translation
+
+When using `--mode direct` (default), the tool generates:
+- `direct_translation.epub`: Book translated directly from source to target language
+
+When using `--mode pivot`, the tool generates:
+- `pivot_translation.epub`: Book translated via intermediate language
 
 ## How It Works
 
