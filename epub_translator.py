@@ -1,16 +1,30 @@
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
-import anthropic
+from openai import OpenAI
 import os
 from typing import List, Dict
-import json
 from datetime import datetime
 
 class EPUBTranslator:
-    def __init__(self, api_key: str):
-        """Initialize with your Anthropic API key"""
-        self.client = anthropic.Anthropic(api_key=api_key)
+    def __init__(self, api_key: str = None, base_url: str = None, model: str = "gpt-4o"):
+        """
+        Initialize with OpenAI-compatible API
+        
+        Args:
+            api_key: Your API key
+            base_url: Base URL for the API (e.g., "https://api.openai.com/v1" for OpenAI,
+                     "http://localhost:11434/v1" for Ollama, etc.)
+            model: Model name to use (e.g., "gpt-4o", "qwen2.5:72b", "mistral-large-latest")
+        """
+        self.client = OpenAI(
+            api_key=api_key or os.environ.get('OPENAI_API_KEY', 'dummy-key'),
+            base_url=base_url
+        )
+        self.model = model
+        print(f"Initialized with model: {model}")
+        if base_url:
+            print(f"Using API endpoint: {base_url}")
     
     def extract_text_from_epub(self, epub_path: str) -> List[dict]:
         """Extract text content from EPUB file"""
@@ -34,7 +48,7 @@ class EPUBTranslator:
     
     def translate_text(self, text: str, target_lang: str, source_lang: str = "English", 
                        chunk_size: int = 3000) -> str:
-        """Translate text in chunks using Claude"""
+        """Translate text in chunks using OpenAI-compatible API"""
         if len(text) <= chunk_size:
             return self._translate_chunk(text, target_lang, source_lang)
         
@@ -66,21 +80,26 @@ class EPUBTranslator:
     
     def _translate_chunk(self, text: str, target_lang: str, source_lang: str) -> str:
         """Translate a single chunk of text"""
-        message = self.client.messages.create(
-            model="claude-sonnet-4-5-20250929",
-            max_tokens=8000,
-            messages=[{
-                "role": "user",
-                "content": f"""Translate the following {source_lang} text to {target_lang}. 
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{
+                    "role": "user",
+                    "content": f"""Translate the following {source_lang} text to {target_lang}. 
 Maintain the original formatting, paragraph breaks, and tone. 
 Only provide the translation, no explanations.
 
 Text to translate:
 {text}"""
-            }]
-        )
-        
-        return message.content[0].text
+                }],
+                temperature=0.3,  # Lower temperature for more consistent translations
+                max_tokens=8000
+            )
+            
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"Error during translation: {e}")
+            raise
     
     def translate_direct(self, text: str) -> str:
         """Direct English to Romanian translation"""
@@ -166,6 +185,7 @@ Text to translate:
         <body>
             <h1>English to Romanian Translation Comparison</h1>
             <p><strong>Generated:</strong> """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + """</p>
+            <p><strong>Model:</strong> """ + self.model + """</p>
             <p><strong>Method Comparison:</strong></p>
             <ul>
                 <li><span style="color: #27ae60;">●</span> <strong>Direct:</strong> English → Romanian (single step)</li>
@@ -275,16 +295,48 @@ Text to translate:
         html_paragraphs = [f'<p>{p.replace(chr(10), "<br/>")}</p>' for p in paragraphs if p.strip()]
         return '\n'.join(html_paragraphs)
 
-# Usage example
+# Usage examples
 if __name__ == "__main__":
-    # Set your API key
-    API_KEY = os.environ.get('ANTHROPIC_API_KEY', 'your-api-key-here')
     
-    translator = EPUBTranslator(API_KEY)
+    # Example 1: Using OpenAI
+    translator_openai = EPUBTranslator(
+        api_key=os.environ.get('OPENAI_API_KEY'),
+        base_url="https://api.openai.com/v1",
+        model="gpt-4o"
+    )
     
-    # This will create:
-    # - output/direct_translation.epub (English → Romanian)
-    # - output/pivot_translation.epub (English → French → Romanian)
-    # - output/comparison.html (side-by-side comparison)
+    # Example 2: Using Ollama (local)
+    # translator_ollama = EPUBTranslator(
+    #     base_url="http://localhost:11434/v1",
+    #     model="qwen2.5:72b"
+    # )
     
-    translator.translate_epub_with_comparison('input.epub', output_dir='output')
+    # Example 3: Using Mistral AI
+    # translator_mistral = EPUBTranslator(
+    #     api_key=os.environ.get('MISTRAL_API_KEY'),
+    #     base_url="https://api.mistral.ai/v1",
+    #     model="mistral-large-latest"
+    # )
+    
+    # Example 4: Using DeepSeek
+    # translator_deepseek = EPUBTranslator(
+    #     api_key=os.environ.get('DEEPSEEK_API_KEY'),
+    #     base_url="https://api.deepseek.com/v1",
+    #     model="deepseek-chat"
+    # )
+    
+    # Example 5: Using LM Studio (local)
+    # translator_lmstudio = EPUBTranslator(
+    #     base_url="http://localhost:1234/v1",
+    #     model="qwen2.5-72b"
+    # )
+    
+    # Example 6: Using Together AI
+    # translator_together = EPUBTranslator(
+    #     api_key=os.environ.get('TOGETHER_API_KEY'),
+    #     base_url="https://api.together.xyz/v1",
+    #     model="Qwen/Qwen2.5-72B-Instruct-Turbo"
+    # )
+    
+    # Run the translation
+    translator_openai.translate_epub_with_comparison('input.epub', output_dir='output')
