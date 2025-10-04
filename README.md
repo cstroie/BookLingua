@@ -96,19 +96,19 @@ python epub_translator.py input.epub --mode both
 
 ```bash
 # OpenAI
-python epub_translator.py input.epub --openai --api-key YOUR_API_KEY
+python epub_translator.py input.epub --openai -k YOUR_API_KEY
 
 # Ollama (local)
 python epub_translator.py input.epub --ollama
 
 # Mistral AI
-python epub_translator.py input.epub --mistral --api-key YOUR_API_KEY
+python epub_translator.py input.epub --mistral -k YOUR_API_KEY
 
 # DeepSeek
-python epub_translator.py input.epub --deepseek --api-key YOUR_API_KEY
+python epub_translator.py input.epub --deepseek -k YOUR_API_KEY
 
 # Together AI
-python epub_translator.py input.epub --together --api-key YOUR_API_KEY
+python epub_translator.py input.epub --together -k YOUR_API_KEY
 
 # LM Studio (local)
 python epub_translator.py input.epub --lmstudio
@@ -125,7 +125,7 @@ python epub_translator.py input.epub \
 
 Or using short options:
 ```bash
-python epub_translator.py input.epub -u https://api.openai.com/v1 --api-key YOUR_API_KEY -m gpt-4o
+python epub_translator.py input.epub -u https://api.openai.com/v1 -k YOUR_API_KEY -m gpt-4o
 ```
 
 ### Environment Variables

@@ -399,7 +399,7 @@ def main():
     parser.add_argument("-t", "--target-lang", default="Romanian", help="Target language (default: Romanian)")
     parser.add_argument("-u", "--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
     parser.add_argument("-m", "--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
-    parser.add_argument("--api-key", help="API key for the translation service")
+    parser.add_argument("-k", "--api-key", help="API key for the translation service")
     
     # Preset configurations for common services
     parser.add_argument("--openai", action="store_true", help="Use OpenAI API")
