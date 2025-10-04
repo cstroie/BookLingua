@@ -136,46 +136,49 @@ Text to translate:
             print(f"Error during translation: {e}")
             raise
     
-    def translate_direct(self, text: str) -> str:
-        """Direct English to Romanian translation"""
-        return self.translate_text(text, "Romanian", "English")
+    def translate_direct(self, text: str, source_lang: str = "English", target_lang: str = "Romanian") -> str:
+        """Direct translation from source to target language"""
+        return self.translate_text(text, target_lang, source_lang)
     
-    def translate_pivot(self, text: str) -> Dict[str, str]:
-        """Pivot translation: English -> French -> Romanian"""
-        print("  - Translating to French...")
-        french = self.translate_text(text, "French", "English")
-        print("  - Translating French to Romanian...")
-        romanian = self.translate_text(french, "Romanian", "French")
+    def translate_pivot(self, text: str, source_lang: str = "English", pivot_lang: str = "French", 
+                       target_lang: str = "Romanian") -> Dict[str, str]:
+        """Pivot translation: source -> pivot -> target"""
+        print(f"  - Translating to {pivot_lang}...")
+        intermediate = self.translate_text(text, pivot_lang, source_lang)
+        print(f"  - Translating {pivot_lang} to {target_lang}...")
+        final = self.translate_text(intermediate, target_lang, pivot_lang)
         return {
-            'french': french,
-            'romanian': romanian
+            'intermediate': intermediate,
+            'final': final
         }
     
     def create_comparison_html(self, chapter_num: int, original: str, 
-                              direct: str, pivot_french: str, pivot_romanian: str) -> str:
+                              direct: str, pivot_intermediate: str, pivot_final: str,
+                              source_lang: str = "English", pivot_lang: str = "French", 
+                              target_lang: str = "Romanian") -> str:
         """Create HTML comparison of translations"""
         html = f"""
         <div class="chapter-comparison">
             <h2>Chapter {chapter_num} Comparison</h2>
             
             <div class="translation-block">
-                <h3>Original English</h3>
+                <h3>Original {source_lang}</h3>
                 <div class="text-content">{original.replace(chr(10), '<br>')}</div>
             </div>
             
             <div class="translation-block">
-                <h3>Direct Translation (English → Romanian)</h3>
+                <h3>Direct Translation ({source_lang} → {target_lang})</h3>
                 <div class="text-content direct">{direct.replace(chr(10), '<br>')}</div>
             </div>
             
             <div class="translation-block">
-                <h3>Intermediate French (English → French)</h3>
-                <div class="text-content french">{pivot_french.replace(chr(10), '<br>')}</div>
+                <h3>Intermediate {pivot_lang} ({source_lang} → {pivot_lang})</h3>
+                <div class="text-content french">{pivot_intermediate.replace(chr(10), '<br>')}</div>
             </div>
             
             <div class="translation-block">
-                <h3>Pivot Translation (English → French → Romanian)</h3>
-                <div class="text-content pivot">{pivot_romanian.replace(chr(10), '<br>')}</div>
+                <h3>Pivot Translation ({source_lang} → {pivot_lang} → {target_lang})</h3>
+                <div class="text-content pivot">{pivot_final.replace(chr(10), '<br>')}</div>
             </div>
         </div>
         <hr>
@@ -183,7 +186,8 @@ Text to translate:
         return html
     
     def translate_epub_with_comparison(self, input_path: str, output_dir: str = "output", 
-                                       mode: str = "both"):
+                                       mode: str = "both", source_lang: str = "English",
+                                       pivot_lang: str = "French", target_lang: str = "Romanian"):
         """
         Translate EPUB using direct, pivot, or both methods
         
@@ -191,6 +195,9 @@ Text to translate:
             input_path: Path to input EPUB file
             output_dir: Directory for output files
             mode: "direct", "pivot", or "both" (default: "both")
+            source_lang: Source language (default: "English")
+            pivot_lang: Intermediate language for pivot translation (default: "French")
+            target_lang: Target language (default: "Romanian")
         """
         if mode not in ["direct", "pivot", "both"]:
             raise ValueError("mode must be 'direct', 'pivot', or 'both'")
@@ -202,48 +209,49 @@ Text to translate:
         chapters = self.extract_text_from_epub(input_path)
         
         print(f"Found {len(chapters)} chapters to translate")
-        print(f"Translation mode: {mode.upper()}\n")
+        print(f"Translation mode: {mode.upper()}")
+        print(f"Languages: {source_lang} → {target_lang} (direct), {source_lang} → {pivot_lang} → {target_lang} (pivot)\n")
         
         # Prepare output books based on mode
         direct_book = None
         pivot_book = None
         
         if mode in ["direct", "both"]:
-            direct_book = self._create_book_template(book, "Direct Translation")
+            direct_book = self._create_book_template(book, f"Direct Translation ({source_lang} to {target_lang})")
         if mode in ["pivot", "both"]:
-            pivot_book = self._create_book_template(book, "Pivot Translation")
+            pivot_book = self._create_book_template(book, f"Pivot Translation ({source_lang} to {target_lang} via {pivot_lang})")
         
         # HTML comparison document (only for "both" mode)
         comparison_html = None
         if mode == "both":
-            comparison_html = """
+            comparison_html = f"""
             <!DOCTYPE html>
             <html>
             <head>
                 <meta charset="UTF-8">
                 <title>Translation Comparison</title>
                 <style>
-                    body { font-family: Georgia, serif; line-height: 1.6; max-width: 1400px; margin: 0 auto; padding: 20px; }
-                    h2 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
-                    h3 { color: #34495e; margin-top: 20px; }
-                    .chapter-comparison { margin-bottom: 50px; }
-                    .translation-block { margin: 20px 0; padding: 15px; border-radius: 5px; }
-                    .translation-block h3 { margin-top: 0; }
-                    .text-content { background: #f8f9fa; padding: 15px; border-left: 4px solid #ccc; }
-                    .direct { border-left-color: #27ae60; }
-                    .french { border-left-color: #3498db; }
-                    .pivot { border-left-color: #e74c3c; }
-                    hr { margin: 40px 0; border: none; border-top: 2px dashed #ccc; }
+                    body {{ font-family: Georgia, serif; line-height: 1.6; max-width: 1400px; margin: 0 auto; padding: 20px; }}
+                    h2 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
+                    h3 {{ color: #34495e; margin-top: 20px; }}
+                    .chapter-comparison {{ margin-bottom: 50px; }}
+                    .translation-block {{ margin: 20px 0; padding: 15px; border-radius: 5px; }}
+                    .translation-block h3 {{ margin-top: 0; }}
+                    .text-content {{ background: #f8f9fa; padding: 15px; border-left: 4px solid #ccc; }}
+                    .direct {{ border-left-color: #27ae60; }}
+                    .french {{ border-left-color: #3498db; }}
+                    .pivot {{ border-left-color: #e74c3c; }}
+                    hr {{ margin: 40px 0; border: none; border-top: 2px dashed #ccc; }}
                 </style>
             </head>
             <body>
-                <h1>English to Romanian Translation Comparison</h1>
-                <p><strong>Generated:</strong> """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + """</p>
-                <p><strong>Model:</strong> """ + self.model + """</p>
+                <h1>{source_lang} to {target_lang} Translation Comparison</h1>
+                <p><strong>Generated:</strong> {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
+                <p><strong>Model:</strong> {self.model}</p>
                 <p><strong>Method Comparison:</strong></p>
                 <ul>
-                    <li><span style="color: #27ae60;">●</span> <strong>Direct:</strong> English → Romanian (single step)</li>
-                    <li><span style="color: #e74c3c;">●</span> <strong>Pivot:</strong> English → French → Romanian (two steps)</li>
+                    <li><span style="color: #27ae60;">●</span> <strong>Direct:</strong> {source_lang} → {target_lang} (single step)</li>
+                    <li><span style="color: #e74c3c;">●</span> <strong>Pivot:</strong> {source_lang} → {pivot_lang} → {target_lang} (two steps)</li>
                 </ul>
             """
         
@@ -263,13 +271,13 @@ Text to translate:
             
             # Direct translation
             if mode in ["direct", "both"]:
-                print("Direct translation (English → Romanian)...")
-                direct_translation = self.translate_direct(original_text)
+                print(f"Direct translation ({source_lang} → {target_lang})...")
+                direct_translation = self.translate_direct(original_text, source_lang, target_lang)
             
             # Pivot translation
             if mode in ["pivot", "both"]:
-                print("Pivot translation (English → French → Romanian)...")
-                pivot_result = self.translate_pivot(original_text)
+                print(f"Pivot translation ({source_lang} → {pivot_lang} → {target_lang})...")
+                pivot_result = self.translate_pivot(original_text, source_lang, pivot_lang, target_lang)
             
             # Add to comparison HTML (only in "both" mode)
             if mode == "both":
@@ -277,8 +285,11 @@ Text to translate:
                     i + 1, 
                     original_text, 
                     direct_translation,
-                    pivot_result['french'],
-                    pivot_result['romanian']
+                    pivot_result['intermediate'],
+                    pivot_result['final'],
+                    source_lang,
+                    pivot_lang,
+                    target_lang
                 )
             
             # Create chapters for books
@@ -298,7 +309,7 @@ Text to translate:
                     file_name=f'chapter_{i+1}.xhtml',
                     lang='ro'
                 )
-                pivot_chapter.content = f'<html><body>{self._text_to_html(pivot_result["romanian"])}</body></html>'
+                pivot_chapter.content = f'<html><body>{self._text_to_html(pivot_result["final"])}</body></html>'
                 pivot_book.add_item(pivot_chapter)
                 pivot_chapters.append(pivot_chapter)
             
@@ -363,11 +374,14 @@ Text to translate:
         return '\n'.join(html_paragraphs)
 
 def main():
-    parser = argparse.ArgumentParser(description="Translate EPUB books to Romanian using various AI models")
+    parser = argparse.ArgumentParser(description="Translate EPUB books using various AI models")
     parser.add_argument("input", help="Input EPUB file path")
     parser.add_argument("-o", "--output", default="output", help="Output directory (default: output)")
     parser.add_argument("-m", "--mode", choices=["direct", "pivot", "both"], default="both",
                         help="Translation mode (default: both)")
+    parser.add_argument("--source-lang", default="English", help="Source language (default: English)")
+    parser.add_argument("--pivot-lang", default="French", help="Pivot language (default: French)")
+    parser.add_argument("--target-lang", default="Romanian", help="Target language (default: Romanian)")
     parser.add_argument("--api-key", help="API key for the translation service")
     parser.add_argument("--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
     parser.add_argument("--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
@@ -428,7 +442,10 @@ def main():
     translator.translate_epub_with_comparison(
         input_path=args.input,
         output_dir=args.output,
-        mode=args.mode
+        mode=args.mode,
+        source_lang=args.source_lang,
+        pivot_lang=args.pivot_lang,
+        target_lang=args.target_lang
     )
 
 # Usage examples

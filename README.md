@@ -1,18 +1,19 @@
 # EPUB Translator
 
-A Python tool for translating EPUB books using various AI models through their API endpoints. The tool supports multiple translation methods including direct translation and pivot translation (via an intermediate language) with side-by-side comparisons.
+A Python tool for translating EPUB books using various AI models through their API endpoints. The tool supports multiple translation methods including direct translation and pivot translation (via an intermediate language) with side-by-side comparisons. Languages are configurable via command line options.
 
 ## Features
 
-- Translate EPUB books to Romanian using various AI models
+- Translate EPUB books between any languages using various AI models
 - Support for multiple translation services (OpenAI, Ollama, Mistral, DeepSeek, Together AI, LM Studio)
 - Two translation methods:
-  - **Direct**: English → Romanian (single step)
-  - **Pivot**: English → French → Romanian (two steps)
+  - **Direct**: Source → Target (single step)
+  - **Pivot**: Source → Intermediate → Target (two steps)
 - Side-by-side comparison of translation methods
 - Preserves original formatting and structure
 - Chunked translation for handling large texts
 - HTML comparison output for evaluating translation quality
+- Configurable source, pivot, and target languages
 
 ## Requirements
 
@@ -42,10 +43,19 @@ pip install ebooklib beautifulsoup4 requests
 python epub_translator.py input.epub
 ```
 
-This will translate the EPUB file using both direct and pivot methods and generate:
+This will translate the EPUB file using both direct and pivot methods with default languages (English → Romanian) and generate:
 - `direct_translation.epub` - Direct translation
 - `pivot_translation.epub` - Pivot translation
 - `comparison.html` - Side-by-side comparison
+
+### Custom Languages
+
+```bash
+python epub_translator.py input.epub \
+  --source-lang German \
+  --pivot-lang English \
+  --target-lang Spanish
+```
 
 ### Specify Output Directory
 
@@ -124,8 +134,8 @@ export TOGETHER_API_KEY=your_together_key
 ## Output Files
 
 When using `--mode both` (default), the tool generates:
-- `direct_translation.epub`: Book translated directly from English to Romanian
-- `pivot_translation.epub`: Book translated via French (English → French → Romanian)
+- `direct_translation.epub`: Book translated directly from source to target language
+- `pivot_translation.epub`: Book translated via intermediate language
 - `comparison.html`: Side-by-side comparison of original text, direct translation, and pivot translation
 
 ## How It Works
