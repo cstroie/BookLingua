@@ -383,7 +383,37 @@ class EPUBTranslator:
     
     def translate_text(self, text: str, target_lang: str, source_lang: str = "English", 
                        chunk_size: int = 3000) -> str:
-        """Translate text in chunks using OpenAI-compatible API"""
+        """Translate text in chunks using OpenAI-compatible API.
+        
+        This method translates text content by breaking it into manageable chunks
+        and processing each chunk individually. It handles both single paragraphs
+        and longer documents with multiple paragraphs.
+        
+        Args:
+            text (str): The text content to translate
+            target_lang (str): Target language code (e.g., "Romanian", "French", "German")
+            source_lang (str, optional): Source language code. Defaults to "English"
+            chunk_size (int, optional): Maximum character length for translation chunks.
+                Defaults to 3000 characters. Text longer than this will be split
+                into paragraphs and translated individually.
+                
+        Returns:
+            str: Translated text in the target language, preserving original
+                 formatting, structure, and paragraph breaks.
+                 
+        Translation process:
+            - If text is shorter than chunk_size: translates as single chunk
+            - If text contains paragraphs: translates each paragraph separately
+            - Preserves Markdown formatting and document structure
+            - Maintains translation context across chunks for consistency
+            
+        Example:
+            >>> translator = EPUBTranslator()
+            >>> text = "This is a paragraph.\\n\\nThis is another paragraph."
+            >>> translated = translator.translate_text(text, "Romanian")
+            >>> print(translated)
+            'Acesta este un paragraf.\\n\\nAcesta este alt paragraf.'
+        """
         # Split into paragraphs (separated by double newlines)
         paragraphs = text.split('\n\n')
         
