@@ -370,5 +370,13 @@ if __name__ == "__main__":
     #     model="Qwen/Qwen2.5-72B-Instruct-Turbo"
     # )
     
-    # Run the translation
-    translator_openai.translate_epub_with_comparison('input.epub', output_dir='output')
+    # Run the translation with your preferred mode
+    
+    # Option 1: Direct translation only (faster, cheaper)
+    # translator_openai.translate_epub_with_comparison('input.epub', output_dir='output', mode='direct')
+    
+    # Option 2: Pivot translation only (to test French intermediary)
+    # translator_openai.translate_epub_with_comparison('input.epub', output_dir='output', mode='pivot')
+    
+    # Option 3: Both methods with comparison (most expensive but lets you compare)
+    translator_openai.translate_epub_with_comparison('input.epub', output_dir='output', mode='both')
