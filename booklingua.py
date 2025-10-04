@@ -283,6 +283,7 @@ Text to translate:
             print(f"{'='*60}")
             
             original_text = chapter['content']
+            original_paragraphs = chapter.get('paragraphs', [])
             
             direct_translation = None
             pivot_result = None
@@ -290,12 +291,46 @@ Text to translate:
             # Direct translation
             if mode in ["direct", "both"]:
                 print(f"Direct translation ({source_lang} → {target_lang})...")
-                direct_translation = self.translate_direct(original_text, source_lang, target_lang)
+                if original_paragraphs:
+                    # Translate each paragraph separately for better quality
+                    translated_paragraphs = []
+                    for j, paragraph in enumerate(original_paragraphs):
+                        if self.verbose:
+                            print(f"  Translating paragraph {j+1}/{len(original_paragraphs)}")
+                        if paragraph.strip():
+                            translated_paragraphs.append(self._translate_chunk(paragraph, target_lang, source_lang))
+                        else:
+                            translated_paragraphs.append(paragraph)
+                    direct_translation = '\n\n'.join(translated_paragraphs)
+                else:
+                    direct_translation = self.translate_direct(original_text, source_lang, target_lang)
             
             # Pivot translation
             if mode in ["pivot", "both"]:
                 print(f"Pivot translation ({source_lang} → {pivot_lang} → {target_lang})...")
-                pivot_result = self.translate_pivot(original_text, source_lang, pivot_lang, target_lang)
+                if original_paragraphs:
+                    # Translate each paragraph through pivot for better quality
+                    intermediate_paragraphs = []
+                    final_paragraphs = []
+                    for j, paragraph in enumerate(original_paragraphs):
+                        if self.verbose:
+                            print(f"  Pivot translating paragraph {j+1}/{len(original_paragraphs)}")
+                        if paragraph.strip():
+                            # Source -> Pivot
+                            intermediate = self._translate_chunk(paragraph, pivot_lang, source_lang)
+                            intermediate_paragraphs.append(intermediate)
+                            # Pivot -> Target
+                            final = self._translate_chunk(intermediate, target_lang, pivot_lang)
+                            final_paragraphs.append(final)
+                        else:
+                            intermediate_paragraphs.append(paragraph)
+                            final_paragraphs.append(paragraph)
+                    pivot_result = {
+                        'intermediate': '\n\n'.join(intermediate_paragraphs),
+                        'final': '\n\n'.join(final_paragraphs)
+                    }
+                else:
+                    pivot_result = self.translate_pivot(original_text, source_lang, pivot_lang, target_lang)
             
             # Add to comparison HTML (only in "both" mode)
             if mode == "both":
