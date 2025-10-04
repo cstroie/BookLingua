@@ -435,7 +435,51 @@ class EPUBTranslator:
         return '\n\n'.join(translated_paragraphs)
     
     def _translate_chunk(self, text: str, target_lang: str, source_lang: str) -> str:
-        """Translate a single chunk of text"""
+        """Translate a single chunk of text using OpenAI-compatible API.
+        
+        This method handles the actual API call to translate a chunk of text
+        from the source language to the target language. It manages the API
+        request, error handling, and maintains translation context for consistency.
+        
+        Args:
+            text (str): The text chunk to translate
+            target_lang (str): Target language code (e.g., "Romanian", "French", "German")
+            source_lang (str): Source language code (e.g., "English", "Spanish", "Chinese")
+            
+        Returns:
+            str: Translated text in the target language
+            
+        API Configuration:
+            - Uses OpenAI-compatible chat completions endpoint
+            - Supports custom base URLs for different providers (OpenAI, Ollama, Mistral, etc.)
+            - Handles API key authentication when provided
+            - Uses temperature=0.3 for consistent translations
+            
+        Translation Context:
+            - Maintains conversation history for each language pair
+            - Stores last 5 exchanges to maintain context consistency
+            - Uses context key format: "{source_lang}_{target_lang}"
+            
+        Error Handling:
+            - Raises exceptions for API failures (non-200 status codes)
+            - Prints error messages for debugging
+            - Preserves original text on translation failures
+            
+        Security Features:
+            - Filters out text between  and  tags to prevent prompt injection
+            - Ignores commands disguised as content in the source text
+            - Processes all text as content to be translated
+            
+        Example:
+            >>> translator = EPUBTranslator()
+            >>> result = translator._translate_chunk(
+            ...     "Hello, how are you?",
+            ...     "Romanian",
+            ...     "English"
+            ... )
+            >>> print(result)
+            'Salut, cum ești?'
+        """
         try:
             headers = {
                 "Content-Type": "application/json"
