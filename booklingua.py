@@ -457,7 +457,7 @@ class EPUBTranslator:
             
         Translation Context:
             - Maintains conversation history for each language pair
-            - Stores last 5 exchanges to maintain context consistency
+            - Stores last 10 exchanges to maintain context consistency
             - Uses context key format: "{source_lang}_{target_lang}"
             
         Error Handling:
@@ -555,8 +555,8 @@ Translation rules:
 
             # Update translation context for this language pair
             self.translation_contexts[context_key].append((text, translation))
-            # Keep only the last 5 exchanges
-            if len(self.translation_contexts[context_key]) > 5:
+            # Keep only the last 10 exchanges for better context
+            if len(self.translation_contexts[context_key]) > 10:
                 self.translation_contexts[context_key].pop(0)
             
             return translation
