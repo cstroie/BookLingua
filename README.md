@@ -1,11 +1,13 @@
 # BookLingua
 
-A Python tool for translating EPUB books using various AI models through their API endpoints. The tool supports multiple translation methods including direct translation and pivot translation (via an intermediate language) with side-by-side comparisons. Languages are configurable via command line options.
+**Translate EPUB books using AI models. Supports direct, pivot, and comparison translations for high-quality multilingual book conversion.**
+
+A Python tool for translating EPUB books using various AI models through their API endpoints. The tool supports multiple translation methods including direct translation and pivot translation (via an intermediate language) with side-by-side comparisons.
 
 ## Features
 
 - Translate EPUB books between any languages using various AI models
-- Support for multiple translation services (OpenAI, Ollama, Mistral, DeepSeek, Together AI, LM Studio)
+- Support for multiple translation services (OpenAI, Ollama, Mistral, DeepSeek, Together AI, LM Studio, OpenRouter)
 - Two translation methods:
   - **Direct**: Source → Target (single step)
   - **Pivot**: Source → Intermediate → Target (two steps)
@@ -13,167 +15,126 @@ A Python tool for translating EPUB books using various AI models through their A
 - Preserves original formatting and structure
 - Chunked translation for handling large texts
 - HTML comparison output for evaluating translation quality
-- Configurable source, pivot, and target languages
-
-## Requirements
-
-- Python 3.7+
-- ebooklib
-- beautifulsoup4
-- requests
 
 ## Installation
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd epub-translator
-```
-
-2. Install dependencies:
+1. Install dependencies:
 ```bash
 pip install ebooklib beautifulsoup4 requests
 ```
 
-## Usage
+2. Set your API key (optional):
+```bash
+export OPENAI_API_KEY=your_api_key_here
+```
 
-### Basic Usage
+## Quick Start
 
 ```bash
+# Basic translation
 python booklingua.py input.epub
-```
 
-This will translate the EPUB file using direct translation method with default languages (English → Romanian) and generate:
-- `direct_translation.epub` - Direct translation
+# Custom languages
+python booklingua.py input.epub -s German -t Spanish
 
-### Verbose Mode
-
-To see each chunk being translated along with its translation:
-
-```bash
+# Verbose mode
 python booklingua.py input.epub --verbose
+
+# Both translation methods with comparison
+python booklingua.py input.epub --mode both
 ```
 
-### Custom Languages
-
-```bash
-python booklingua.py input.epub \
-  --source-lang German \
-  --pivot-lang English \
-  --target-lang Spanish
-```
-
-Or using short options:
-```bash
-python booklingua.py input.epub -s German -p English -t Spanish
-```
-
-### Specify Output Directory
-
-```bash
-python booklingua.py input.epub -o /path/to/output
-```
+## Usage
 
 ### Translation Modes
 
-Choose a specific translation mode:
 ```bash
 # Direct translation only (default)
 python booklingua.py input.epub --mode direct
 
-# Pivot translation only
+# Pivot translation only  
 python booklingua.py input.epub --mode pivot
 
-# Both methods
+# Both methods with comparison
 python booklingua.py input.epub --mode both
 ```
 
-### API Configuration
+### Language Configuration
 
-#### Using Preset Configurations
+```bash
+# Set source, pivot, and target languages
+python booklingua.py input.epub \
+  --source-lang English \
+  --pivot-lang French \
+  --target-lang Romanian
+```
+
+### API Services
 
 ```bash
 # OpenAI
-python booklingua.py input.epub --openai -k YOUR_API_KEY
+python booklingua.py input.epub --openai -k YOUR_KEY
 
 # Ollama (local)
 python booklingua.py input.epub --ollama
 
 # Mistral AI
-python booklingua.py input.epub --mistral -k YOUR_API_KEY
+python booklingua.py input.epub --mistral -k YOUR_KEY
 
 # DeepSeek
-python booklingua.py input.epub --deepseek -k YOUR_API_KEY
+python booklingua.py input.epub --deepseek -k YOUR_KEY
 
 # Together AI
-python booklingua.py input.epub --together -k YOUR_API_KEY
+python booklingua.py input.epub --together -k YOUR_KEY
 
 # LM Studio (local)
 python booklingua.py input.epub --lmstudio
+
+# OpenRouter
+python booklingua.py input.epub --openrouter -k YOUR_KEY
 ```
 
-#### Manual Configuration
+### Manual Configuration
 
 ```bash
 python booklingua.py input.epub \
   --base-url https://api.openai.com/v1 \
-  --api-key YOUR_API_KEY \
+  --api-key YOUR_KEY \
   --model gpt-4o
-```
-
-Or using short options:
-```bash
-python booklingua.py input.epub -u https://api.openai.com/v1 -k YOUR_API_KEY -m gpt-4o
-```
-
-### Environment Variables
-
-You can also set API keys as environment variables:
-```bash
-export OPENAI_API_KEY=your_openai_key
-export MISTRAL_API_KEY=your_mistral_key
-export DEEPSEEK_API_KEY=your_deepseek_key
-export TOGETHER_API_KEY=your_together_key
 ```
 
 ## Supported Services
 
-| Service      | Flag        | Default Model     | Default URL              |
-|--------------|-------------|-------------------|--------------------------|
-| OpenAI       | `--openai`  | `gpt-4o`          | https://api.openai.com/v1 |
-| Ollama       | `--ollama`  | `qwen2.5:72b`     | http://localhost:11434/v1 |
-| Mistral AI   | `--mistral` | `mistral-large-latest` | https://api.mistral.ai/v1 |
-| DeepSeek     | `--deepseek`| `deepseek-chat`   | https://api.deepseek.com/v1 |
-| Together AI  | `--together`| `Qwen/Qwen2.5-72B-Instruct-Turbo` | https://api.together.xyz/v1 |
-| LM Studio    | `--lmstudio`| `qwen2.5-72b`     | http://localhost:1234/v1 |
+| Service      | Flag        | Default Model                     | Default URL                     |
+|--------------|-------------|-----------------------------------|---------------------------------|
+| OpenAI       | `--openai`  | `gpt-4o`                          | https://api.openai.com/v1       |
+| Ollama       | `--ollama`  | `qwen2.5:72b`                     | http://localhost:11434/v1       |
+| Mistral AI   | `--mistral` | `mistral-large-latest`           | https://api.mistral.ai/v1       |
+| DeepSeek     | `--deepseek`| `deepseek-chat`                  | https://api.deepseek.com/v1     |
+| Together AI  | `--together`| `Qwen/Qwen2.5-72B-Instruct-Turbo`| https://api.together.xyz/v1     |
+| LM Studio    | `--lmstudio`| `qwen2.5:72b`                     | http://localhost:1234/v1        |
+| OpenRouter   | `--openrouter`| `openai/gpt-4o`                 | https://openrouter.ai/api/v1    |
 
 ## Output Files
 
-When using `--mode both`, the tool generates:
-- `direct_translation.epub`: Book translated directly from source to target language
-- `pivot_translation.epub`: Book translated via intermediate language
-- `comparison.html`: Side-by-side comparison of original text, direct translation, and pivot translation
-
-When using `--mode direct` (default), the tool generates:
-- `direct_translation.epub`: Book translated directly from source to target language
-
-When using `--mode pivot`, the tool generates:
-- `pivot_translation.epub`: Book translated via intermediate language
+- `direct_translation.epub` - Direct translation (direct mode)
+- `pivot_translation.epub` - Pivot translation (pivot mode)  
+- `comparison.html` - Side-by-side comparison (both mode)
 
 ## How It Works
 
-1. **Text Extraction**: The tool extracts text content from each chapter of the EPUB file
-2. **Chunking**: Large chapters are split into manageable chunks at paragraph boundaries
-3. **Translation**: Each chunk is sent to the AI model with specific instructions to maintain formatting
-4. **Reconstruction**: Translated chunks are reassembled into complete chapters
-5. **EPUB Generation**: New EPUB files are created with the translated content
+1. **Extract** text content from EPUB chapters
+2. **Chunk** large content into manageable pieces
+3. **Translate** using AI models with formatting preservation
+4. **Reconstruct** translated content into complete chapters
+5. **Generate** new EPUB files and comparison HTML
 
 ## Customization
 
-You can adjust translation parameters in the code:
-- `chunk_size`: Maximum characters per translation request (default: 3000)
-- `temperature`: Controls randomness in translation (default: 0.3)
-- `max_tokens`: Maximum tokens per response (default: 8000)
+Adjust parameters in the code:
+- `chunk_size`: Max characters per request (default: 3000)
+- `temperature`: Translation randomness (default: 0.3)
+- `max_tokens`: Max tokens per response (default: 8000)
 
 ## License
 
@@ -181,4 +142,4 @@ MIT License
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions welcome! Please submit Pull Requests.
