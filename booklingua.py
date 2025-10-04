@@ -328,9 +328,9 @@ Translation rules:
     def translate_pivot(self, text: str, source_lang: str = "English", pivot_lang: str = "French", 
                        target_lang: str = "Romanian") -> Dict[str, str]:
         """Pivot translation: source -> pivot -> target"""
-        print(f"  - Translating to {pivot_lang}...")
+        print(f"  - Translating to {pivot_lang.upper()}...")
         intermediate = self.translate_text(text, pivot_lang, source_lang)
-        print(f"  - Translating {pivot_lang} to {target_lang}...")
+        print(f"  - Translating {pivot_lang.upper()} to {target_lang.upper()}...")
         final = self.translate_text(intermediate, target_lang, pivot_lang)
         return {
             'intermediate': intermediate,
@@ -357,7 +357,7 @@ Translation rules:
             </div>
             
             <div class="translation-block">
-                <h3>Intermediate {pivot_lang} ({source_lang} → {pivot_lang})</h3>
+                <h3>Intermediate {pivot_lang.upper()} ({source_lang.upper()} → {pivot_lang.upper()})</h3>
                 <div class="text-content french">{pivot_intermediate.replace(chr(10), '<br>')}</div>
             </div>
             
