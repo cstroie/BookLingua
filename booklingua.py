@@ -1065,7 +1065,48 @@ Translation rules:
         book.spine = ['nav'] + chapters
     
     def _text_to_html(self, text: str) -> str:
-        """Convert text to HTML paragraphs"""
+        """Convert text to HTML paragraphs with intelligent format detection.
+        
+        This method converts text content to HTML format, automatically detecting
+        whether the input is Markdown-formatted or plain text. It provides the
+        appropriate conversion method to preserve formatting and structure.
+        
+        Args:
+            text (str): Text content to convert to HTML
+            
+        Returns:
+            str: HTML formatted text with appropriate tags and structure
+            
+        Format Detection:
+            - Detects Markdown presence by checking for common Markdown syntax:
+              * Headers (# ## ###)
+              * Bullet points (- item)
+              * Emphasis markers (*, _, ~, `)
+            - If Markdown detected: Uses _markdown_to_html() for conversion
+            - If plain text: Uses simple paragraph conversion
+            
+        Plain Text Conversion:
+            - Splits text by double newlines to identify paragraphs
+            - Wraps each paragraph in <p> tags
+            - Converts single line breaks to <br/> tags within paragraphs
+            - Preserves empty lines as paragraph separators
+            
+        Markdown Conversion:
+            - Processes headers, lists, and inline formatting
+            - Preserves document structure and formatting
+            - Converts Markdown syntax to equivalent HTML tags
+            
+        Example:
+            >>> translator = EPUBTranslator()
+            # Plain text example
+            >>> plain_html = translator._text_to_html("Hello world\\n\\nHow are you?")
+            >>> print(plain_html)
+            '<p>Hello world<br/>How are you?</p>'
+            # Markdown example
+            >>> markdown_html = translator._text_to_html("# Title\\n\\nThis is **bold** text")
+            >>> print(markdown_html)
+            '<h1>Title</h1>\\n\\n<p>This is <strong>bold</strong> text</p>'
+        """
         # First try to convert from Markdown, fallback to plain text
         if '#' in text or '- ' in text or '*' in text or '_' in text or '~' in text or '`' in text:
             return self._markdown_to_html(text)
