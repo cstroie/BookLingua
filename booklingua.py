@@ -292,9 +292,6 @@ Translation rules:
                 "max_tokens": 8000
             }
             
-            if self.verbose:
-                print(f"{source_lang.upper()}: {text}\n")
-            
             response = requests.post(
                 f"{self.base_url}/chat/completions",
                 headers=headers,
@@ -316,9 +313,6 @@ Translation rules:
             # Keep only the last 5 exchanges
             if len(self.translation_context) > 5:
                 self.translation_context.pop(0)
-
-            if self.verbose:
-                print(f"{target_lang.upper()}: {translation}\n")
             
             return translation
         except Exception as e:
@@ -467,9 +461,14 @@ Translation rules:
                     translated_paragraphs = []
                     for j, paragraph in enumerate(original_paragraphs):
                         if self.verbose:
-                            print(f"  Translating paragraph {j+1}/{len(original_paragraphs)}")
+                            print(f"\nTranslating paragraph {j+1}/{len(original_paragraphs)}")
                         if paragraph.strip():
-                            translated_paragraphs.append(self._translate_chunk(paragraph, target_lang, source_lang))
+                            if self.verbose:
+                                print(f"{source_lang.upper()}: {paragraph}")
+                            translated_paragraph = self._translate_chunk(paragraph, target_lang, source_lang)
+                            translated_paragraphs.append(translated_paragraph)
+                            if self.verbose:
+                                print(f"{target_lang.upper()}: {translated_paragraph}")
                         else:
                             translated_paragraphs.append(paragraph)
                     direct_translation = '\n\n'.join(translated_paragraphs)
@@ -485,17 +484,24 @@ Translation rules:
                     final_paragraphs = []
                     for j, paragraph in enumerate(original_paragraphs):
                         if self.verbose:
-                            print(f"  Pivot translating paragraph {j+1}/{len(original_paragraphs)}")
+                            print(f"\nPivot translating paragraph {j+1}/{len(original_paragraphs)}")
                         if paragraph.strip():
+                            if self.verbose:
+                                print(f"{source_lang.upper()}: {paragraph}")
                             # Source -> Pivot
                             intermediate = self._translate_chunk(paragraph, pivot_lang, source_lang)
                             intermediate_paragraphs.append(intermediate)
+                            if self.verbose:
+                                print(f"{pivot_lang.upper()}: {intermediate}")
                             # Pivot -> Target
                             final = self._translate_chunk(intermediate, target_lang, pivot_lang)
                             final_paragraphs.append(final)
+                            if self.verbose:
+                                print(f"{target_lang.upper()}: {final}")
                         else:
                             intermediate_paragraphs.append(paragraph)
                             final_paragraphs.append(paragraph)
+                            
                     pivot_result = {
                         'intermediate': '\n\n'.join(intermediate_paragraphs),
                         'final': '\n\n'.join(final_paragraphs)
