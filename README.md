@@ -48,6 +48,14 @@ This will translate the EPUB file using both direct and pivot methods with defau
 - `pivot_translation.epub` - Pivot translation
 - `comparison.html` - Side-by-side comparison
 
+### Verbose Mode
+
+To see each chunk being translated along with its translation:
+
+```bash
+python epub_translator.py input.epub --verbose
+```
+
 ### Custom Languages
 
 ```bash

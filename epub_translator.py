@@ -26,7 +26,7 @@ from typing import List, Dict
 from datetime import datetime
 
 class EPUBTranslator:
-    def __init__(self, api_key: str = None, base_url: str = None, model: str = "gpt-4o"):
+    def __init__(self, api_key: str = None, base_url: str = None, model: str = "gpt-4o", verbose: bool = False):
         """
         Initialize with OpenAI-compatible API
         
@@ -35,10 +35,12 @@ class EPUBTranslator:
             base_url: Base URL for the API (e.g., "https://api.openai.com/v1" for OpenAI,
                      "http://localhost:11434/v1" for Ollama, etc.)
             model: Model name to use (e.g., "gpt-4o", "qwen2.5:72b", "mistral-large-latest")
+            verbose: Whether to print verbose output
         """
         self.api_key = api_key or os.environ.get('OPENAI_API_KEY', 'dummy-key')
         self.base_url = base_url or "https://api.openai.com/v1"
         self.model = model
+        self.verbose = verbose
         print(f"Initialized with model: {model}")
         if base_url:
             print(f"Using API endpoint: {base_url}")
@@ -121,6 +123,12 @@ Text to translate:
                 "max_tokens": 8000
             }
             
+            if self.verbose:
+                print(f"\n--- Translating chunk ---")
+                print(f"Source language: {source_lang}")
+                print(f"Target language: {target_lang}")
+                print(f"Text to translate:\n{text}\n")
+            
             response = requests.post(
                 f"{self.base_url}/chat/completions",
                 headers=headers,
@@ -131,7 +139,13 @@ Text to translate:
                 raise Exception(f"API request failed with status {response.status_code}: {response.text}")
             
             result = response.json()
-            return result["choices"][0]["message"]["content"].strip()
+            translation = result["choices"][0]["message"]["content"].strip()
+            
+            if self.verbose:
+                print(f"Translation:\n{translation}\n")
+                print("--- End of chunk translation ---\n")
+            
+            return translation
         except Exception as e:
             print(f"Error during translation: {e}")
             raise
@@ -379,6 +393,7 @@ def main():
     parser.add_argument("-o", "--output", default="output", help="Output directory (default: output)")
     parser.add_argument("-m", "--mode", choices=["direct", "pivot", "both"], default="both",
                         help="Translation mode (default: both)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("--source-lang", default="English", help="Source language (default: English)")
     parser.add_argument("--pivot-lang", default="French", help="Pivot language (default: French)")
     parser.add_argument("--target-lang", default="Romanian", help="Target language (default: Romanian)")
@@ -435,7 +450,8 @@ def main():
     translator = EPUBTranslator(
         api_key=api_key,
         base_url=base_url,
-        model=model
+        model=model,
+        verbose=args.verbose
     )
     
     # Run translation
