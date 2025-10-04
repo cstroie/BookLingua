@@ -338,7 +338,35 @@ class EPUBTranslator:
         return '\n'.join(html_lines)
     
     def _process_markdown_inline_formatting(self, text: str) -> str:
-        """Convert Markdown inline formatting back to HTML tags"""
+        """Convert Markdown inline formatting back to HTML tags.
+        
+        This method processes Markdown-style inline formatting and converts it to
+        equivalent HTML tags. It handles various formatting elements in the correct
+        order of precedence to ensure proper nesting and formatting.
+        
+        Args:
+            text (str): Text containing Markdown inline formatting
+            
+        Returns:
+            str: Text with Markdown formatting converted to HTML tags
+            
+        Processing order (highest to lowest precedence):
+            1. Code blocks (`text`) → <code>text</code>
+            2. Strikethrough (~~text~~) → <s>text</s>
+            3. Bold text (**text**) → <strong>text</strong>
+            4. Italic text (*text*) → <em>text</em>
+            5. Underline (__text__) → <u>text</u>
+            
+        Note:
+            The processing order is important to handle nested formatting correctly.
+            For example, **bold *italic*** should be processed as <strong>bold <em>italic</em></strong>.
+            
+        Example:
+            >>> markdown_text = "This is **bold** and *italic* text with `code`"
+            >>> html_text = translator._process_markdown_inline_formatting(markdown_text)
+            >>> print(html_text)
+            'This is <strong>bold</strong> and <em>italic</em> text with <code>code</code>'
+        """
         # Process formatting in order of precedence
         # Code (highest precedence)
         text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
