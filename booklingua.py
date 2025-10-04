@@ -250,15 +250,30 @@ class EPUBTranslator:
             
             payload = {
                 "model": self.model,
-                "messages": [{
-                    "role": "user",
-                    "content": f"""/no_think Translate the following {source_lang} text to {target_lang}. 
-Maintain the original formatting, paragraph breaks, and tone. 
-Only provide the translation, no explanations.
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": f"""You are a professional translator specializing in {source_lang} to {target_lang} translation. 
+Your task is to translate the provided text while preserving its meaning, tone, and structure.
 
-Text to translate:
-{text}"""
-                }],
+Formatting guidelines:
+- The input text uses Markdown syntax
+- Preserve all Markdown formatting in your response
+- Maintain original paragraph breaks and structure
+- Do not add any explanations or comments
+- Respond only with the translated text
+
+Translation rules:
+- Be accurate and faithful to the source
+- Use natural, fluent {target_lang} expressions
+- Keep proper nouns, technical terms, and titles as appropriate
+- Preserve emphasis formatting (bold, italic, etc.)"""
+                    },
+                    {
+                        "role": "user",
+                        "content": text
+                    }
+                ],
                 "temperature": 0.3,  # Lower temperature for more consistent translations
                 "max_tokens": 8000
             }
