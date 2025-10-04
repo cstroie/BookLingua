@@ -29,14 +29,43 @@ from datetime import datetime
 class EPUBTranslator:
     def __init__(self, api_key: str = None, base_url: str = None, model: str = "gpt-4o", verbose: bool = False):
         """
-        Initialize with OpenAI-compatible API
+        Initialize the EPUBTranslator with an OpenAI-compatible API.
+        
+        This class provides functionality to translate EPUB books using various AI models
+        through OpenAI-compatible APIs. It supports both direct translation and pivot
+        translation through an intermediate language.
         
         Args:
-            api_key: Your API key
-            base_url: Base URL for the API (e.g., "https://api.openai.com/v1" for OpenAI,
-                     "http://localhost:11434/v1" for Ollama, etc.)
-            model: Model name to use (e.g., "gpt-4o", "qwen2.5:72b", "mistral-large-latest")
-            verbose: Whether to print verbose output
+            api_key (str, optional): API key for the translation service. 
+                If not provided, will use OPENAI_API_KEY environment variable.
+                Defaults to 'dummy-key' for testing.
+            base_url (str, optional): Base URL for the API endpoint.
+                Examples:
+                - "https://api.openai.com/v1" for OpenAI
+                - "http://localhost:11434/v1" for Ollama
+                - "https://api.mistral.ai/v1" for Mistral AI
+                Defaults to "https://api.openai.com/v1".
+            model (str, optional): Name of the model to use for translation.
+                Examples: "gpt-4o", "qwen2.5:72b", "mistral-large-latest"
+                Defaults to "gpt-4o".
+            verbose (bool, optional): Whether to print detailed progress information
+                during translation. Defaults to False.
+                
+        Attributes:
+            api_key (str): The API key used for authentication
+            base_url (str): The base URL for the API endpoint
+            model (str): The model name used for translation
+            verbose (bool): Whether verbose output is enabled
+            translation_contexts (dict): Cache for translation contexts to maintain
+                consistency across multiple translations
+                
+        Example:
+            >>> translator = EPUBTranslator(
+            ...     api_key="your-api-key",
+            ...     base_url="https://api.openai.com/v1",
+            ...     model="gpt-4o",
+            ...     verbose=True
+            ... )
         """
         self.api_key = api_key or os.environ.get('OPENAI_API_KEY', 'dummy-key')
         self.base_url = base_url or "https://api.openai.com/v1"
