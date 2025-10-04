@@ -125,7 +125,32 @@ class EPUBTranslator:
         return chapters
     
     def _html_to_markdown(self, soup) -> str:
-        """Convert HTML to Markdown format"""
+        """Convert HTML BeautifulSoup object to Markdown format.
+        
+        This method processes HTML content from an EPUB file and converts it to
+        Markdown format suitable for AI translation. It handles various HTML elements
+        and preserves document structure.
+        
+        Args:
+            soup (BeautifulSoup): BeautifulSoup object containing HTML content
+            
+        Returns:
+            str: Markdown formatted text with preserved structure and formatting
+            
+        Processing details:
+            - Removes script and style elements
+            - Converts headers (h1-h6) to Markdown headers
+            - Converts list items to Markdown bullet points
+            - Handles paragraph breaks with double newlines
+            - Preserves text content while removing HTML tags
+            
+        Example:
+            >>> html = "<h1>Title</h1><p>Paragraph text</p>"
+            >>> soup = BeautifulSoup(html, 'html.parser')
+            >>> markdown = translator._html_to_markdown(soup)
+            >>> print(markdown)
+            '# Title\n\nParagraph text'
+        """
         # Remove script and style elements
         for script in soup(["script", "style"]):
             script.decompose()
