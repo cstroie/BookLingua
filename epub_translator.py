@@ -2,7 +2,8 @@
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
-from openai import OpenAI
+import requests
+import json
 import os
 import argparse
 from typing import List, Dict
@@ -19,10 +20,8 @@ class EPUBTranslator:
                      "http://localhost:11434/v1" for Ollama, etc.)
             model: Model name to use (e.g., "gpt-4o", "qwen2.5:72b", "mistral-large-latest")
         """
-        self.client = OpenAI(
-            api_key=api_key or os.environ.get('OPENAI_API_KEY', 'dummy-key'),
-            base_url=base_url
-        )
+        self.api_key = api_key or os.environ.get('OPENAI_API_KEY', 'dummy-key')
+        self.base_url = base_url or "https://api.openai.com/v1"
         self.model = model
         print(f"Initialized with model: {model}")
         if base_url:
@@ -83,9 +82,17 @@ class EPUBTranslator:
     def _translate_chunk(self, text: str, target_lang: str, source_lang: str) -> str:
         """Translate a single chunk of text"""
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[{
+            headers = {
+                "Content-Type": "application/json"
+            }
+            
+            # Add API key if provided and not a local endpoint
+            if self.api_key and self.api_key != 'dummy-key':
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            
+            payload = {
+                "model": self.model,
+                "messages": [{
                     "role": "user",
                     "content": f"""Translate the following {source_lang} text to {target_lang}. 
 Maintain the original formatting, paragraph breaks, and tone. 
@@ -94,11 +101,21 @@ Only provide the translation, no explanations.
 Text to translate:
 {text}"""
                 }],
-                temperature=0.3,  # Lower temperature for more consistent translations
-                max_tokens=8000
+                "temperature": 0.3,  # Lower temperature for more consistent translations
+                "max_tokens": 8000
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload
             )
             
-            return response.choices[0].message.content.strip()
+            if response.status_code != 200:
+                raise Exception(f"API request failed with status {response.status_code}: {response.text}")
+            
+            result = response.json()
+            return result["choices"][0]["message"]["content"].strip()
         except Exception as e:
             print(f"Error during translation: {e}")
             raise
