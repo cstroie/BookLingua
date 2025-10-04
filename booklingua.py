@@ -39,7 +39,7 @@ class EPUBTranslator:
             verbose: Whether to print verbose output
         """
         self.api_key = api_key or os.environ.get('OPENAI_API_KEY', 'dummy-key')
-        self.base_url = base_url or "https://api.openai.com/v1"
+        self.base_url = base_url #or "https://api.openai.com/v1"
         self.model = model
         self.verbose = verbose
         self.translation_contexts = {}  # Store contexts for different language pairs
@@ -669,6 +669,7 @@ def main():
         if not api_key:
             api_key = os.environ.get('TOGETHER_API_KEY')
     elif args.openrouter:
+        print("OpenRouter")
         base_url = base_url or "https://openrouter.ai/api/v1"
         model = model or "openai/gpt-4o"
         if not api_key:
