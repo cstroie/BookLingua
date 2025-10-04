@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# epub_translator.py - Translate EPUB books using AI models
+# BookLingua - Translate EPUB books using AI models
 # Copyright (C) 2025 Costin Stroie <costinstroie@eridu.eu.org>
 #
 # This program is free software: you can redistribute it and/or modify
@@ -388,7 +388,7 @@ Text to translate:
         return '\n'.join(html_paragraphs)
 
 def main():
-    parser = argparse.ArgumentParser(description="Translate EPUB books using various AI models")
+    parser = argparse.ArgumentParser(description="BookLingua - Translate EPUB books using various AI models")
     parser.add_argument("input", help="Input EPUB file path")
     parser.add_argument("-o", "--output", default="output", help="Output directory (default: output)")
     parser.add_argument("-M", "--mode", choices=["direct", "pivot", "both"], default="both",

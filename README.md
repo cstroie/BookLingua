@@ -1,4 +1,4 @@
-# EPUB Translator
+# BookLingua
 
 A Python tool for translating EPUB books using various AI models through their API endpoints. The tool supports multiple translation methods including direct translation and pivot translation (via an intermediate language) with side-by-side comparisons. Languages are configurable via command line options.
 
