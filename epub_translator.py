@@ -4,6 +4,7 @@ from ebooklib import epub
 from bs4 import BeautifulSoup
 from openai import OpenAI
 import os
+import argparse
 from typing import List, Dict
 from datetime import datetime
 
@@ -328,56 +329,75 @@ Text to translate:
         html_paragraphs = [f'<p>{p.replace(chr(10), "<br/>")}</p>' for p in paragraphs if p.strip()]
         return '\n'.join(html_paragraphs)
 
-# Usage examples
-if __name__ == "__main__":
+def main():
+    parser = argparse.ArgumentParser(description="Translate EPUB books to Romanian using various AI models")
+    parser.add_argument("input", help="Input EPUB file path")
+    parser.add_argument("-o", "--output", default="output", help="Output directory (default: output)")
+    parser.add_argument("-m", "--mode", choices=["direct", "pivot", "both"], default="both",
+                        help="Translation mode (default: both)")
+    parser.add_argument("--api-key", help="API key for the translation service")
+    parser.add_argument("--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
+    parser.add_argument("--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
     
-    # Example 1: Using OpenAI
-    translator_openai = EPUBTranslator(
-        api_key=os.environ.get('OPENAI_API_KEY'),
-        base_url="https://api.openai.com/v1",
-        model="gpt-4o"
+    # Preset configurations for common services
+    parser.add_argument("--openai", action="store_true", help="Use OpenAI API")
+    parser.add_argument("--ollama", action="store_true", help="Use Ollama local server")
+    parser.add_argument("--mistral", action="store_true", help="Use Mistral AI API")
+    parser.add_argument("--deepseek", action="store_true", help="Use DeepSeek API")
+    parser.add_argument("--lmstudio", action="store_true", help="Use LM Studio local server")
+    parser.add_argument("--together", action="store_true", help="Use Together AI API")
+    
+    args = parser.parse_args()
+    
+    # Determine API configuration
+    api_key = args.api_key
+    base_url = args.base_url
+    model = args.model
+    
+    # Handle preset configurations
+    if args.openai:
+        base_url = base_url or "https://api.openai.com/v1"
+        model = model or "gpt-4o"
+    elif args.ollama:
+        base_url = base_url or "http://localhost:11434/v1"
+        model = model or "qwen2.5:72b"
+    elif args.mistral:
+        base_url = base_url or "https://api.mistral.ai/v1"
+        model = model or "mistral-large-latest"
+        if not api_key:
+            api_key = os.environ.get('MISTRAL_API_KEY')
+    elif args.deepseek:
+        base_url = base_url or "https://api.deepseek.com/v1"
+        model = model or "deepseek-chat"
+        if not api_key:
+            api_key = os.environ.get('DEEPSEEK_API_KEY')
+    elif args.lmstudio:
+        base_url = base_url or "http://localhost:1234/v1"
+        model = model or "qwen2.5-72b"
+    elif args.together:
+        base_url = base_url or "https://api.together.xyz/v1"
+        model = model or "Qwen/Qwen2.5-72B-Instruct-Turbo"
+        if not api_key:
+            api_key = os.environ.get('TOGETHER_API_KEY')
+    
+    # Use environment variable as fallback for API key
+    if not api_key:
+        api_key = os.environ.get('OPENAI_API_KEY')
+    
+    # Initialize translator
+    translator = EPUBTranslator(
+        api_key=api_key,
+        base_url=base_url,
+        model=model
     )
     
-    # Example 2: Using Ollama (local)
-    # translator_ollama = EPUBTranslator(
-    #     base_url="http://localhost:11434/v1",
-    #     model="qwen2.5:72b"
-    # )
-    
-    # Example 3: Using Mistral AI
-    # translator_mistral = EPUBTranslator(
-    #     api_key=os.environ.get('MISTRAL_API_KEY'),
-    #     base_url="https://api.mistral.ai/v1",
-    #     model="mistral-large-latest"
-    # )
-    
-    # Example 4: Using DeepSeek
-    # translator_deepseek = EPUBTranslator(
-    #     api_key=os.environ.get('DEEPSEEK_API_KEY'),
-    #     base_url="https://api.deepseek.com/v1",
-    #     model="deepseek-chat"
-    # )
-    
-    # Example 5: Using LM Studio (local)
-    # translator_lmstudio = EPUBTranslator(
-    #     base_url="http://localhost:1234/v1",
-    #     model="qwen2.5-72b"
-    # )
-    
-    # Example 6: Using Together AI
-    # translator_together = EPUBTranslator(
-    #     api_key=os.environ.get('TOGETHER_API_KEY'),
-    #     base_url="https://api.together.xyz/v1",
-    #     model="Qwen/Qwen2.5-72B-Instruct-Turbo"
-    # )
-    
-    # Run the translation with your preferred mode
-    
-    # Option 1: Direct translation only (faster, cheaper)
-    # translator_openai.translate_epub_with_comparison('input.epub', output_dir='output', mode='direct')
-    
-    # Option 2: Pivot translation only (to test French intermediary)
-    # translator_openai.translate_epub_with_comparison('input.epub', output_dir='output', mode='pivot')
-    
-    # Option 3: Both methods with comparison (most expensive but lets you compare)
-    translator_openai.translate_epub_with_comparison('input.epub', output_dir='output', mode='both')
+    # Run translation
+    translator.translate_epub_with_comparison(
+        input_path=args.input,
+        output_dir=args.output,
+        mode=args.mode
+    )
+
+# Usage examples
+if __name__ == "__main__":
+    main()
