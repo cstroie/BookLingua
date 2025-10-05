@@ -99,7 +99,7 @@ class EPUBTranslator:
         if self.conn:
             self.conn.close()
     
-    def extract_text_from_epub(self, book) -> List[dict]:
+    def extract_text_from_epub_book(self, book) -> List[dict]:
         """Extract text content from an already opened EPUB book object.
         
         This method processes an already opened EPUB book object, extracts all 
@@ -762,7 +762,7 @@ Translation rules:
         
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path)
-        chapters = self.extract_text_from_epub(book)
+        chapters = self.extract_text_from_epub_book(book)
         
         print(f"Found {len(chapters)} chapters to translate")
         print(f"Languages: {source_lang} → {target_lang}")
@@ -880,13 +880,13 @@ Translation rules:
         # Create context key for this language pair
         context_key = f"{source_lang.lower()}_{target_lang.lower()}"
         
-        # If context already exists and has enough entries, skip
-        if self.translation_contexts.get(context_key):
-            if len(self.translation_contexts[context_key]) >= 5:
-                return
-        else:
-            # Initialize context list
+        # Initialize context list if it doesn't exist
+        if context_key not in self.translation_contexts:
             self.translation_contexts[context_key] = []
+        
+        # If context already has enough entries, skip
+        if len(self.translation_contexts[context_key]) >= 5:
+            return
         
         # Try to prefill from database first
         if self.conn:
