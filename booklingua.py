@@ -741,68 +741,14 @@ Translation rules:
         """
         return self.translate_text(text, source_lang, target_lang)
     
-    def translate_pivot(self, text: str, source_lang: str, pivot_lang: str = "fr", 
-                       target_lang: str = "ro") -> Dict[str, str]:
-        """Pivot translation from source to target language via intermediate language.
-        
-        This method performs a two-step translation process where text is first
-        translated from the source language to an intermediate (pivot) language,
-        then from the pivot language to the final target language. This approach
-        can sometimes improve translation quality for certain language pairs.
-        
-        Args:
-            text (str): The text content to translate
-            source_lang (str): Source language code
-            pivot_lang (str, optional): Intermediate language code. Defaults to "fr"
-            target_lang (str, optional): Target language code. Defaults to "ro"
-            
-        Returns:
-            Dict[str, str]: A dictionary containing:
-                - 'intermediate': Text translated to pivot language
-                - 'final': Text translated from pivot to target language
-                
-        Translation process:
-            - Step 1: Translate source → pivot language
-            - Step 2: Translate pivot → target language
-            - Maintains separate translation contexts for each language pair
-            - Preserves formatting and document structure in both steps
-            - Uses temperature=0.5 for balanced creativity and consistency
-            
-        Use cases:
-            - When direct translation quality is poor for certain language pairs
-            - When the AI model performs better with specific intermediate languages
-            - For testing different translation approaches and comparing results
-            
-        Example:
-            >>> translator = EPUBTranslator()
-            >>> result = translator.translate_pivot(
-            ...     "Hello, how are you?",
-            ...     "en",
-            ...     pivot_lang="fr",
-            ...     target_lang="ro"
-            ... )
-            >>> print(result['intermediate'])
-            'Bonjour, comment allez-vous?'
-            >>> print(result['final'])
-            'Salut, cum ești?'
-        """
-        print(f"  - Translating to {pivot_lang.upper()}...")
-        intermediate = self.translate_text(text, source_lang, pivot_lang)
-        print(f"  - Translating {pivot_lang.upper()} to {target_lang.upper()}...")
-        final = self.translate_text(intermediate, pivot_lang, target_lang)
-        return {
-            'intermediate': intermediate,
-            'final': final
-        }
     
     
     def translate_epub(self, input_path: str, output_dir: str = "output", 
-                      mode: str = "direct", source_lang: str = "en",
-                      pivot_lang: str = "fr", target_lang: str = "ro"):
-        """Translate EPUB books using direct or pivot translation methods.
+                      source_lang: str = "en", target_lang: str = "ro"):
+        """Translate EPUB books using direct translation method.
         
         This method provides a translation workflow for EPUB books,
-        supporting two translation modes: direct translation or pivot translation.
+        supporting direct translation from source to target language.
         It processes each chapter individually, preserves document structure, 
         and generates output formats.
         
@@ -810,31 +756,23 @@ Translation rules:
             input_path (str): Path to the input EPUB file to be translated
             output_dir (str, optional): Directory where output files will be saved.
                 Defaults to "output". The directory will be created if it doesn't exist.
-            mode (str, optional): Translation mode to use. Options:
-                - "direct": Single-step translation from source to target language
-                - "pivot": Two-step translation via intermediate language
-                Defaults to "direct".
             source_lang (str, optional): Source language code. Defaults to "en".
-            pivot_lang (str, optional): Intermediate language code for pivot translation.
-                Defaults to "fr".
             target_lang (str, optional): Target language code. Defaults to "ro".
                 
         Returns:
             None: Results are saved to files in the specified output directory.
                 
         Output Files:
-            - direct_translation.epub: EPUB with direct translation (if mode is "direct")
-            - pivot_translation.epub: EPUB with pivot translation (if mode is "pivot")
+            - translated.epub: EPUB with translated content
                 
         Translation Process:
             1. Extracts text content from EPUB file
             2. Processes each chapter individually
             3. For each chapter:
-               - Performs direct translation (if enabled)
-               - Performs pivot translation (if enabled)
+               - Performs direct translation
                - Maintains translation context for consistency
                - Preserves document structure and formatting
-            4. Generates output files based on selected mode
+            4. Generates output file
             
         Features:
             - Handles both single paragraphs and multi-chapter documents
@@ -850,20 +788,16 @@ Translation rules:
             >>> translator.translate_epub(
             ...     input_path="book.epub",
             ...     output_dir="translations",
-            ...     mode="direct",
             ...     source_lang="English",
             ...     target_lang="Romanian"
             ... )
-            # Creates: translations/direct_translation.epub
+            # Creates: translations/translated.epub
         """
         # Update database path if not set during initialization
         if not self.db_path and input_path:
             self.db_path = os.path.splitext(input_path)[0] + '.db'
             self._init_database()
 
-        if mode not in ["direct", "pivot"]:
-            raise ValueError("mode must be 'direct' or 'pivot'")
-        
         os.makedirs(output_dir, exist_ok=True)
         
         print(f"Reading EPUB from {input_path}...")
@@ -871,27 +805,16 @@ Translation rules:
         chapters = self.extract_text_from_epub(input_path)
         
         print(f"Found {len(chapters)} chapters to translate")
-        print(f"Translation mode: {mode.upper()}")
-        if mode == "direct":
-            print(f"Languages: {source_lang.upper()} → {target_lang.upper()}")
-        else:
-            print(f"Languages: {source_lang.upper()} → {pivot_lang.upper()} → {target_lang.upper()}")
+        print(f"Languages: {source_lang.upper()} → {target_lang.upper()}")
         print()
         
-        # Prepare output books based on mode
-        direct_book = None
-        pivot_book = None
-        
-        if mode == "direct":
-            direct_book = self._create_book_template(book, f"Direct Translation ({source_lang.upper()} to {target_lang.upper()})")
-        if mode == "pivot":
-            pivot_book = self._create_book_template(book, f"Pivot Translation ({source_lang.upper()} to {target_lang.upper()} via {pivot_lang.upper()})")
+        # Prepare output book
+        translated_book = self._create_book_template(book, f"Translation ({source_lang.upper()} to {target_lang.upper()})")
         
         # Pre-fill context list with random paragraphs if empty
-        self._prefill_context_with_random_paragraphs(chapters, source_lang, target_lang, pivot_lang)
+        self._prefill_context_with_random_paragraphs(chapters, source_lang, target_lang)
         
-        direct_chapters = []
-        pivot_chapters = []
+        translated_chapters = []
         
         # Process each chapter
         for i, chapter in enumerate(chapters):
@@ -906,170 +829,83 @@ Translation rules:
             original_text = chapter['content']
             original_paragraphs = chapter.get('paragraphs', [])
             
-            direct_translation = None
-            pivot_result = None
+            translated_text = None
             
             # Direct translation
-            if mode == "direct":
-                print(f"Direct translation ({source_lang} → {target_lang})...")
-                if original_paragraphs:
-                    # Translate each paragraph separately for better quality
-                    translated_paragraphs = []
-                    for j, paragraph in enumerate(original_paragraphs):
+            print(f"Translating ({source_lang} → {target_lang})...")
+            if original_paragraphs:
+                # Translate each paragraph separately for better quality
+                translated_paragraphs = []
+                for j, paragraph in enumerate(original_paragraphs):
+                    if self.verbose:
+                        print(f"\nTranslating paragraph {j+1}/{len(original_paragraphs)}")
+                    if paragraph.strip():
                         if self.verbose:
-                            print(f"\nTranslating paragraph {j+1}/{len(original_paragraphs)}")
-                        if paragraph.strip():
-                            if self.verbose:
-                                print(f"{source_lang.upper()}: {paragraph}")
-                            
-                            # Time the translation
-                            start_time = datetime.now()
-                            translated_paragraph = self._translate_chunk(paragraph, source_lang, target_lang)
-                            end_time = datetime.now()
-                            
-                            # Calculate and store timing
-                            paragraph_time = (end_time - start_time).total_seconds()
-                            paragraph_times.append(paragraph_time)
-                            
-                            # Calculate statistics
-                            current_avg = sum(paragraph_times) / len(paragraph_times)
-                            remaining_paragraphs = len(original_paragraphs) - (j + 1)
-                            estimated_remaining = current_avg * remaining_paragraphs
-                            
-                            # Show timing statistics
-                            print(f"  Time: {paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
-                            
-                            # Show fluency score for this paragraph
-                            fluency = self.calculate_fluency_score(translated_paragraph)
-                            print(f"  Fluency score: {fluency:.2f}")
-                            
-                            translated_paragraphs.append(translated_paragraph)
-                            if self.verbose:
-                                print(f"{target_lang.upper()}: {translated_paragraph}")
-                        else:
-                            translated_paragraphs.append(paragraph)
-                    direct_translation = '\n\n'.join(translated_paragraphs)
-                else:
-                    direct_translation = self.translate_direct(original_text, source_lang, target_lang)
-                
-                # Show chapter completion time
-                chapter_end_time = datetime.now()
-                chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
-                print(f"✓ Chapter {i+1} direct translation completed in {chapter_duration:.2f}s")
-            
-            # Pivot translation
-            if mode == "pivot":
-                print(f"Pivot translation ({source_lang} → {pivot_lang} → {target_lang})...")
-                if original_paragraphs:
-                    # Translate each paragraph through pivot for better quality
-                    intermediate_paragraphs = []
-                    final_paragraphs = []
-                    for j, paragraph in enumerate(original_paragraphs):
+                            print(f"{source_lang.upper()}: {paragraph}")
+                        
+                        # Time the translation
+                        start_time = datetime.now()
+                        translated_paragraph = self._translate_chunk(paragraph, source_lang, target_lang)
+                        end_time = datetime.now()
+                        
+                        # Calculate and store timing
+                        paragraph_time = (end_time - start_time).total_seconds()
+                        paragraph_times.append(paragraph_time)
+                        
+                        # Calculate statistics
+                        current_avg = sum(paragraph_times) / len(paragraph_times)
+                        remaining_paragraphs = len(original_paragraphs) - (j + 1)
+                        estimated_remaining = current_avg * remaining_paragraphs
+                        
+                        # Show timing statistics
+                        print(f"  Time: {paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
+                        
+                        # Show fluency score for this paragraph
+                        fluency = self.calculate_fluency_score(translated_paragraph)
+                        print(f"  Fluency score: {fluency:.2f}")
+                        
+                        translated_paragraphs.append(translated_paragraph)
                         if self.verbose:
-                            print(f"\nPivot translating paragraph {j+1}/{len(original_paragraphs)}")
-                        if paragraph.strip():
-                            if self.verbose:
-                                print(f"{source_lang.upper()}: {paragraph}")
-                            
-                            # Time the source -> pivot translation
-                            start_time = datetime.now()
-                            # Source -> Pivot
-                            intermediate = self._translate_chunk(paragraph, source_lang, pivot_lang)
-                            intermediate_time = (datetime.now() - start_time).total_seconds()
-                            
-                            intermediate_paragraphs.append(intermediate)
-                            if self.verbose:
-                                print(f"{pivot_lang.upper()}: {intermediate}")
-                            
-                            # Time the pivot -> target translation
-                            start_time = datetime.now()
-                            # Pivot -> Target
-                            final = self._translate_chunk(intermediate, pivot_lang, target_lang)
-                            final_time = (datetime.now() - start_time).total_seconds()
-                            
-                            # Calculate and store timing
-                            total_paragraph_time = intermediate_time + final_time
-                            paragraph_times.append(total_paragraph_time)
-                            
-                            # Calculate statistics
-                            current_avg = sum(paragraph_times) / len(paragraph_times)
-                            remaining_paragraphs = len(original_paragraphs) - (j + 1)
-                            estimated_remaining = current_avg * remaining_paragraphs
-                            
-                            # Show timing statistics
-                            print(f"  Time: {total_paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
-                            
-                            # Show fluency score for this paragraph
-                            fluency = self.calculate_fluency_score(final)
-                            print(f"  Fluency score: {fluency:.2f}")
-                            
-                            final_paragraphs.append(final)
-                            if self.verbose:
-                                print(f"{target_lang.upper()}: {final}")
-                        else:
-                            intermediate_paragraphs.append(paragraph)
-                            final_paragraphs.append(paragraph)
-                    
-                    pivot_result = {
-                        'intermediate': '\n\n'.join(intermediate_paragraphs),
-                        'final': '\n\n'.join(final_paragraphs)
-                    }
-                else:
-                    pivot_result = self.translate_pivot(original_text, source_lang, pivot_lang, target_lang)
-                
-                # Show chapter completion time for pivot translation
-                chapter_end_time = datetime.now()
-                chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
-                print(f"✓ Chapter {i+1} pivot translation completed in {chapter_duration:.2f}s")
+                            print(f"{target_lang.upper()}: {translated_paragraph}")
+                    else:
+                        translated_paragraphs.append(paragraph)
+                translated_text = '\n\n'.join(translated_paragraphs)
+            else:
+                translated_text = self.translate_direct(original_text, source_lang, target_lang)
             
-            # Create chapters for books
-            if direct_book and direct_translation:
-                direct_chapter = epub.EpubHtml(
-                    title=f'Chapter {i+1}',
-                    file_name=f'chapter_{i+1}.xhtml',
-                    lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
-                )
-                direct_chapter.content = f'<html><body>{self._text_to_html(direct_translation)}</body></html>'
-                direct_book.add_item(direct_chapter)
-                direct_chapters.append(direct_chapter)
+            # Show chapter completion time
+            chapter_end_time = datetime.now()
+            chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
+            print(f"✓ Chapter {i+1} translation completed in {chapter_duration:.2f}s")
             
-            if pivot_book and pivot_result:
-                pivot_chapter = epub.EpubHtml(
-                    title=f'Chapter {i+1}',
-                    file_name=f'chapter_{i+1}.xhtml',
-                    lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
-                )
-                pivot_chapter.content = f'<html><body>{self._text_to_html(pivot_result["final"])}</body></html>'
-                pivot_book.add_item(pivot_chapter)
-                pivot_chapters.append(pivot_chapter)
+            # Create chapter for book
+            translated_chapter = epub.EpubHtml(
+                title=f'Chapter {i+1}',
+                file_name=f'chapter_{i+1}.xhtml',
+                lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
+            )
+            translated_chapter.content = f'<html><body>{self._text_to_html(translated_text)}</body></html>'
+            translated_book.add_item(translated_chapter)
+            translated_chapters.append(translated_chapter)
             
             print(f"✓ Chapter {i+1} complete")
         
-        # Finalize books
-        if direct_book:
-            self._finalize_book(direct_book, direct_chapters)
-        if pivot_book:
-            self._finalize_book(pivot_book, pivot_chapters)
+        # Finalize book
+        self._finalize_book(translated_book, translated_chapters)
         
         # Save outputs
         print(f"\n{'='*60}")
         print("Saving output files...")
         
-        if direct_book:
-            direct_path = os.path.join(output_dir, "direct_translation.epub")
-            epub.write_epub(direct_path, direct_book)
-            print(f"✓ Direct translation saved: {direct_path}")
-        
-        if pivot_book:
-            pivot_path = os.path.join(output_dir, "pivot_translation.epub")
-            epub.write_epub(pivot_path, pivot_book)
-            print(f"✓ Pivot translation saved: {pivot_path}")
+        translated_path = os.path.join(output_dir, "translated.epub")
+        epub.write_epub(translated_path, translated_book)
+        print(f"✓ Translation saved: {translated_path}")
         
         print(f"\n{'='*60}")
         print("Translation complete! 🎉")
         print(f"{'='*60}")
     
-    def _prefill_context_with_random_paragraphs(self, chapters: List[dict], source_lang: str, target_lang: str, pivot_lang: str):
+    def _prefill_context_with_random_paragraphs(self, chapters: List[dict], source_lang: str, target_lang: str):
         """Pre-fill translation context with randomly selected paragraphs.
         
         This method selects 5 random paragraphs from the document and translates them
@@ -1080,7 +916,6 @@ Translation rules:
             chapters (List[dict]): List of chapter dictionaries containing paragraphs
             source_lang (str): Source language code
             target_lang (str): Target language code
-            pivot_lang (str): Pivot language code
         """
         # Collect all paragraphs from all chapters
         all_paragraphs = []
@@ -1097,15 +932,11 @@ Translation rules:
         # Select 5 random paragraphs
         selected_paragraphs = random.sample(all_paragraphs, min(5, len(all_paragraphs)))
         
-        # Create context keys
-        direct_context_key = f"{source_lang.lower()}_{target_lang.lower()}"
-        pivot_context_key = f"{source_lang.lower()}_{pivot_lang.lower()}"
-        reverse_pivot_context_key = f"{pivot_lang.lower()}_{target_lang.lower()}"
+        # Create context key
+        context_key = f"{source_lang.lower()}_{target_lang.lower()}"
         
-        # Initialize context lists
-        self.translation_contexts[direct_context_key] = []
-        self.translation_contexts[pivot_context_key] = []
-        self.translation_contexts[reverse_pivot_context_key] = []
+        # Initialize context list
+        self.translation_contexts[context_key] = []
         
         # Translate selected paragraphs to establish context
         for i, paragraph in enumerate(selected_paragraphs):
@@ -1113,19 +944,9 @@ Translation rules:
             
             try:
                 # Direct translation context
-                direct_translation = self._translate_chunk_without_context_storage(
+                translation = self._translate_chunk_without_context_storage(
                     paragraph, source_lang, target_lang)
-                self.translation_contexts[direct_context_key].append((paragraph, direct_translation))
-                
-                # Pivot translation context (source -> pivot)
-                pivot_translation = self._translate_chunk_without_context_storage(
-                    paragraph, source_lang, pivot_lang)
-                self.translation_contexts[pivot_context_key].append((paragraph, pivot_translation))
-                
-                # Pivot translation context (pivot -> target)
-                final_translation = self._translate_chunk_without_context_storage(
-                    pivot_translation, pivot_lang, target_lang)
-                self.translation_contexts[reverse_pivot_context_key].append((pivot_translation, final_translation))
+                self.translation_contexts[context_key].append((paragraph, translation))
                 
             except Exception as e:
                 print(f"    Warning: Failed to pre-translate context paragraph: {e}")
@@ -1598,11 +1419,8 @@ def main():
     parser = argparse.ArgumentParser(description="BookLingua - Translate EPUB books using various AI models")
     parser.add_argument("input", help="Input EPUB file path")
     parser.add_argument("-o", "--output", default="output", help="Output directory (default: output)")
-    parser.add_argument("-M", "--mode", choices=["direct", "pivot", "both"], default="direct",
-                        help="Translation mode (default: direct)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("-s", "--source-lang", default="en", help="Source language code (default: en)")
-    parser.add_argument("-p", "--pivot-lang", default="fr", help="Pivot language code (default: fr)")
     parser.add_argument("-t", "--target-lang", default="ro", help="Target language code (default: ro)")
     parser.add_argument("-u", "--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
     parser.add_argument("-m", "--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
@@ -1697,9 +1515,7 @@ def main():
     translator.translate_epub(
         input_path=args.input,
         output_dir=args.output,
-        mode=args.mode,
         source_lang=source_lang,
-        pivot_lang=pivot_lang,
         target_lang=target_lang
     )
 
