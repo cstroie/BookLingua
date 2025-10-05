@@ -1004,6 +1004,10 @@ Translation rules:
             print(f"Chapter {i+1}/{len(chapters)}: {chapter['name']}")
             print(f"{'='*60}")
             
+            # Initialize timing statistics for this chapter
+            chapter_start_time = datetime.now()
+            paragraph_times = []
+            
             original_text = chapter['content']
             original_paragraphs = chapter.get('paragraphs', [])
             
@@ -1022,7 +1026,24 @@ Translation rules:
                         if paragraph.strip():
                             if self.verbose:
                                 print(f"{source_lang.upper()}: {paragraph}")
+                            
+                            # Time the translation
+                            start_time = datetime.now()
                             translated_paragraph = self._translate_chunk(paragraph, source_lang, target_lang)
+                            end_time = datetime.now()
+                            
+                            # Calculate and store timing
+                            paragraph_time = (end_time - start_time).total_seconds()
+                            paragraph_times.append(paragraph_time)
+                            
+                            # Calculate statistics
+                            current_avg = sum(paragraph_times) / len(paragraph_times)
+                            remaining_paragraphs = len(original_paragraphs) - (j + 1)
+                            estimated_remaining = current_avg * remaining_paragraphs
+                            
+                            # Show timing statistics
+                            print(f"  Time: {paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
+                            
                             translated_paragraphs.append(translated_paragraph)
                             if self.verbose:
                                 print(f"{target_lang.upper()}: {translated_paragraph}")
@@ -1045,19 +1066,53 @@ Translation rules:
                         if paragraph.strip():
                             if self.verbose:
                                 print(f"{source_lang.upper()}: {paragraph}")
+                            
+                            # Time the source -> pivot translation
+                            start_time = datetime.now()
                             # Source -> Pivot
                             intermediate = self._translate_chunk(paragraph, source_lang, pivot_lang)
+                            intermediate_time = (datetime.now() - start_time).total_seconds()
+                            
                             intermediate_paragraphs.append(intermediate)
                             if self.verbose:
                                 print(f"{pivot_lang.upper()}: {intermediate}")
+                            
+                            # Time the pivot -> target translation
+                            start_time = datetime.now()
                             # Pivot -> Target
                             final = self._translate_chunk(intermediate, pivot_lang, target_lang)
+                            final_time = (datetime.now() - start_time).total_seconds()
+                            
+                            # Calculate and store timing
+                            total_paragraph_time = intermediate_time + final_time
+                            paragraph_times.append(total_paragraph_time)
+                            
+                            # Calculate statistics
+                            current_avg = sum(paragraph_times) / len(paragraph_times)
+                            remaining_paragraphs = len(original_paragraphs) - (j + 1)
+                            estimated_remaining = current_avg * remaining_paragraphs
+                            
+                            # Show timing statistics
+                            print(f"  Time: {total_paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
+                            
                             final_paragraphs.append(final)
                             if self.verbose:
                                 print(f"{target_lang.upper()}: {final}")
                         else:
                             intermediate_paragraphs.append(paragraph)
                             final_paragraphs.append(paragraph)
+                    
+                    pivot_result = {
+                        'intermediate': '\n\n'.join(intermediate_paragraphs),
+                        'final': '\n\n'.join(final_paragraphs)
+                    }
+                else:
+                    pivot_result = self.translate_pivot(original_text, source_lang, pivot_lang, target_lang)
+                
+                # Show chapter completion time for pivot translation
+                chapter_end_time = datetime.now()
+                chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
+                print(f"✓ Chapter {i+1} pivot translation completed in {chapter_duration:.2f}s")
                             
                     pivot_result = {
                         'intermediate': '\n\n'.join(intermediate_paragraphs),
