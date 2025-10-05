@@ -94,6 +94,11 @@ class EPUBTranslator:
         if self.db_path:
             print(f"Using database: {self.db_path}")
     
+    def __del__(self):
+        """Clean up database connection when object is destroyed."""
+        if self.conn:
+            self.conn.close()
+    
     def extract_text_from_epub(self, epub_path: str) -> List[dict]:
         """Extract text content from EPUB file and convert to structured format.
         
@@ -743,7 +748,7 @@ Translation rules:
         
         Args:
             text (str): The text content to translate
-            source_lang (str, optional): Source language code. Defaults to "English"
+            source_lang (str): Source language code
             pivot_lang (str, optional): Intermediate language code. Defaults to "French"
             target_lang (str, optional): Target language code. Defaults to "Romanian"
             
@@ -778,9 +783,9 @@ Translation rules:
             'Salut, cum ești?'
         """
         print(f"  - Translating to {pivot_lang.upper()}...")
-        intermediate = self.translate_text(text, pivot_lang, source_lang)
+        intermediate = self.translate_text(text, source_lang, pivot_lang)
         print(f"  - Translating {pivot_lang.upper()} to {target_lang.upper()}...")
-        final = self.translate_text(intermediate, target_lang, pivot_lang)
+        final = self.translate_text(intermediate, pivot_lang, target_lang)
         return {
             'intermediate': intermediate,
             'final': final
