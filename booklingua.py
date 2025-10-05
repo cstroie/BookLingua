@@ -123,6 +123,26 @@ class EPUBTranslator:
             >>> print(f"First chapter title: {chapters[0]['name']}")
         """
         book = epub.read_epub(epub_path)
+        return self.extract_text_from_epub_book(book)
+    
+    def extract_text_from_epub_book(self, book) -> List[dict]:
+        """Extract text content from an already opened EPUB book object.
+        
+        This method processes an already opened EPUB book object, extracts all 
+        document items (HTML content), converts them to Markdown format, and 
+        structures the data for translation.
+        
+        Args:
+            book: An opened EPUB book object
+            
+        Returns:
+            List[dict]: A list of chapter dictionaries, each containing:
+                - id (str): Chapter identifier from EPUB
+                - name (str): Chapter name/filename
+                - content (str): Full chapter content in Markdown format
+                - html (str): Original HTML content
+                - paragraphs (List[str]): Individual paragraphs extracted from content
+        """
         chapters = []
         
         for item in book.get_items():
@@ -802,7 +822,7 @@ Translation rules:
         
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path)
-        chapters = self.extract_text_from_epub(input_path)
+        chapters = self.extract_text_from_epub_book(book)
         
         print(f"Found {len(chapters)} chapters to translate")
         print(f"Languages: {source_lang} → {target_lang}")
