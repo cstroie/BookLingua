@@ -409,8 +409,8 @@ class EPUBTranslator:
         
         Args:
             text (str): The text content to translate
+            source_lang (str): Source language code (e.g., "English", "French", "German")
             target_lang (str): Target language code (e.g., "Romanian", "French", "German")
-            source_lang (str, optional): Source language code. Defaults to "English"
             chunk_size (int, optional): Maximum character length for translation chunks.
                 Defaults to 3000 characters. Text longer than this will be split
                 into paragraphs and translated individually.
@@ -437,7 +437,7 @@ class EPUBTranslator:
         
         # If we have only one paragraph or the total text is small enough, translate as one chunk
         if len(paragraphs) <= 1 or len(text) <= chunk_size:
-            return self._translate_chunk(text, target_lang, source_lang)
+            return self._translate_chunk(text, source_lang, target_lang)
         
         # Otherwise, process each paragraph as a separate chunk
         translated_paragraphs = []
@@ -445,7 +445,7 @@ class EPUBTranslator:
             if self.verbose:
                 print(f"Translating paragraph {i+1}/{len(paragraphs)}")
             if paragraph.strip():  # Only translate non-empty paragraphs
-                translated_paragraphs.append(self._translate_chunk(paragraph, target_lang, source_lang))
+                translated_paragraphs.append(self._translate_chunk(paragraph, source_lang, target_lang))
             else:
                 # Preserve empty paragraphs (section breaks)
                 translated_paragraphs.append(paragraph)
@@ -706,8 +706,8 @@ Translation rules:
         
         Args:
             text (str): The text content to translate
-            source_lang (str, optional): Source language code. Defaults to "English"
-            target_lang (str, optional): Target language code. Defaults to "Romanian"
+            source_lang (str): Source language code
+            target_lang (str): Target language code. Defaults to "Romanian"
             
         Returns:
             str: Translated text in the target language, preserving original
@@ -730,7 +730,7 @@ Translation rules:
             >>> print(result)
             'Salut, cum ești?'
         """
-        return self.translate_text(text, target_lang, source_lang)
+        return self.translate_text(text, source_lang, target_lang)
     
     def translate_pivot(self, text: str, source_lang: str, pivot_lang: str = "French", 
                        target_lang: str = "Romanian") -> Dict[str, str]:
@@ -1114,10 +1114,10 @@ Translation rules:
                 chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
                 print(f"✓ Chapter {i+1} pivot translation completed in {chapter_duration:.2f}s")
                             
-            pivot_result = {
-                'intermediate': '\n\n'.join(intermediate_paragraphs),
-                'final': '\n\n'.join(final_paragraphs)
-            }
+                pivot_result = {
+                    'intermediate': '\n\n'.join(intermediate_paragraphs),
+                    'final': '\n\n'.join(final_paragraphs)
+                }
                 else:
                     pivot_result = self.translate_pivot(original_text, source_lang, pivot_lang, target_lang)
             
