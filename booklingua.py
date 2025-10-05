@@ -793,8 +793,8 @@ Translation rules:
     
     def create_comparison_html(self, chapter_num: int, original: str, 
                               direct: str, pivot_intermediate: str, pivot_final: str,
-                              source_lang: str = "English", pivot_lang: str = "French", 
-                              target_lang: str = "Romanian") -> str:
+                              source_lang: str = "en", pivot_lang: str = "fr", 
+                              target_lang: str = "ro") -> str:
         """Create HTML comparison of translations for side-by-side analysis.
         
         This method generates an HTML section that displays the original text,
@@ -808,9 +808,9 @@ Translation rules:
             direct (str): Text translated directly from source to target language
             pivot_intermediate (str): Text translated from source to pivot language
             pivot_final (str): Text translated from pivot to target language
-            source_lang (str, optional): Source language name. Defaults to "English"
-            pivot_lang (str, optional): Pivot language name. Defaults to "French"
-            target_lang (str, optional): Target language name. Defaults to "Romanian"
+            source_lang (str, optional): Source language code. Defaults to "en"
+            pivot_lang (str, optional): Pivot language code. Defaults to "fr"
+            target_lang (str, optional): Target language code. Defaults to "ro"
             
         Returns:
             str: HTML formatted comparison section with CSS styling
@@ -853,7 +853,7 @@ Translation rules:
             </div>
             
             <div class="translation-block">
-                <h3>Direct Translation ({source_lang} → {target_lang})</h3>
+                <h3>Direct Translation ({source_lang.upper()} → {target_lang.upper()})</h3>
                 <div class="text-content direct">{direct.replace(chr(10), '<br>')}</div>
             </div>
             
@@ -863,7 +863,7 @@ Translation rules:
             </div>
             
             <div class="translation-block">
-                <h3>Pivot Translation ({source_lang} → {pivot_lang} → {target_lang})</h3>
+                <h3>Pivot Translation ({source_lang.upper()} → {pivot_lang.upper()} → {target_lang.upper()})</h3>
                 <div class="text-content pivot">{pivot_final.replace(chr(10), '<br>')}</div>
             </div>
         </div>
@@ -952,16 +952,16 @@ Translation rules:
         
         print(f"Found {len(chapters)} chapters to translate")
         print(f"Translation mode: {mode.upper()}")
-        print(f"Languages: {source_lang} → {target_lang} (direct), {source_lang} → {pivot_lang} → {target_lang} (pivot)\n")
+        print(f"Languages: {source_lang.upper()} → {target_lang.upper()} (direct), {source_lang.upper()} → {pivot_lang.upper()} → {target_lang.upper()} (pivot)\n")
         
         # Prepare output books based on mode
         direct_book = None
         pivot_book = None
         
         if mode in ["direct", "both"]:
-            direct_book = self._create_book_template(book, f"Direct Translation ({source_lang} to {target_lang})")
+            direct_book = self._create_book_template(book, f"Direct Translation ({source_lang.upper()} to {target_lang.upper()})")
         if mode in ["pivot", "both"]:
-            pivot_book = self._create_book_template(book, f"Pivot Translation ({source_lang} to {target_lang} via {pivot_lang})")
+            pivot_book = self._create_book_template(book, f"Pivot Translation ({source_lang.upper()} to {target_lang.upper()} via {pivot_lang.upper()})")
         
         # HTML comparison document (only for "both" mode)
         comparison_html = None
