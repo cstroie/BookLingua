@@ -923,7 +923,7 @@ Translation rules:
         os.makedirs(output_dir, exist_ok=True)
         
         print(f"Reading EPUB from {input_path}...")
-        book = epub.read_epub(input_path)
+        book = epub.read_epub(input_path, options={'ignore_ncx': False})
         chapters = self.extract_text_from_epub(book)
         
         print(f"Found {len(chapters)} chapters to translate")
