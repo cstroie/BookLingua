@@ -1142,7 +1142,7 @@ Translation rules:
                 direct_chapter = epub.EpubHtml(
                     title=f'Chapter {i+1}',
                     file_name=f'chapter_{i+1}.xhtml',
-                    lang='ro'
+                    lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
                 )
                 direct_chapter.content = f'<html><body>{self._text_to_html(direct_translation)}</body></html>'
                 direct_book.add_item(direct_chapter)
@@ -1152,7 +1152,7 @@ Translation rules:
                 pivot_chapter = epub.EpubHtml(
                     title=f'Chapter {i+1}',
                     file_name=f'chapter_{i+1}.xhtml',
-                    lang='ro'
+                    lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
                 )
                 pivot_chapter.content = f'<html><body>{self._text_to_html(pivot_result["final"])}</body></html>'
                 pivot_book.add_item(pivot_chapter)
@@ -1384,8 +1384,8 @@ Translation rules:
         new_book.set_identifier(original_book.get_metadata('DC', 'identifier')[0][0])
         
         original_title = original_book.get_metadata('DC', 'title')[0][0]
-        new_book.set_title(f"{original_title} (Română - {method_name})")
-        new_book.set_language('ro')
+        new_book.set_title(f"{original_title} (Translated - {method_name})")
+        new_book.set_language('en')  # Default to English, will be overridden later
         
         for author in original_book.get_metadata('DC', 'creator'):
             new_book.add_author(author[0])
