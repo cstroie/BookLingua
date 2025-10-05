@@ -1486,30 +1486,9 @@ def main():
         epub_path=args.input
     )
     
-    # Convert language names to codes if needed (for backward compatibility)
-    source_lang = args.source_lang
-    pivot_lang = args.pivot_lang
-    target_lang = args.target_lang
-    
-    # Simple mapping for common language names to codes
-    lang_map = {
-        "english": "en",
-        "french": "fr",
-        "romanian": "ro",
-        "german": "de",
-        "spanish": "es",
-        "italian": "it",
-        "portuguese": "pt",
-        "dutch": "nl",
-        "russian": "ru",
-        "chinese": "zh",
-        "japanese": "ja",
-        "korean": "ko"
-    }
-    
-    source_lang = lang_map.get(source_lang.lower(), source_lang)
-    pivot_lang = lang_map.get(pivot_lang.lower(), pivot_lang)
-    target_lang = lang_map.get(target_lang.lower(), target_lang)
+    # Use language names directly (lowercase)
+    source_lang = args.source_lang.lower()
+    target_lang = args.target_lang.lower()
     
     # Run translation
     translator.translate_epub(
