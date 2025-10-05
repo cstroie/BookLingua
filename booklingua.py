@@ -1130,9 +1130,11 @@ Return only a single number between 0 and 1."""
             'potential_mistranslations': 0
         }
         
-        # Check for untranslated segments (English words in non-English translation)
-        if translated.lower() != translated:  # Has uppercase
-            english_words = re.findall(r'\b[a-z]{4,}\b', translated.lower())
+        # Check for untranslated segments (source language words in target translation)
+        # This is a simplified check - in practice would need language-specific detection
+        if source_lang.lower() == 'english':
+            # Simple check for English words in non-English translation
+            english_words = re.findall(r'\b[a-zA-Z]{4,}\b', translated)
             errors['untranslated_segments'] = len(english_words)
         
         # Check for repeated phrases
