@@ -901,38 +901,79 @@ Translation rules:
         print(f"{'='*60}")
 
     def _prefill_context(self, chapters: List[dict], source_lang: str, target_lang: str):
-        """Pre-fill translation context with randomly selected paragraphs.
+        """Pre-fill translation context with existing translations or random paragraphs.
         
-        This method selects 5 random paragraphs from the document and translates them
-        to establish initial context for the translation process. These translations
-        are not used for the actual document translation and are not stored in the database.
+        This method first tries to use existing translations from the database to
+        establish initial context for the translation process. If there aren't enough
+        existing translations, it selects random paragraphs from the document and
+        translates them to fill the context. These translations are not used for the
+        actual document translation and are not stored in the database.
         
         Args:
             chapters (List[dict]): List of chapter dictionaries containing paragraphs
             source_lang (str): Source language code
             target_lang (str): Target language code
         """
+        # Create context key for this language pair
+        context_key = f"{source_lang.lower()}_{target_lang.lower()}"
+        
+        # If context already exists, skip
+        if self.translation_contexts.get(context_key):
+            return
+        
+        # Initialize context list
+        self.translation_contexts[context_key] = []
+        
+        # Try to prefill from database first
+        if self.conn:
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute('''
+                    SELECT source_text, translated_text FROM translations 
+                    WHERE source_lang = ? AND target_lang = ? 
+                    ORDER BY id DESC LIMIT 10
+                ''', (source_lang, target_lang))
+                results = cursor.fetchall()
+                
+                # Add to context in chronological order (oldest first)
+                for source_text, translated_text in reversed(results):
+                    self.translation_contexts[context_key].append((source_text, translated_text))
+                
+                if len(results) >= 5:
+                    print(f"Pre-filled context with {len(results)} existing translations from database")
+                    return
+                else:
+                    print(f"Found only {len(results)} existing translations, need more for adequate context")
+            except Exception as e:
+                if self.verbose:
+                    print(f"Database context prefill failed: {e}")
+        
+        # If we don't have enough from database, add random paragraphs
         # Collect all paragraphs from all chapters
         all_paragraphs = []
         for chapter in chapters:
             paragraphs = chapter.get('paragraphs', [])
             all_paragraphs.extend([p for p in paragraphs if p.strip()])
         
-        # If we don't have enough paragraphs or context already exists, skip
-        if len(all_paragraphs) < 5 or self.translation_contexts:
+        # Calculate how many more we need (aim for at least 5)
+        current_count = len(self.translation_contexts[context_key])
+        needed_count = max(0, 5 - current_count)
+        
+        # If we don't have enough paragraphs, skip
+        if len(all_paragraphs) < needed_count or needed_count <= 0:
             return
         
         print("Pre-filling translation context with random paragraphs...")
         
-        # Select 5 random paragraphs
-        selected_paragraphs = random.sample(all_paragraphs, min(5, len(all_paragraphs)))
+        # Select needed random paragraphs
+        selected_paragraphs = random.sample(all_paragraphs, min(needed_count, len(all_paragraphs)))
         
         # Translate selected paragraphs to establish context
         for i, paragraph in enumerate(selected_paragraphs):
             print(f"  Pre-translating context paragraph {i+1}/{len(selected_paragraphs)}")
             
             try:
-                # Direct translation context
+                # Direct translation context (without storing in database)
                 translation = self._translate_chunk(
                     paragraph, source_lang, target_lang, True)
                 
@@ -940,7 +981,7 @@ Translation rules:
                 print(f"    Warning: Failed to pre-translate context paragraph: {e}")
                 continue
         
-        print(f"  ✓ Pre-filled context with {len(selected_paragraphs)} paragraph pairs")
+        print(f"  ✓ Pre-filled context with {len(self.translation_contexts[context_key])} paragraph pairs")
     
     def _create_book_template(self, original_book, method_name: str):
         """Create a new EPUB book template with metadata copied from original book.
