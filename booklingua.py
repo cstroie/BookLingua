@@ -795,95 +795,16 @@ Translation rules:
             'final': final
         }
     
-    def create_comparison_html(self, chapter_num: int, original: str, 
-                              direct: str, pivot_intermediate: str, pivot_final: str,
-                              source_lang: str = "en", pivot_lang: str = "fr", 
-                              target_lang: str = "ro") -> str:
-        """Create HTML comparison of translations for side-by-side analysis.
-        
-        This method generates an HTML section that displays the original text,
-        direct translation, and pivot translation (both intermediate and final)
-        in a formatted comparison layout. This is useful for analyzing the
-        differences between translation methods.
-        
-        Args:
-            chapter_num (int): Chapter number for display purposes
-            original (str): Original text in the source language
-            direct (str): Text translated directly from source to target language
-            pivot_intermediate (str): Text translated from source to pivot language
-            pivot_final (str): Text translated from pivot to target language
-            source_lang (str, optional): Source language code. Defaults to "en"
-            pivot_lang (str, optional): Pivot language code. Defaults to "fr"
-            target_lang (str, optional): Target language code. Defaults to "ro"
-            
-        Returns:
-            str: HTML formatted comparison section with CSS styling
-            
-        HTML Structure:
-            - Container div with class "chapter-comparison"
-            - Chapter title header
-            - Four translation blocks with distinct styling:
-              * Original text (neutral styling)
-              * Direct translation (green accent)
-              * Pivot intermediate (blue accent)
-              * Pivot final (red accent)
-            - Horizontal separator between chapters
-            
-        Styling Features:
-            - Responsive layout with proper spacing
-            - Color-coded translation blocks for easy identification
-            - Line break conversion for proper text display
-            - Professional typography and visual hierarchy
-            
-        Example:
-            >>> translator = EPUBTranslator()
-            >>> html = translator.create_comparison_html(
-            ...     chapter_num=1,
-            ...     original="Hello world",
-            ...     direct="Salut lume",
-            ...     pivot_intermediate="Bonjour monde",
-            ...     pivot_final="Salut lume"
-            ... )
-            >>> print(html[:100])  # First 100 characters
-            '<div class="chapter-comparison"><h2>Chapter 1 Comparison</h2><div class="translation-block">'
-        """
-        html = f"""
-        <div class="chapter-comparison">
-            <h2>Chapter {chapter_num} Comparison</h2>
-            
-            <div class="translation-block">
-                <h3>Original {source_lang}</h3>
-                <div class="text-content">{original.replace(chr(10), '<br>')}</div>
-            </div>
-            
-            <div class="translation-block">
-                <h3>Direct Translation ({source_lang.upper()} → {target_lang.upper()})</h3>
-                <div class="text-content direct">{direct.replace(chr(10), '<br>')}</div>
-            </div>
-            
-            <div class="translation-block">
-                <h3>Intermediate {pivot_lang.upper()} ({source_lang.upper()} → {pivot_lang.upper()})</h3>
-                <div class="text-content french">{pivot_intermediate.replace(chr(10), '<br>')}</div>
-            </div>
-            
-            <div class="translation-block">
-                <h3>Pivot Translation ({source_lang.upper()} → {pivot_lang.upper()} → {target_lang.upper()})</h3>
-                <div class="text-content pivot">{pivot_final.replace(chr(10), '<br>')}</div>
-            </div>
-        </div>
-        <hr>
-        """
-        return html
     
-    def translate_epub_with_comparison(self, input_path: str, output_dir: str = "output", 
-                                       mode: str = "both", source_lang: str = "en",
-                                       pivot_lang: str = "fr", target_lang: str = "ro"):
-        """Translate EPUB books using direct, pivot, or both translation methods with comparison output.
+    def translate_epub(self, input_path: str, output_dir: str = "output", 
+                      mode: str = "direct", source_lang: str = "en",
+                      pivot_lang: str = "fr", target_lang: str = "ro"):
+        """Translate EPUB books using direct or pivot translation methods.
         
-        This method provides a comprehensive translation workflow for EPUB books,
-        supporting three translation modes: direct translation, pivot translation,
-        or both with side-by-side comparison. It processes each chapter individually,
-        preserves document structure, and generates multiple output formats.
+        This method provides a translation workflow for EPUB books,
+        supporting two translation modes: direct translation or pivot translation.
+        It processes each chapter individually, preserves document structure, 
+        and generates output formats.
         
         Args:
             input_path (str): Path to the input EPUB file to be translated
@@ -892,8 +813,7 @@ Translation rules:
             mode (str, optional): Translation mode to use. Options:
                 - "direct": Single-step translation from source to target language
                 - "pivot": Two-step translation via intermediate language
-                - "both": Both methods with comparison output
-                Defaults to "both".
+                Defaults to "direct".
             source_lang (str, optional): Source language code. Defaults to "en".
             pivot_lang (str, optional): Intermediate language code for pivot translation.
                 Defaults to "fr".
@@ -903,9 +823,8 @@ Translation rules:
             None: Results are saved to files in the specified output directory.
                 
         Output Files:
-            - direct_translation.epub: EPUB with direct translation (if mode includes direct)
-            - pivot_translation.epub: EPUB with pivot translation (if mode includes pivot)
-            - comparison.html: HTML comparison document (if mode is "both")
+            - direct_translation.epub: EPUB with direct translation (if mode is "direct")
+            - pivot_translation.epub: EPUB with pivot translation (if mode is "pivot")
                 
         Translation Process:
             1. Extracts text content from EPUB file
@@ -921,7 +840,6 @@ Translation rules:
             - Handles both single paragraphs and multi-chapter documents
             - Maintains translation context across chapters for consistency
             - Preserves Markdown formatting and document structure
-            - Generates comparison HTML for analysis (both mode)
             - Supports paragraph-level translation for better quality
             - Uses temperature=0.5 for balanced creativity and accuracy
             - Verbose progress reporting when enabled
@@ -929,24 +847,22 @@ Translation rules:
             
         Example:
             >>> translator = EPUBTranslator()
-            >>> translator.translate_epub_with_comparison(
+            >>> translator.translate_epub(
             ...     input_path="book.epub",
             ...     output_dir="translations",
-            ...     mode="both",
+            ...     mode="direct",
             ...     source_lang="English",
             ...     target_lang="Romanian"
             ... )
             # Creates: translations/direct_translation.epub
-            # Creates: translations/pivot_translation.epub  
-            # Creates: translations/comparison.html
         """
         # Update database path if not set during initialization
         if not self.db_path and input_path:
             self.db_path = os.path.splitext(input_path)[0] + '.db'
             self._init_database()
 
-        if mode not in ["direct", "pivot", "both"]:
-            raise ValueError("mode must be 'direct', 'pivot', or 'both'")
+        if mode not in ["direct", "pivot"]:
+            raise ValueError("mode must be 'direct' or 'pivot'")
         
         os.makedirs(output_dir, exist_ok=True)
         
@@ -956,50 +872,20 @@ Translation rules:
         
         print(f"Found {len(chapters)} chapters to translate")
         print(f"Translation mode: {mode.upper()}")
-        print(f"Languages: {source_lang.upper()} → {target_lang.upper()} (direct), {source_lang.upper()} → {pivot_lang.upper()} → {target_lang.upper()} (pivot)\n")
+        if mode == "direct":
+            print(f"Languages: {source_lang.upper()} → {target_lang.upper()}")
+        else:
+            print(f"Languages: {source_lang.upper()} → {pivot_lang.upper()} → {target_lang.upper()}")
+        print()
         
         # Prepare output books based on mode
         direct_book = None
         pivot_book = None
         
-        if mode in ["direct", "both"]:
+        if mode == "direct":
             direct_book = self._create_book_template(book, f"Direct Translation ({source_lang.upper()} to {target_lang.upper()})")
-        if mode in ["pivot", "both"]:
+        if mode == "pivot":
             pivot_book = self._create_book_template(book, f"Pivot Translation ({source_lang.upper()} to {target_lang.upper()} via {pivot_lang.upper()})")
-        
-        # HTML comparison document (only for "both" mode)
-        comparison_html = None
-        if mode == "both":
-            comparison_html = f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <title>Translation Comparison</title>
-                <style>
-                    body {{ font-family: Georgia, serif; line-height: 1.6; max-width: 1400px; margin: 0 auto; padding: 20px; }}
-                    h2 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
-                    h3 {{ color: #34495e; margin-top: 20px; }}
-                    .chapter-comparison {{ margin-bottom: 50px; }}
-                    .translation-block {{ margin: 20px 0; padding: 15px; border-radius: 5px; }}
-                    .translation-block h3 {{ margin-top: 0; }}
-                    .text-content {{ background: #f8f9fa; padding: 15px; border-left: 4px solid #ccc; }}
-                    .direct {{ border-left-color: #27ae60; }}
-                    .french {{ border-left-color: #3498db; }}
-                    .pivot {{ border-left-color: #e74c3c; }}
-                    hr {{ margin: 40px 0; border: none; border-top: 2px dashed #ccc; }}
-                </style>
-            </head>
-            <body>
-                <h1>{source_lang} to {target_lang} Translation Comparison</h1>
-                <p><strong>Generated:</strong> {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</p>
-                <p><strong>Model:</strong> {self.model}</p>
-                <p><strong>Method Comparison:</strong></p>
-                <ul>
-                    <li><span style="color: #27ae60;">●</span> <strong>Direct:</strong> {source_lang} → {target_lang} (single step)</li>
-                    <li><span style="color: #e74c3c;">●</span> <strong>Pivot:</strong> {source_lang} → {pivot_lang} → {target_lang} (two steps)</li>
-                </ul>
-            """
         
         # Pre-fill context list with random paragraphs if empty
         self._prefill_context_with_random_paragraphs(chapters, source_lang, target_lang, pivot_lang)
@@ -1024,7 +910,7 @@ Translation rules:
             pivot_result = None
             
             # Direct translation
-            if mode in ["direct", "both"]:
+            if mode == "direct":
                 print(f"Direct translation ({source_lang} → {target_lang})...")
                 if original_paragraphs:
                     # Translate each paragraph separately for better quality
@@ -1072,7 +958,7 @@ Translation rules:
                 print(f"✓ Chapter {i+1} direct translation completed in {chapter_duration:.2f}s")
             
             # Pivot translation
-            if mode in ["pivot", "both"]:
+            if mode == "pivot":
                 print(f"Pivot translation ({source_lang} → {pivot_lang} → {target_lang})...")
                 if original_paragraphs:
                     # Translate each paragraph through pivot for better quality
@@ -1136,19 +1022,6 @@ Translation rules:
                 chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
                 print(f"✓ Chapter {i+1} pivot translation completed in {chapter_duration:.2f}s")
             
-            # Add to comparison HTML (only in "both" mode)
-            if mode == "both":
-                comparison_html += self.create_comparison_html(
-                    i + 1, 
-                    original_text, 
-                    direct_translation,
-                    pivot_result['intermediate'],
-                    pivot_result['final'],
-                    source_lang,
-                    pivot_lang,
-                    target_lang
-                )
-            
             # Create chapters for books
             if direct_book and direct_translation:
                 direct_chapter = epub.EpubHtml(
@@ -1191,44 +1064,6 @@ Translation rules:
             pivot_path = os.path.join(output_dir, "pivot_translation.epub")
             epub.write_epub(pivot_path, pivot_book)
             print(f"✓ Pivot translation saved: {pivot_path}")
-        
-        if mode == "both":
-            # Generate quality report
-            quality_report = self.generate_quality_report(chapters, source_lang, target_lang)
-            
-            # Add quality metrics to comparison HTML
-            comparison_html += f"""
-            <div class="quality-metrics">
-                <h2>Translation Quality Metrics</h2>
-                <div class="metric">
-                    <span class="metric-label">Overall Quality Score:</span>
-                    <span class="metric-value">{quality_report['overall_score']:.2f}</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Average Fluency:</span>
-                    <span class="metric-value">{sum(quality_report['fluency_scores'])/len(quality_report['fluency_scores']):.2f}</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Consistency:</span>
-                    <span class="metric-value">{quality_report['consistency_score']:.2f}</span>
-                </div>
-            </div>
-            """
-            
-            comparison_path = os.path.join(output_dir, "comparison.html")
-            comparison_html += "</body></html>"
-            with open(comparison_path, 'w', encoding='utf-8') as f:
-                f.write(comparison_html)
-            print(f"✓ Comparison document saved: {comparison_path}")
-            
-            # Print quality summary
-            print(f"\n{'='*60}")
-            print("QUALITY ASSESSMENT SUMMARY")
-            print(f"{'='*60}")
-            print(f"Overall Quality Score: {quality_report['overall_score']:.2f}")
-            print(f"Average Fluency: {sum(quality_report['fluency_scores'])/len(quality_report['fluency_scores']):.2f}")
-            print(f"Consistency Score: {quality_report['consistency_score']:.2f}")
-            print(f"{'='*60}")
         
         print(f"\n{'='*60}")
         print("Translation complete! 🎉")
@@ -1859,7 +1694,7 @@ def main():
     target_lang = lang_map.get(target_lang.lower(), target_lang)
     
     # Run translation
-    translator.translate_epub_with_comparison(
+    translator.translate_epub(
         input_path=args.input,
         output_dir=args.output,
         mode=args.mode,
