@@ -459,6 +459,10 @@ class EPUBTranslator:
     
     def _init_database(self):
         """Initialize the SQLite database for storing translations."""
+        if not self.db_path:
+            self.conn = None
+            return
+            
         try:
             self.conn = sqlite3.connect(self.db_path)
             self.conn.execute('''
