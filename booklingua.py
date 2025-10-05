@@ -1052,6 +1052,11 @@ Translation rules:
                     direct_translation = '\n\n'.join(translated_paragraphs)
                 else:
                     direct_translation = self.translate_direct(original_text, source_lang, target_lang)
+                
+                # Show chapter completion time
+                chapter_end_time = datetime.now()
+                chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
+                print(f"✓ Chapter {i+1} direct translation completed in {chapter_duration:.2f}s")
             
             # Pivot translation
             if mode in ["pivot", "both"]:
