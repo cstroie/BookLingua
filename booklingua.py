@@ -404,7 +404,7 @@ class EPUBTranslator:
         
         return text
     
-    def translate_text(self, text: str, source_lang: str, target_lang: str = "ro", 
+    def translate_text(self, text: str, source_lang: str, target_lang: str = "Romanian", 
                        chunk_size: int = 3000) -> str:
         """Translate text in chunks using OpenAI-compatible API.
         
@@ -414,8 +414,8 @@ class EPUBTranslator:
         
         Args:
             text (str): The text content to translate
-            source_lang (str): Source language code (e.g., "en", "fr", "de")
-            target_lang (str): Target language code (e.g., "ro", "fr", "de")
+            source_lang (str): Source language name (e.g., "English", "French", "German")
+            target_lang (str): Target language name (e.g., "Romanian", "French", "German")
             chunk_size (int, optional): Maximum character length for translation chunks.
                 Defaults to 3000 characters. Text longer than this will be split
                 into paragraphs and translated individually.
@@ -433,7 +433,7 @@ class EPUBTranslator:
         Example:
             >>> translator = EPUBTranslator()
             >>> text = "This is a paragraph.\\n\\nThis is another paragraph."
-            >>> translated = translator.translate_text(text, "en", "ro")
+            >>> translated = translator.translate_text(text, "English", "Romanian")
             >>> print(translated)
             'Acesta este un paragraf.\\n\\nAcesta este alt paragraf.'
         """
@@ -706,7 +706,7 @@ Translation rules:
             print(f"Error during translation: {e}")
             raise
     
-    def translate_direct(self, text: str, source_lang: str, target_lang: str = "ro") -> str:
+    def translate_direct(self, text: str, source_lang: str, target_lang: str = "Romanian") -> str:
         """Direct translation from source to target language using AI models.
         
         This method performs a direct translation of text from the source language
@@ -715,8 +715,8 @@ Translation rules:
         
         Args:
             text (str): The text content to translate
-            source_lang (str): Source language code
-            target_lang (str): Target language code. Defaults to "ro"
+            source_lang (str): Source language name
+            target_lang (str): Target language name. Defaults to "Romanian"
             
         Returns:
             str: Translated text in the target language, preserving original
@@ -733,8 +733,8 @@ Translation rules:
             >>> translator = EPUBTranslator()
             >>> result = translator.translate_direct(
             ...     "Hello, how are you?",
-            ...     source_lang="en",
-            ...     target_lang="ro"
+            ...     source_lang="English",
+            ...     target_lang="Romanian"
             ... )
             >>> print(result)
             'Salut, cum ești?'
@@ -744,7 +744,7 @@ Translation rules:
     
     
     def translate_epub(self, input_path: str, output_dir: str = "output", 
-                      source_lang: str = "en", target_lang: str = "ro"):
+                      source_lang: str = "English", target_lang: str = "Romanian"):
         """Translate EPUB books using direct translation method.
         
         This method provides a translation workflow for EPUB books,
@@ -756,8 +756,8 @@ Translation rules:
             input_path (str): Path to the input EPUB file to be translated
             output_dir (str, optional): Directory where output files will be saved.
                 Defaults to "output". The directory will be created if it doesn't exist.
-            source_lang (str, optional): Source language code. Defaults to "en".
-            target_lang (str, optional): Target language code. Defaults to "ro".
+            source_lang (str, optional): Source language name. Defaults to "English".
+            target_lang (str, optional): Target language name. Defaults to "Romanian".
                 
         Returns:
             None: Results are saved to files in the specified output directory.
@@ -805,11 +805,11 @@ Translation rules:
         chapters = self.extract_text_from_epub(input_path)
         
         print(f"Found {len(chapters)} chapters to translate")
-        print(f"Languages: {source_lang.upper()} → {target_lang.upper()}")
+        print(f"Languages: {source_lang} → {target_lang}")
         print()
         
         # Prepare output book
-        translated_book = self._create_book_template(book, f"Translation ({source_lang.upper()} to {target_lang.upper()})")
+        translated_book = self._create_book_template(book, f"Translation ({source_lang} to {target_lang})")
         
         # Pre-fill context list with random paragraphs if empty
         self._prefill_context_with_random_paragraphs(chapters, source_lang, target_lang)
@@ -841,7 +841,7 @@ Translation rules:
                         print(f"\nTranslating paragraph {j+1}/{len(original_paragraphs)}")
                     if paragraph.strip():
                         if self.verbose:
-                            print(f"{source_lang.upper()}: {paragraph}")
+                            print(f"{source_lang}: {paragraph}")
                         
                         # Time the translation
                         start_time = datetime.now()
@@ -866,7 +866,7 @@ Translation rules:
                         
                         translated_paragraphs.append(translated_paragraph)
                         if self.verbose:
-                            print(f"{target_lang.upper()}: {translated_paragraph}")
+                            print(f"{target_lang}: {translated_paragraph}")
                     else:
                         translated_paragraphs.append(paragraph)
                 translated_text = '\n\n'.join(translated_paragraphs)
@@ -1420,8 +1420,8 @@ def main():
     parser.add_argument("input", help="Input EPUB file path")
     parser.add_argument("-o", "--output", default="output", help="Output directory (default: output)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
-    parser.add_argument("-s", "--source-lang", default="en", help="Source language code (default: en)")
-    parser.add_argument("-t", "--target-lang", default="ro", help="Target language code (default: ro)")
+    parser.add_argument("-s", "--source-lang", default="English", help="Source language (default: English)")
+    parser.add_argument("-t", "--target-lang", default="Romanian", help="Target language (default: Romanian)")
     parser.add_argument("-u", "--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
     parser.add_argument("-m", "--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
     parser.add_argument("-k", "--api-key", help="API key for the translation service")
