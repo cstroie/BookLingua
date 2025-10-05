@@ -493,7 +493,17 @@ class EPUBTranslator:
                 WHERE source_lang = ? AND target_lang = ? AND source_text = ?
             ''', (source_lang, target_lang, text))
             result = cursor.fetchone()
-            return result[0] if result else None
+            if result:
+                # Push to context list for continuity
+                context_key = f"{source_lang.lower()}_{target_lang.lower()}"
+                if context_key not in self.translation_contexts:
+                    self.translation_contexts[context_key] = []
+                self.translation_contexts[context_key].append((text, result[0]))
+                # Keep only the last 10 exchanges for better context
+                if len(self.translation_contexts[context_key]) > 10:
+                    self.translation_contexts[context_key].pop(0)
+                return result[0]
+            return None
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup failed: {e}")
