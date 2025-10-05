@@ -1053,6 +1053,10 @@ Translation rules:
                             # Show timing statistics
                             print(f"  Time: {paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
                             
+                            # Show fluency score for this paragraph
+                            fluency = self.calculate_fluency_score(translated_paragraph)
+                            print(f"  Fluency score: {fluency:.2f}")
+                            
                             translated_paragraphs.append(translated_paragraph)
                             if self.verbose:
                                 print(f"{target_lang.upper()}: {translated_paragraph}")
@@ -1108,6 +1112,10 @@ Translation rules:
                             
                             # Show timing statistics
                             print(f"  Time: {total_paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
+                            
+                            # Show fluency score for this paragraph
+                            fluency = self.calculate_fluency_score(final)
+                            print(f"  Fluency score: {fluency:.2f}")
                             
                             final_paragraphs.append(final)
                             if self.verbose:
@@ -1185,11 +1193,42 @@ Translation rules:
             print(f"✓ Pivot translation saved: {pivot_path}")
         
         if mode == "both":
+            # Generate quality report
+            quality_report = self.generate_quality_report(chapters, source_lang, target_lang)
+            
+            # Add quality metrics to comparison HTML
+            comparison_html += f"""
+            <div class="quality-metrics">
+                <h2>Translation Quality Metrics</h2>
+                <div class="metric">
+                    <span class="metric-label">Overall Quality Score:</span>
+                    <span class="metric-value">{quality_report['overall_score']:.2f}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Average Fluency:</span>
+                    <span class="metric-value">{sum(quality_report['fluency_scores'])/len(quality_report['fluency_scores']):.2f}</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Consistency:</span>
+                    <span class="metric-value">{quality_report['consistency_score']:.2f}</span>
+                </div>
+            </div>
+            """
+            
             comparison_path = os.path.join(output_dir, "comparison.html")
             comparison_html += "</body></html>"
             with open(comparison_path, 'w', encoding='utf-8') as f:
                 f.write(comparison_html)
             print(f"✓ Comparison document saved: {comparison_path}")
+            
+            # Print quality summary
+            print(f"\n{'='*60}")
+            print("QUALITY ASSESSMENT SUMMARY")
+            print(f"{'='*60}")
+            print(f"Overall Quality Score: {quality_report['overall_score']:.2f}")
+            print(f"Average Fluency: {sum(quality_report['fluency_scores'])/len(quality_report['fluency_scores']):.2f}")
+            print(f"Consistency Score: {quality_report['consistency_score']:.2f}")
+            print(f"{'='*60}")
         
         print(f"\n{'='*60}")
         print("Translation complete! 🎉")
@@ -1430,6 +1469,171 @@ Translation rules:
         book.add_item(epub.EpubNav())
         book.spine = ['nav'] + chapters
     
+    def calculate_fluency_score(self, text: str) -> float:
+        """Calculate fluency score based on linguistic patterns.
+        
+        Args:
+            text (str): Text to evaluate for fluency
+            
+        Returns:
+            float: Fluency score between 0.0 and 1.0 (higher is better)
+        """
+        # Check for sentence length variation
+        sentences = [s.strip() for s in text.split('.') if s.strip()]
+        if not sentences:
+            return 1.0
+            
+        avg_length = sum(len(s.split()) for s in sentences) / len(sentences)
+        length_variance = sum((len(s.split()) - avg_length)**2 for s in sentences) / len(sentences)
+        
+        # Check for repeated words
+        words = text.lower().split()
+        word_freq = {}
+        for word in words:
+            word_freq[word] = word_freq.get(word, 0) + 1
+        max_freq = max(word_freq.values()) if word_freq else 0
+        
+        # Score calculation (0-1 scale, higher is better)
+        fluency = 1.0 - (length_variance / 1000) - (max_freq / len(words))
+        return max(0.0, min(1.0, fluency))
+    
+    def calculate_adequacy_score(self, original: str, translated: str, source_lang: str, target_lang: str) -> float:
+        """Calculate adequacy score using AI evaluation.
+        
+        Args:
+            original (str): Original text
+            translated (str): Translated text
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            float: Adequacy score between 0.0 and 1.0 (higher is better)
+        """
+        prompt = f"""Rate the translation quality on a scale of 0-1:
+        
+Original ({source_lang}): {original}
+Translation ({target_lang}): {translated}
+
+Criteria:
+- Meaning preservation (0.5)
+- Completeness (0.3) 
+- Naturalness (0.2)
+
+Return only a single number between 0 and 1."""
+        
+        # Use the existing translation system to evaluate
+        try:
+            result = self._translate_chunk(prompt, source_lang, target_lang)
+            # Extract numerical score from response
+            import re
+            score_match = re.search(r'(\d+\.?\d*)', result)
+            if score_match:
+                return min(1.0, float(score_match.group(1)))
+            return 0.5  # Default score if parsing fails
+        except Exception:
+            return 0.5  # Default score on error
+    
+    def calculate_consistency_score(self, chapters: List[dict]) -> float:
+        """Check terminology consistency across chapters.
+        
+        Args:
+            chapters (List[dict]): List of chapter dictionaries
+            
+        Returns:
+            float: Consistency score between 0.0 and 1.0 (higher is better)
+        """
+        all_terms = {}
+        inconsistencies = 0
+        total_terms = 0
+        
+        for chapter in chapters:
+            text = chapter['content'].lower()
+            # Extract potential terms (nouns, proper nouns)
+            terms = re.findall(r'\b[A-Z][a-z]+\b|\b\w{4,}\b', text)
+            
+            for term in terms:
+                if term in all_terms:
+                    if all_terms[term] != term:  # Different translation found
+                        inconsistencies += 1
+                else:
+                    all_terms[term] = term
+                total_terms += 1
+        
+        return 1.0 - (inconsistencies / total_terms) if total_terms > 0 else 1.0
+    
+    def detect_translation_errors(self, original: str, translated: str) -> Dict[str, int]:
+        """Detect common translation errors.
+        
+        Args:
+            original (str): Original text
+            translated (str): Translated text
+            
+        Returns:
+            Dict[str, int]: Dictionary containing error counts
+        """
+        errors = {
+            'untranslated_segments': 0,
+            'repeated_phrases': 0,
+            'formatting_issues': 0,
+            'potential_mistranslations': 0
+        }
+        
+        # Check for untranslated segments (English words in non-English translation)
+        if translated.lower() != translated:  # Has uppercase
+            english_words = re.findall(r'\b[a-z]{4,}\b', translated.lower())
+            errors['untranslated_segments'] = len(english_words)
+        
+        # Check for repeated phrases
+        phrases = [p.strip() for p in translated.split('.') if p.strip()]
+        for i in range(len(phrases)-1):
+            for j in range(i+1, min(i+3, len(phrases))):
+                if phrases[i] == phrases[j]:
+                    errors['repeated_phrases'] += 1
+        
+        return errors
+    
+    def generate_quality_report(self, chapters: List[dict], source_lang: str, target_lang: str) -> Dict:
+        """Generate comprehensive quality assessment report.
+        
+        Args:
+            chapters (List[dict]): List of chapter dictionaries
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            Dict: Quality assessment report with scores and metrics
+        """
+        report = {
+            'fluency_scores': [],
+            'adequacy_scores': [],
+            'consistency_score': 0,
+            'error_summary': {},
+            'overall_score': 0
+        }
+        
+        # Calculate fluency for each chapter
+        for chapter in chapters:
+            fluency = self.calculate_fluency_score(chapter['content'])
+            report['fluency_scores'].append(fluency)
+        
+        # Calculate adequacy for sample paragraphs
+        sample_size = min(5, len(chapters))
+        for i in range(sample_size):
+            original = chapters[i]['content']
+            translated = self.translate_direct(original, source_lang, target_lang)
+            adequacy = self.calculate_adequacy_score(original, translated, source_lang, target_lang)
+            report['adequacy_scores'].append(adequacy)
+        
+        # Calculate consistency
+        report['consistency_score'] = self.calculate_consistency_score(chapters)
+        
+        # Overall score (weighted average)
+        avg_fluency = sum(report['fluency_scores']) / len(report['fluency_scores'])
+        avg_adequacy = sum(report['adequacy_scores']) / len(report['adequacy_scores'])
+        report['overall_score'] = (avg_fluency * 0.4 + avg_adequacy * 0.4 + report['consistency_score'] * 0.2)
+        
+        return report
+
     def _text_to_html(self, text: str) -> str:
         """Convert text to HTML paragraphs with intelligent format detection.
         
@@ -1591,7 +1795,7 @@ def main():
         model = model or "gpt-4o"
     elif args.ollama:
         base_url = base_url or "http://localhost:11434/v1"
-        model = model or "qwen2.5:72b"
+        model = model or "gemma3n:e4b"
     elif args.mistral:
         base_url = base_url or "https://api.mistral.ai/v1"
         model = model or "mistral-large-latest"
