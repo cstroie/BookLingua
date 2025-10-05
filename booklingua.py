@@ -1237,7 +1237,7 @@ Return only a single number between 0 and 1."""
         
         # Use the existing translation system to evaluate
         try:
-            result = self._translate_chunk(prompt, source_lang, target_lang)
+            result = self._translate_chunk(prompt, "English", "English", prefill=True)  # Evaluate in English
             # Extract numerical score from response
             import re
             score_match = re.search(r'(\d+\.?\d*)', result)
@@ -1275,12 +1275,13 @@ Return only a single number between 0 and 1."""
         
         return 1.0 - (inconsistencies / total_terms) if total_terms > 0 else 1.0
 
-    def _detect_translation_errors(self, original: str, translated: str) -> Dict[str, int]:
+    def _detect_translation_errors(self, original: str, translated: str, source_lang: str) -> Dict[str, int]:
         """Detect common translation errors.
         
         Args:
             original (str): Original text
             translated (str): Translated text
+            source_lang (str): Source language name
             
         Returns:
             Dict[str, int]: Dictionary containing error counts
@@ -1344,8 +1345,8 @@ Return only a single number between 0 and 1."""
         report['consistency_score'] = self._calculate_consistency_score(chapters)
 
         # Overall score (weighted average)
-        avg_fluency = sum(report['fluency_scores']) / len(report['fluency_scores'])
-        avg_adequacy = sum(report['adequacy_scores']) / len(report['adequacy_scores'])
+        avg_fluency = sum(report['fluency_scores']) / len(report['fluency_scores']) if report['fluency_scores'] else 0
+        avg_adequacy = sum(report['adequacy_scores']) / len(report['adequacy_scores']) if report['adequacy_scores'] else 0
         report['overall_score'] = (avg_fluency * 0.4 + avg_adequacy * 0.4 + report['consistency_score'] * 0.2)
         
         return report
