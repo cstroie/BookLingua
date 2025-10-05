@@ -28,6 +28,15 @@ import random
 from typing import List, Dict, Optional
 from datetime import datetime
 
+# Constants for configurable values
+DEFAULT_CHUNK_SIZE = 3000
+DEFAULT_TEMPERATURE = 0.5
+DEFAULT_MAX_TOKENS = 4096
+DEFAULT_CONTEXT_SIZE = 10
+DEFAULT_PREFILL_CONTEXT_SIZE = 5
+DEFAULT_KEEP_ALIVE = "30m"
+DEFAULT_OUTPUT_DIR = "output"
+
 class EPUBTranslator:
     def __init__(self, api_key: str = None, base_url: str = None, model: str = "gpt-4o", verbose: bool = False, epub_path: str = None):
         """
@@ -528,7 +537,7 @@ class EPUBTranslator:
         return text
     
     def translate_text(self, text: str, source_lang: str, target_lang: str = "Romanian", 
-                       chunk_size: int = 3000) -> str:
+                       chunk_size: int = DEFAULT_CHUNK_SIZE) -> str:
         """Translate text in chunks using OpenAI-compatible API.
         
         This method translates text content by breaking it into manageable chunks
@@ -656,8 +665,8 @@ class EPUBTranslator:
                 if context_key not in self.translation_contexts:
                     self.translation_contexts[context_key] = []
                 self.translation_contexts[context_key].append((text, result[0]))
-                # Keep only the last 10 exchanges for better context
-                if len(self.translation_contexts[context_key]) > 10:
+                # Keep only the last N exchanges for better context
+                if len(self.translation_contexts[context_key]) > DEFAULT_CONTEXT_SIZE:
                     self.translation_contexts[context_key].pop(0)
                 return result[0]
             return None
@@ -819,9 +828,9 @@ Translation rules:
             payload = {
                 "model": self.model,
                 "messages": messages,
-                "temperature": 0.5,
-                "max_tokens": 4096,
-                "keep_alive": "30m",
+                "temperature": DEFAULT_TEMPERATURE,
+                "max_tokens": DEFAULT_MAX_TOKENS,
+                "keep_alive": DEFAULT_KEEP_ALIVE,
                 "stream": False
             }
             
@@ -847,8 +856,8 @@ Translation rules:
 
             # Update translation context for this language pair
             self.translation_contexts[context_key].append((text, translation))
-            # Keep only the last 10 exchanges for better context
-            if len(self.translation_contexts[context_key]) > 10:
+            # Keep only the last N exchanges for better context
+            if len(self.translation_contexts[context_key]) > DEFAULT_CONTEXT_SIZE:
                 self.translation_contexts[context_key].pop(0)
             
             return translation
@@ -1038,7 +1047,7 @@ Translation rules:
             self.translation_contexts[context_key] = []
         
         # If context already has enough entries, skip
-        if len(self.translation_contexts[context_key]) >= 5:
+        if len(self.translation_contexts[context_key]) >= DEFAULT_PREFILL_CONTEXT_SIZE:
             return
         
         # Try to prefill from database first
@@ -1056,7 +1065,7 @@ Translation rules:
                 for source_text, translated_text in reversed(results):
                     self.translation_contexts[context_key].append((source_text, translated_text))
                 
-                if len(results) >= 5:
+                if len(results) >= DEFAULT_PREFILL_CONTEXT_SIZE:
                     print(f"Pre-filled context with {len(results)} existing translations from database")
                     return
                 else:
@@ -1072,9 +1081,9 @@ Translation rules:
             paragraphs = chapter.get('paragraphs', [])
             all_paragraphs.extend([p for p in paragraphs if p.strip()])
         
-        # Calculate how many more we need (aim for at least 5)
+        # Calculate how many more we need (aim for at least DEFAULT_PREFILL_CONTEXT_SIZE)
         current_count = len(self.translation_contexts[context_key])
-        needed_count = max(0, 5 - current_count)
+        needed_count = max(0, DEFAULT_PREFILL_CONTEXT_SIZE - current_count)
         
         # If we don't have enough paragraphs, skip
         if len(all_paragraphs) < needed_count or needed_count <= 0:
