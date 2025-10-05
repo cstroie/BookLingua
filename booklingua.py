@@ -404,7 +404,7 @@ class EPUBTranslator:
         
         return text
     
-    def translate_text(self, text: str, source_lang: str, target_lang: str = "Romanian", 
+    def translate_text(self, text: str, source_lang: str, target_lang: str = "ro", 
                        chunk_size: int = 3000) -> str:
         """Translate text in chunks using OpenAI-compatible API.
         
@@ -414,8 +414,8 @@ class EPUBTranslator:
         
         Args:
             text (str): The text content to translate
-            source_lang (str): Source language code (e.g., "English", "French", "German")
-            target_lang (str): Target language code (e.g., "Romanian", "French", "German")
+            source_lang (str): Source language code (e.g., "en", "fr", "de")
+            target_lang (str): Target language code (e.g., "ro", "fr", "de")
             chunk_size (int, optional): Maximum character length for translation chunks.
                 Defaults to 3000 characters. Text longer than this will be split
                 into paragraphs and translated individually.
@@ -433,7 +433,7 @@ class EPUBTranslator:
         Example:
             >>> translator = EPUBTranslator()
             >>> text = "This is a paragraph.\\n\\nThis is another paragraph."
-            >>> translated = translator.translate_text(text, "English", "Romanian")
+            >>> translated = translator.translate_text(text, "en", "ro")
             >>> print(translated)
             'Acesta este un paragraf.\\n\\nAcesta este alt paragraf.'
         """
@@ -702,7 +702,7 @@ Translation rules:
             print(f"Error during translation: {e}")
             raise
     
-    def translate_direct(self, text: str, source_lang: str, target_lang: str = "Romanian") -> str:
+    def translate_direct(self, text: str, source_lang: str, target_lang: str = "ro") -> str:
         """Direct translation from source to target language using AI models.
         
         This method performs a direct translation of text from the source language
@@ -712,7 +712,7 @@ Translation rules:
         Args:
             text (str): The text content to translate
             source_lang (str): Source language code
-            target_lang (str): Target language code. Defaults to "Romanian"
+            target_lang (str): Target language code. Defaults to "ro"
             
         Returns:
             str: Translated text in the target language, preserving original
@@ -729,16 +729,16 @@ Translation rules:
             >>> translator = EPUBTranslator()
             >>> result = translator.translate_direct(
             ...     "Hello, how are you?",
-            ...     source_lang="English",
-            ...     target_lang="Romanian"
+            ...     source_lang="en",
+            ...     target_lang="ro"
             ... )
             >>> print(result)
             'Salut, cum ești?'
         """
         return self.translate_text(text, source_lang, target_lang)
     
-    def translate_pivot(self, text: str, source_lang: str, pivot_lang: str = "French", 
-                       target_lang: str = "Romanian") -> Dict[str, str]:
+    def translate_pivot(self, text: str, source_lang: str, pivot_lang: str = "fr", 
+                       target_lang: str = "ro") -> Dict[str, str]:
         """Pivot translation from source to target language via intermediate language.
         
         This method performs a two-step translation process where text is first
@@ -749,8 +749,8 @@ Translation rules:
         Args:
             text (str): The text content to translate
             source_lang (str): Source language code
-            pivot_lang (str, optional): Intermediate language code. Defaults to "French"
-            target_lang (str, optional): Target language code. Defaults to "Romanian"
+            pivot_lang (str, optional): Intermediate language code. Defaults to "fr"
+            target_lang (str, optional): Target language code. Defaults to "ro"
             
         Returns:
             Dict[str, str]: A dictionary containing:
@@ -773,9 +773,9 @@ Translation rules:
             >>> translator = EPUBTranslator()
             >>> result = translator.translate_pivot(
             ...     "Hello, how are you?",
-            ...     "English",
-            ...     pivot_lang="French",
-            ...     target_lang="Romanian"
+            ...     "en",
+            ...     pivot_lang="fr",
+            ...     target_lang="ro"
             ... )
             >>> print(result['intermediate'])
             'Bonjour, comment allez-vous?'
