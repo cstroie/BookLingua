@@ -1558,9 +1558,9 @@ def main():
     parser.add_argument("-M", "--mode", choices=["direct", "pivot", "both"], default="direct",
                         help="Translation mode (default: direct)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
-    parser.add_argument("-s", "--source-lang", default="English", help="Source language (default: English)")
-    parser.add_argument("-p", "--pivot-lang", default="French", help="Pivot language (default: French)")
-    parser.add_argument("-t", "--target-lang", default="Romanian", help="Target language (default: Romanian)")
+    parser.add_argument("-s", "--source-lang", default="en", help="Source language code (default: en)")
+    parser.add_argument("-p", "--pivot-lang", default="fr", help="Pivot language code (default: fr)")
+    parser.add_argument("-t", "--target-lang", default="ro", help="Target language code (default: ro)")
     parser.add_argument("-u", "--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
     parser.add_argument("-m", "--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
     parser.add_argument("-k", "--api-key", help="API key for the translation service")
@@ -1625,14 +1625,39 @@ def main():
         epub_path=args.input
     )
     
+    # Convert language names to codes if needed (for backward compatibility)
+    source_lang = args.source_lang
+    pivot_lang = args.pivot_lang
+    target_lang = args.target_lang
+    
+    # Simple mapping for common language names to codes
+    lang_map = {
+        "english": "en",
+        "french": "fr",
+        "romanian": "ro",
+        "german": "de",
+        "spanish": "es",
+        "italian": "it",
+        "portuguese": "pt",
+        "dutch": "nl",
+        "russian": "ru",
+        "chinese": "zh",
+        "japanese": "ja",
+        "korean": "ko"
+    }
+    
+    source_lang = lang_map.get(source_lang.lower(), source_lang)
+    pivot_lang = lang_map.get(pivot_lang.lower(), pivot_lang)
+    target_lang = lang_map.get(target_lang.lower(), target_lang)
+    
     # Run translation
     translator.translate_epub_with_comparison(
         input_path=args.input,
         output_dir=args.output,
         mode=args.mode,
-        source_lang=args.source_lang,
-        pivot_lang=args.pivot_lang,
-        target_lang=args.target_lang
+        source_lang=source_lang,
+        pivot_lang=pivot_lang,
+        target_lang=target_lang
     )
 
 if __name__ == "__main__":
