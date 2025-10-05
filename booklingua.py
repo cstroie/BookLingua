@@ -99,7 +99,7 @@ class EPUBTranslator:
         if self.conn:
             self.conn.close()
     
-    def extract_text_from_epub_book(self, book) -> List[dict]:
+    def extract_text_from_epub(self, book) -> List[dict]:
         """Extract text content from an already opened EPUB book object.
         
         This method processes an already opened EPUB book object, extracts all 
@@ -762,7 +762,7 @@ Translation rules:
         
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path)
-        chapters = self.extract_text_from_epub_book(book)
+        chapters = self.extract_text_from_epub(book)
         
         print(f"Found {len(chapters)} chapters to translate")
         print(f"Languages: {source_lang} → {target_lang}")
