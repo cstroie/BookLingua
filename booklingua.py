@@ -1097,11 +1097,14 @@ Translation rules:
         # Translate selected paragraphs to establish context
         for i, paragraph in enumerate(selected_paragraphs):
             print(f"  Pre-translating context paragraph {i+1}/{len(selected_paragraphs)}")
+            if self.verbose:
+                print(f"{source_lang}: {paragraph}")
             
             try:
                 # Direct translation context (without storing in database)
-                translation = self._translate_chunk(
-                    paragraph, source_lang, target_lang, True)
+                translation = self._translate_chunk(paragraph, source_lang, target_lang, True)
+                if self.verbose:
+                    print(f"{target_lang}: {translation}")
                 
             except Exception as e:
                 print(f"    Warning: Failed to pre-translate context paragraph: {e}")
