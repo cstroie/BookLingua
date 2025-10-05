@@ -1486,9 +1486,9 @@ def main():
         epub_path=args.input
     )
     
-    # Use language names directly (lowercase)
-    source_lang = args.source_lang.lower()
-    target_lang = args.target_lang.lower()
+    # Use language names with first letter uppercase
+    source_lang = args.source_lang.capitalize()
+    target_lang = args.target_lang.capitalize()
     
     # Run translation
     translator.translate_epub(
