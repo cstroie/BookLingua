@@ -99,7 +99,7 @@ class EPUBTranslator:
         if self.conn:
             self.conn.close()
     
-    def extract_text_from_epub_book(self, book) -> List[dict]:
+    def extract_text_from_epub(self, book) -> List[dict]:
         """Extract text content from an already opened EPUB book object.
         
         This method processes an already opened EPUB book object, extracts all 
@@ -701,44 +701,7 @@ Translation rules:
             return translation
         except Exception as e:
             print(f"Error during translation: {e}")
-            raise
-    
-    def translate_direct(self, text: str, source_lang: str, target_lang: str = "Romanian") -> str:
-        """Direct translation from source to target language using AI models.
-        
-        This method performs a direct translation of text from the source language
-        to the target language in a single step. It uses the configured AI model
-        and maintains translation context for consistency.
-        
-        Args:
-            text (str): The text content to translate
-            source_lang (str): Source language name
-            target_lang (str): Target language name. Defaults to "Romanian"
-            
-        Returns:
-            str: Translated text in the target language, preserving original
-                 formatting, structure, and paragraph breaks.
-                 
-        Translation process:
-            - Uses OpenAI-compatible API for translation
-            - Maintains translation context for consistency across multiple calls
-            - Handles both single paragraphs and longer documents
-            - Preserves Markdown formatting and document structure
-            - Uses temperature=0.5 for balanced creativity and accuracy
-            
-        Example:
-            >>> translator = EPUBTranslator()
-            >>> result = translator.translate_direct(
-            ...     "Hello, how are you?",
-            ...     source_lang="English",
-            ...     target_lang="Romanian"
-            ... )
-            >>> print(result)
-            'Salut, cum ești?'
-        """
-        return self.translate_text(text, source_lang, target_lang)
-    
-    
+            raise    
     
     def translate_epub(self, input_path: str, output_dir: str = "output", 
                       source_lang: str = "English", target_lang: str = "Romanian"):
@@ -799,7 +762,7 @@ Translation rules:
         
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path)
-        chapters = self.extract_text_from_epub_book(book)
+        chapters = self.extract_text_from_epub(book)
         
         print(f"Found {len(chapters)} chapters to translate")
         print(f"Languages: {source_lang} → {target_lang}")
@@ -861,13 +824,13 @@ Translation rules:
                         print(f"Time: {paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
                         
                         # Show fluency score for this paragraph
-                        fluency = self.calculate_fluency_score(translated_paragraph)
+                        fluency = self._calculate_fluency_score(translated_paragraph)
                         print(f"Fluency score: {fluency:.2f}")
                     else:
                         translated_paragraphs.append(paragraph)
                 translated_text = '\n\n'.join(translated_paragraphs)
             else:
-                translated_text = self.translate_direct(original_text, source_lang, target_lang)
+                translated_text = self.translate_text(original_text, source_lang, target_lang)
             
             # Show chapter completion time
             chapter_end_time = datetime.now()
@@ -917,12 +880,13 @@ Translation rules:
         # Create context key for this language pair
         context_key = f"{source_lang.lower()}_{target_lang.lower()}"
         
-        # If context already exists, skip
+        # If context already exists and has enough entries, skip
         if self.translation_contexts.get(context_key):
-            return
-        
-        # Initialize context list
-        self.translation_contexts[context_key] = []
+            if len(self.translation_contexts[context_key]) >= 5:
+                return
+        else:
+            # Initialize context list
+            self.translation_contexts[context_key] = []
         
         # Try to prefill from database first
         if self.conn:
@@ -1057,7 +1021,7 @@ Translation rules:
         book.add_item(epub.EpubNav())
         book.spine = ['nav'] + chapters
     
-    def calculate_fluency_score(self, text: str) -> float:
+    def _calculate_fluency_score(self, text: str) -> float:
         """Calculate fluency score based on linguistic patterns.
         
         Args:
@@ -1084,8 +1048,8 @@ Translation rules:
         # Score calculation (0-1 scale, higher is better)
         fluency = 1.0 - (length_variance / 1000) - (max_freq / len(words))
         return max(0.0, min(1.0, fluency))
-    
-    def calculate_adequacy_score(self, original: str, translated: str, source_lang: str, target_lang: str) -> float:
+
+    def _calculate_adequacy_score(self, original: str, translated: str, source_lang: str, target_lang: str) -> float:
         """Calculate adequacy score using AI evaluation.
         
         Args:
@@ -1120,8 +1084,8 @@ Return only a single number between 0 and 1."""
             return 0.5  # Default score if parsing fails
         except Exception:
             return 0.5  # Default score on error
-    
-    def calculate_consistency_score(self, chapters: List[dict]) -> float:
+
+    def _calculate_consistency_score(self, chapters: List[dict]) -> float:
         """Check terminology consistency across chapters.
         
         Args:
@@ -1148,8 +1112,8 @@ Return only a single number between 0 and 1."""
                 total_terms += 1
         
         return 1.0 - (inconsistencies / total_terms) if total_terms > 0 else 1.0
-    
-    def detect_translation_errors(self, original: str, translated: str) -> Dict[str, int]:
+
+    def _detect_translation_errors(self, original: str, translated: str) -> Dict[str, int]:
         """Detect common translation errors.
         
         Args:
@@ -1179,8 +1143,8 @@ Return only a single number between 0 and 1."""
                     errors['repeated_phrases'] += 1
         
         return errors
-    
-    def generate_quality_report(self, chapters: List[dict], source_lang: str, target_lang: str) -> Dict:
+
+    def _generate_quality_report(self, chapters: List[dict], source_lang: str, target_lang: str) -> Dict:
         """Generate comprehensive quality assessment report.
         
         Args:
@@ -1201,20 +1165,20 @@ Return only a single number between 0 and 1."""
         
         # Calculate fluency for each chapter
         for chapter in chapters:
-            fluency = self.calculate_fluency_score(chapter['content'])
+            fluency = self._calculate_fluency_score(chapter['content'])
             report['fluency_scores'].append(fluency)
         
         # Calculate adequacy for sample paragraphs
         sample_size = min(5, len(chapters))
         for i in range(sample_size):
             original = chapters[i]['content']
-            translated = self.translate_direct(original, source_lang, target_lang)
-            adequacy = self.calculate_adequacy_score(original, translated, source_lang, target_lang)
+            translated = self.translate_text(original, source_lang, target_lang)
+            adequacy = self._calculate_adequacy_score(original, translated, source_lang, target_lang)
             report['adequacy_scores'].append(adequacy)
         
         # Calculate consistency
-        report['consistency_score'] = self.calculate_consistency_score(chapters)
-        
+        report['consistency_score'] = self._calculate_consistency_score(chapters)
+
         # Overall score (weighted average)
         avg_fluency = sum(report['fluency_scores']) / len(report['fluency_scores'])
         avg_adequacy = sum(report['adequacy_scores']) / len(report['adequacy_scores'])
