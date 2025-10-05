@@ -1118,13 +1118,6 @@ Translation rules:
                 chapter_end_time = datetime.now()
                 chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
                 print(f"✓ Chapter {i+1} pivot translation completed in {chapter_duration:.2f}s")
-                            
-                pivot_result = {
-                    'intermediate': '\n\n'.join(intermediate_paragraphs),
-                    'final': '\n\n'.join(final_paragraphs)
-                }
-                else:
-                    pivot_result = self.translate_pivot(original_text, source_lang, pivot_lang, target_lang)
             
             # Add to comparison HTML (only in "both" mode)
             if mode == "both":
