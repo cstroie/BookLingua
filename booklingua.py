@@ -119,25 +119,59 @@ class EPUBTranslator:
         """
         chapters = []
         
-        for item in book.get_items():
-            if item.get_type() == ebooklib.ITEM_DOCUMENT:
-                html_content = item.get_content()
-                soup = BeautifulSoup(html_content, 'html.parser')
-                
-                # Convert HTML to Markdown
-                markdown_content = self._html_to_markdown(soup)
-                
-                # Extract paragraphs from Markdown
-                paragraphs = [p.strip() for p in markdown_content.split('\n\n') if p.strip()]
-                
-                if markdown_content.strip():  # Only include non-empty chapters
-                    chapters.append({
-                        'id': item.get_id(),
-                        'name': item.get_name(),
-                        'content': markdown_content,
-                        'html': html_content,
-                        'paragraphs': paragraphs
-                    })
+        if not book:
+            print("Warning: No book provided to extract_text_from_epub")
+            return chapters
+            
+        try:
+            items = book.get_items()
+        except Exception as e:
+            print(f"Warning: Failed to get items from book: {e}")
+            return chapters
+            
+        for item in items:
+            try:
+                if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                    try:
+                        html_content = item.get_content()
+                    except Exception as e:
+                        print(f"Warning: Failed to get content from item {item.get_id()}: {e}")
+                        continue
+                        
+                    if not html_content:
+                        continue
+                        
+                    try:
+                        soup = BeautifulSoup(html_content, 'html.parser')
+                    except Exception as e:
+                        print(f"Warning: Failed to parse HTML content from item {item.get_id()}: {e}")
+                        continue
+                    
+                    # Convert HTML to Markdown
+                    try:
+                        markdown_content = self._html_to_markdown(soup)
+                    except Exception as e:
+                        print(f"Warning: Failed to convert HTML to Markdown for item {item.get_id()}: {e}")
+                        markdown_content = ""
+                    
+                    # Extract paragraphs from Markdown
+                    try:
+                        paragraphs = [p.strip() for p in markdown_content.split('\n\n') if p.strip()]
+                    except Exception as e:
+                        print(f"Warning: Failed to extract paragraphs from item {item.get_id()}: {e}")
+                        paragraphs = []
+                    
+                    if markdown_content.strip():  # Only include non-empty chapters
+                        chapters.append({
+                            'id': item.get_id(),
+                            'name': item.get_name(),
+                            'content': markdown_content,
+                            'html': html_content,
+                            'paragraphs': paragraphs
+                        })
+            except Exception as e:
+                print(f"Warning: Error processing item: {e}")
+                continue
         
         return chapters
     
@@ -168,31 +202,51 @@ class EPUBTranslator:
             >>> print(markdown)
             '# Title\n\nParagraph text'
         """
-        # Remove script and style elements
-        for script in soup(["script", "style"]):
-            script.decompose()
+        if not soup:
+            return ""
+            
+        try:
+            # Remove script and style elements
+            for script in soup(["script", "style"]):
+                script.decompose()
+        except Exception as e:
+            print(f"Warning: Failed to remove script/style elements: {e}")
         
         markdown_lines = []
         
-        # Process each element
-        for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'br']):
-            # Process inline tags within the element
-            processed_element = self._process_inline_tags(element)
-            text = processed_element.get_text(separator=' ', strip=True)
-            if not text:
-                continue
-                
-            # Add appropriate Markdown formatting
-            if element.name.startswith('h'):
-                level = int(element.name[1])
-                markdown_lines.append('#' * level + ' ' + text)
-            elif element.name == 'li':
-                markdown_lines.append('- ' + text)
-            else:
-                markdown_lines.append(text)
+        try:
+            # Process each element
+            for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'br']):
+                try:
+                    # Process inline tags within the element
+                    processed_element = self._process_inline_tags(element)
+                    text = processed_element.get_text(separator=' ', strip=True)
+                    if not text:
+                        continue
+                        
+                    # Add appropriate Markdown formatting
+                    if element.name and element.name.startswith('h'):
+                        try:
+                            level = int(element.name[1])
+                            markdown_lines.append('#' * level + ' ' + text)
+                        except (ValueError, IndexError):
+                            markdown_lines.append(text)  # Fallback to plain text
+                    elif element.name == 'li':
+                        markdown_lines.append('- ' + text)
+                    else:
+                        markdown_lines.append(text)
+                except Exception as e:
+                    print(f"Warning: Error processing element: {e}")
+                    continue
+        except Exception as e:
+            print(f"Warning: Failed to find elements in soup: {e}")
         
         # Join with double newlines for paragraph separation
-        return '\n\n'.join(markdown_lines)
+        try:
+            return '\n\n'.join(markdown_lines)
+        except Exception as e:
+            print(f"Warning: Failed to join markdown lines: {e}")
+            return ""
     
     def _process_inline_tags(self, element) -> BeautifulSoup:
         """Process inline HTML tags and convert them to Markdown-style formatting.
@@ -230,58 +284,78 @@ class EPUBTranslator:
             >>> print(processed.get_text())
             'This is **bold** and *italic* text'
         """
-        # Create a copy to avoid modifying the original
-        element_copy = BeautifulSoup(str(element), 'html.parser')
-        
-        # Process each inline tag
-        for tag in element_copy.find_all(['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span']):
-            text = tag.get_text()
-            if not text:
-                continue
-                
-            # Replace with appropriate Markdown formatting
-            if tag.name in ['i', 'em']:
-                replacement = f'*{text}*'
-            elif tag.name in ['b', 'strong']:
-                replacement = f'**{text}**'
-            elif tag.name in ['u', 'ins']:
-                replacement = f'__{text}__'
-            elif tag.name in ['s', 'del']:
-                replacement = f'~~{text}~~'
-            elif tag.name == 'code':
-                replacement = f'`{text}`'
-            elif tag.name == 'span':
-                # Check for styling that mimics other tags
-                style = tag.get('style', '').lower()
-                css_class = tag.get('class', [])
-                if isinstance(css_class, list):
-                    css_class = ' '.join(css_class).lower()
-                else:
-                    css_class = css_class.lower()
-                
-                # Check for bold styling
-                if ('font-weight' in style and 'bold' in style) or any(cls in css_class for cls in ['bold', 'strong']):
-                    replacement = f'**{text}**'
-                # Check for italic styling
-                elif ('font-style' in style and 'italic' in style) or any(cls in css_class for cls in ['italic', 'em']):
-                    replacement = f'*{text}*'
-                # Check for underline styling
-                elif ('text-decoration' in style and 'underline' in style) or any(cls in css_class for cls in ['underline']):
-                    replacement = f'__{text}__'
-                # Check for strikethrough styling
-                elif ('text-decoration' in style and 'line-through' in style) or any(cls in css_class for cls in ['strikethrough', 'line-through']):
-                    replacement = f'~~{text}~~'
-                # Check for monospace styling
-                elif ('font-family' in style and ('monospace' in style or 'courier' in style)) or any(cls in css_class for cls in ['code', 'monospace']):
-                    replacement = f'`{text}`'
-                else:
-                    # Default to plain text for other spans
-                    replacement = text
-            else:  # other tags
-                replacement = text
+        if not element:
+            return BeautifulSoup("", 'html.parser')
             
-            # Replace the tag with formatted text
-            tag.replace_with(replacement)
+        try:
+            # Create a copy to avoid modifying the original
+            element_copy = BeautifulSoup(str(element), 'html.parser')
+        except Exception as e:
+            print(f"Warning: Failed to create element copy: {e}")
+            return BeautifulSoup("", 'html.parser')
+        
+        try:
+            # Process each inline tag
+            for tag in element_copy.find_all(['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span']):
+                try:
+                    text = tag.get_text()
+                    if not text:
+                        continue
+                        
+                    # Replace with appropriate Markdown formatting
+                    if not tag.name:
+                        replacement = text
+                    elif tag.name in ['i', 'em']:
+                        replacement = f'*{text}*'
+                    elif tag.name in ['b', 'strong']:
+                        replacement = f'**{text}**'
+                    elif tag.name in ['u', 'ins']:
+                        replacement = f'__{text}__'
+                    elif tag.name in ['s', 'del']:
+                        replacement = f'~~{text}~~'
+                    elif tag.name == 'code':
+                        replacement = f'`{text}`'
+                    elif tag.name == 'span':
+                        try:
+                            # Check for styling that mimics other tags
+                            style = tag.get('style', '').lower()
+                            css_class = tag.get('class', [])
+                            if isinstance(css_class, list):
+                                css_class = ' '.join(css_class).lower() if css_class else ''
+                            else:
+                                css_class = str(css_class).lower() if css_class else ''
+                            
+                            # Check for bold styling
+                            if ('font-weight' in style and 'bold' in style) or any(cls in css_class for cls in ['bold', 'strong']):
+                                replacement = f'**{text}**'
+                            # Check for italic styling
+                            elif ('font-style' in style and 'italic' in style) or any(cls in css_class for cls in ['italic', 'em']):
+                                replacement = f'*{text}*'
+                            # Check for underline styling
+                            elif ('text-decoration' in style and 'underline' in style) or any(cls in css_class for cls in ['underline']):
+                                replacement = f'__{text}__'
+                            # Check for strikethrough styling
+                            elif ('text-decoration' in style and 'line-through' in style) or any(cls in css_class for cls in ['strikethrough', 'line-through']):
+                                replacement = f'~~{text}~~'
+                            # Check for monospace styling
+                            elif ('font-family' in style and ('monospace' in style or 'courier' in style)) or any(cls in css_class for cls in ['code', 'monospace']):
+                                replacement = f'`{text}`'
+                            else:
+                                # Default to plain text for other spans
+                                replacement = text
+                        except Exception as e:
+                            print(f"Warning: Error processing span tag: {e}")
+                            replacement = text
+                    else:  # other tags
+                        replacement = text
+                    
+                    # Replace the tag with formatted text
+                    tag.replace_with(replacement)
+                except Exception as e:
+                    print(f"Warning: Error processing tag: {e}")
+                    continue
+        except Exception as e:
+            print(f"Warning: Failed to find inline tags: {e}")
         
         return element_copy
     
@@ -316,43 +390,91 @@ class EPUBTranslator:
             >>> print(html)
             '<h1>Title</h1>\\n\\n<p>This is <strong>bold</strong> text</p>'
         """
-        lines = markdown_text.split('\n')
+        if not markdown_text:
+            return ""
+            
+        try:
+            lines = markdown_text.split('\n')
+        except Exception as e:
+            print(f"Warning: Failed to split markdown text: {e}")
+            return ""
+            
         html_lines = []
         
         for line in lines:
-            line = line.strip()
-            if not line:
+            try:
+                line = line.strip()
+                if not line:
+                    continue
+                    
+                # Handle headers
+                if line.startswith('###### '):
+                    try:
+                        content = self._process_markdown_inline_formatting(line[7:])
+                        html_lines.append(f'<h6>{content}</h6>')
+                    except Exception as e:
+                        print(f"Warning: Error processing h6 header: {e}")
+                        html_lines.append(f'<h6>{line[7:]}</h6>')
+                elif line.startswith('##### '):
+                    try:
+                        content = self._process_markdown_inline_formatting(line[6:])
+                        html_lines.append(f'<h5>{content}</h5>')
+                    except Exception as e:
+                        print(f"Warning: Error processing h5 header: {e}")
+                        html_lines.append(f'<h5>{line[6:]}</h5>')
+                elif line.startswith('#### '):
+                    try:
+                        content = self._process_markdown_inline_formatting(line[5:])
+                        html_lines.append(f'<h4>{content}</h4>')
+                    except Exception as e:
+                        print(f"Warning: Error processing h4 header: {e}")
+                        html_lines.append(f'<h4>{line[5:]}</h4>')
+                elif line.startswith('### '):
+                    try:
+                        content = self._process_markdown_inline_formatting(line[4:])
+                        html_lines.append(f'<h3>{content}</h3>')
+                    except Exception as e:
+                        print(f"Warning: Error processing h3 header: {e}")
+                        html_lines.append(f'<h3>{line[4:]}</h3>')
+                elif line.startswith('## '):
+                    try:
+                        content = self._process_markdown_inline_formatting(line[3:])
+                        html_lines.append(f'<h2>{content}</h2>')
+                    except Exception as e:
+                        print(f"Warning: Error processing h2 header: {e}")
+                        html_lines.append(f'<h2>{line[3:]}</h2>')
+                elif line.startswith('# '):
+                    try:
+                        content = self._process_markdown_inline_formatting(line[2:])
+                        html_lines.append(f'<h1>{content}</h1>')
+                    except Exception as e:
+                        print(f"Warning: Error processing h1 header: {e}")
+                        html_lines.append(f'<h1>{line[2:]}</h1>')
+                # Handle lists
+                elif line.startswith('- '):
+                    try:
+                        content = self._process_markdown_inline_formatting(line[2:])
+                        html_lines.append(f'<li>{content}</li>')
+                    except Exception as e:
+                        print(f"Warning: Error processing list item: {e}")
+                        html_lines.append(f'<li>{line[2:]}</li>')
+                # Handle regular paragraphs
+                else:
+                    try:
+                        content = self._process_markdown_inline_formatting(line)
+                        html_lines.append(f'<p>{content}</p>')
+                    except Exception as e:
+                        print(f"Warning: Error processing paragraph: {e}")
+                        html_lines.append(f'<p>{line}</p>')
+            except Exception as e:
+                print(f"Warning: Error processing line: {e}")
                 continue
-                
-            # Handle headers
-            if line.startswith('###### '):
-                content = self._process_markdown_inline_formatting(line[7:])
-                html_lines.append(f'<h6>{content}</h6>')
-            elif line.startswith('##### '):
-                content = self._process_markdown_inline_formatting(line[6:])
-                html_lines.append(f'<h5>{content}</h5>')
-            elif line.startswith('#### '):
-                content = self._process_markdown_inline_formatting(line[5:])
-                html_lines.append(f'<h4>{content}</h4>')
-            elif line.startswith('### '):
-                content = self._process_markdown_inline_formatting(line[4:])
-                html_lines.append(f'<h3>{content}</h3>')
-            elif line.startswith('## '):
-                content = self._process_markdown_inline_formatting(line[3:])
-                html_lines.append(f'<h2>{content}</h2>')
-            elif line.startswith('# '):
-                content = self._process_markdown_inline_formatting(line[2:])
-                html_lines.append(f'<h1>{content}</h1>')
-            # Handle lists
-            elif line.startswith('- '):
-                content = self._process_markdown_inline_formatting(line[2:])
-                html_lines.append(f'<li>{content}</li>')
-            # Handle regular paragraphs
-            else:
-                content = self._process_markdown_inline_formatting(line)
-                html_lines.append(f'<p>{content}</p>')
         
-        return '\n'.join(html_lines)
+        try:
+            return '\n'.join(html_lines)
+        except Exception as e:
+            print(f"Warning: Failed to join HTML lines: {e}")
+            return ""
     
     def _process_markdown_inline_formatting(self, text: str) -> str:
         """Convert Markdown inline formatting back to HTML tags.
@@ -384,17 +506,24 @@ class EPUBTranslator:
             >>> print(html_text)
             'This is <strong>bold</strong> and <em>italic</em> text with <code>code</code>'
         """
-        # Process formatting in order of precedence
-        # Code (highest precedence)
-        text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
-        # Strikethrough
-        text = re.sub(r'~~([^~]+)~~', r'<s>\1</s>', text)
-        # Strong/Bold
-        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
-        # Emphasis/Italic
-        text = re.sub(r'\*([^*]+)\*', r'<em>\1</em>', text)
-        # Underline
-        text = re.sub(r'__([^_]+)__', r'<u>\1</u>', text)
+        if not text:
+            return ""
+            
+        try:
+            # Process formatting in order of precedence
+            # Code (highest precedence)
+            text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
+            # Strikethrough
+            text = re.sub(r'~~([^~]+)~~', r'<s>\1</s>', text)
+            # Strong/Bold
+            text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+            # Emphasis/Italic
+            text = re.sub(r'\*([^*]+)\*', r'<em>\1</em>', text)
+            # Underline
+            text = re.sub(r'__([^_]+)__', r'<u>\1</u>', text)
+        except Exception as e:
+            print(f"Warning: Error processing markdown inline formatting: {e}")
+            return text
         
         return text
     
@@ -431,25 +560,49 @@ class EPUBTranslator:
             >>> print(translated)
             'Acesta este un paragraf.\\n\\nAcesta este alt paragraf.'
         """
-        # Split into paragraphs (separated by double newlines)
-        paragraphs = text.split('\n\n')
-        
-        # If we have only one paragraph or the total text is small enough, translate as one chunk
-        if len(paragraphs) <= 1 or len(text) <= chunk_size:
-            return self._translate_chunk(text, source_lang, target_lang)
-        
+        if not text:
+            return ""
+            
+        if not source_lang or not target_lang:
+            raise ValueError("Source and target languages must be specified")
+            
+        try:
+            # Split into paragraphs (separated by double newlines)
+            paragraphs = text.split('\n\n')
+        except Exception as e:
+            print(f"Warning: Failed to split text into paragraphs: {e}")
+            return text
+            
+        try:
+            # If we have only one paragraph or the total text is small enough, translate as one chunk
+            if len(paragraphs) <= 1 or len(text) <= chunk_size:
+                return self._translate_chunk(text, source_lang, target_lang)
+        except Exception as e:
+            print(f"Warning: Error checking chunk size: {e}")
+            return text
+            
         # Otherwise, process each paragraph as a separate chunk
         translated_paragraphs = []
         for i, paragraph in enumerate(paragraphs):
-            if self.verbose:
-                print(f"Translating paragraph {i+1}/{len(paragraphs)}")
-            if paragraph.strip():  # Only translate non-empty paragraphs
-                translated_paragraphs.append(self._translate_chunk(paragraph, source_lang, target_lang))
-            else:
-                # Preserve empty paragraphs (section breaks)
+            try:
+                if self.verbose:
+                    print(f"Translating paragraph {i+1}/{len(paragraphs)}")
+                if paragraph.strip():  # Only translate non-empty paragraphs
+                    translated_paragraph = self._translate_chunk(paragraph, source_lang, target_lang)
+                    translated_paragraphs.append(translated_paragraph)
+                else:
+                    # Preserve empty paragraphs (section breaks)
+                    translated_paragraphs.append(paragraph)
+            except Exception as e:
+                print(f"Warning: Failed to translate paragraph {i+1}: {e}")
+                # Preserve original paragraph on error
                 translated_paragraphs.append(paragraph)
         
-        return '\n\n'.join(translated_paragraphs)
+        try:
+            return '\n\n'.join(translated_paragraphs)
+        except Exception as e:
+            print(f"Warning: Failed to join translated paragraphs: {e}")
+            return text
     
     def _init_database(self):
         """Initialize the SQLite database for storing translations."""
