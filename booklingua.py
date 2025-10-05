@@ -872,8 +872,8 @@ Translation rules:
         return html
     
     def translate_epub_with_comparison(self, input_path: str, output_dir: str = "output", 
-                                       mode: str = "both", source_lang: str = "English",
-                                       pivot_lang: str = "French", target_lang: str = "Romanian"):
+                                       mode: str = "both", source_lang: str = "en",
+                                       pivot_lang: str = "fr", target_lang: str = "ro"):
         """Translate EPUB books using direct, pivot, or both translation methods with comparison output.
         
         This method provides a comprehensive translation workflow for EPUB books,
@@ -890,10 +890,10 @@ Translation rules:
                 - "pivot": Two-step translation via intermediate language
                 - "both": Both methods with comparison output
                 Defaults to "both".
-            source_lang (str, optional): Source language code. Defaults to "English".
+            source_lang (str, optional): Source language code. Defaults to "en".
             pivot_lang (str, optional): Intermediate language code for pivot translation.
-                Defaults to "French".
-            target_lang (str, optional): Target language code. Defaults to "Romanian".
+                Defaults to "fr".
+            target_lang (str, optional): Target language code. Defaults to "ro".
                 
         Returns:
             None: Results are saved to files in the specified output directory.
