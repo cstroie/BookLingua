@@ -168,7 +168,7 @@ class EPUBTranslator:
         chapters = []
         
         if not book:
-            print("Warning: No book provided to extract_text_from_epub")
+            print("Warning: No book provided to extract text from.")
             return chapters
             
         try:
@@ -1012,9 +1012,9 @@ class EPUBTranslator:
         print()
         
         # Prepare output book
-        translated_book = self._create_book_template(book, f"Translation ({source_lang} to {target_lang})")
+        translated_book = self._create_book_template(book)
         
-        # Pre-fill context list with random paragraphs if empty
+        # Pre-fill context
         self._prefill_context(chapters, source_lang, target_lang)
         
         translated_chapters = []
@@ -1238,21 +1238,19 @@ class EPUBTranslator:
         
         Args:
             original_book: The original EPUB book object (ebooklib.epub.EpubBook)
-            method_name (str): Description of the translation method to include
-                in the new book title (e.g., "Direct Translation", "Pivot Translation")
                 
         Returns:
             epub.EpubBook: A new EPUB book object with copied metadata and modified title
             
         Metadata copied:
             - Identifier: Preserved from original book
-            - Title: Modified to include translation method (e.g., "Original Title (Română - Direct Translation)")
+            - Title: Modified to include translation method (e.g., "Original Title")
             - Language: Set to target language code ('ro' for Romanian)
             - Authors: Copied from original book's creator metadata
             
         Example:
             >>> original_book = epub.read_epub("book.epub")
-            >>> new_book = translator._create_book_template(original_book, "Direct Translation")
+            >>> new_book = translator._create_book_template(original_book)
             >>> print(new_book.get_title())
             'Original Title (Română - Direct Translation)'
         """
@@ -1260,8 +1258,9 @@ class EPUBTranslator:
         new_book.set_identifier(original_book.get_metadata('DC', 'identifier')[0][0])
         
         original_title = original_book.get_metadata('DC', 'title')[0][0]
-        new_book.set_title(f"{original_title} (Translated - {method_name})")
-        new_book.set_language('en')  # Default to English, will be overridden later
+        new_book.set_title(f"{original_title}")
+        # Default to English, will be overridden later
+        new_book.set_language('en')
         
         for author in original_book.get_metadata('DC', 'creator'):
             new_book.add_author(author[0])
