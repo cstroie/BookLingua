@@ -221,12 +221,12 @@ class EPUBTranslator:
                         
                         # Save chapter as markdown if output directory exists
                         if self.output_dir:
-                            if os.path.exists(output_dir):
+                            if os.path.exists(self.output_dir):
                                 try:
                                     # Create a safe filename from the chapter name
                                     safe_name = re.sub(r'[^\w\-_\. ]', '_', item.get_name())
                                     filename = f"{item.get_id()}_{safe_name}.md"
-                                    filepath = os.path.join(output_dir, filename)
+                                    filepath = os.path.join(self.output_dir, filename)
                                     
                                     with open(filepath, 'w', encoding='utf-8') as f:
                                         f.write(markdown_content)
@@ -1000,7 +1000,8 @@ class EPUBTranslator:
             self._init_database()
 
         if output_dir:
-            os.makedirs(output_dir, exist_ok=True)
+            self.output_dir = output_dir
+            os.makedirs(self.output_dir, exist_ok=True)
         
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path, options={'ignore_ncx': False})
@@ -1125,7 +1126,7 @@ class EPUBTranslator:
         print(f"\n{'='*60}")
         print("Saving output files...")
         
-        translated_path = os.path.join(output_dir, "translated.epub")
+        translated_path = os.path.join(self.output_dir, "translated.epub")
         epub.write_epub(translated_path, translated_book)
         print(f"✓ Translation saved: {translated_path}")
         
