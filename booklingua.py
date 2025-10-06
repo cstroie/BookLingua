@@ -878,7 +878,7 @@ class EPUBTranslator:
         """
         # Return None if no database connection
         if not self.conn:
-            return None
+            return (None, None, None)
         # Query the next paragraph ordered by paragraph number
         try:
             cursor = self.conn.cursor()
@@ -890,11 +890,11 @@ class EPUBTranslator:
             ''', (chapter_number, paragraph_number, source_lang, target_lang))
             result = cursor.fetchone()
             # Return the result or None if not found
-            return result if result else None
+            return result if result else (None, None, None)
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup for next paragraph failed: {e}")
-            return None
+            return (None, None, None)
 
     def _count_translated_paragraphs_in_chapter(self, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count the number of translated paragraphs in a specific chapter.
@@ -1481,6 +1481,20 @@ class EPUBTranslator:
         print("✗ Chapter is not fully translated")
         # Initialize timing statistics for this chapter
         chapter_start_time = datetime.now()
+        # Reset context for each chapter to avoid drift
+        # TODO
+        #self.reset_context()
+        # Get the next chapter's paragraph from database
+        while True:
+            par, source_text, translated_text = self.db_get_next_paragraph(chapter_number, 0, source_lang, target_lang)
+            if par:
+                print(f"\nTranslating chapter {chapter_number}/{total_chapters}, paragraph {par}/{len(paragraphs)}")
+                break
+            else:
+                print("No paragraphs found for this chapter in database.")
+                return
+
+        
         # Get paragraphs from database
         paragraphs = self.db_get_paragraphs(chapter_number, source_lang, target_lang)
         print(paragraphs)
