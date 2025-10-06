@@ -1292,18 +1292,6 @@ class EPUBTranslator:
                 
         Returns:
             epub.EpubBook: A new EPUB book object with copied metadata
-            
-        Metadata copied:
-            - Identifier: Preserved from original book
-            - Title: Preserved from original book
-            - Language: Set to target language code ('ro' for Romanian)
-            - Authors: Copied from original book's creator metadata
-            
-        Example:
-            >>> original_book = epub.read_epub("book.epub")
-            >>> new_book = translator.book_create_template(original_book)
-            >>> print(new_book.get_title())
-            'Original Title'
         """
         new_book = epub.EpubBook()
         new_book.set_identifier(original_book.get_metadata('DC', 'identifier')[0][0])
@@ -1328,24 +1316,6 @@ class EPUBTranslator:
         Args:
             book (epub.EpubBook): The EPUB book object to finalize
             chapters (List[epub.EpubHtml]): List of chapter objects to include in navigation
-            
-        Navigation Components Added:
-            - Table of Contents (TOC): Sets up hierarchical navigation structure
-            - NCX (Navigation Control XML): Required EPUB navigation file
-            - Navigation Document: HTML-based navigation for e-readers
-            - Spine: Defines the reading order and includes all content
-            
-        Structure Setup:
-            - book.toc: Sets the table of contents using the provided chapters
-            - book.spine: Defines reading order starting with navigation, then chapters
-            - Adds required navigation items (NCX and Nav documents)
-            
-        Example:
-            >>> book = epub.EpubBook()
-            >>> chapters = [epub.EpubHtml(title='Chapter 1'), epub.EpubHtml(title='Chapter 2')]
-            >>> translator.book_finalize(book, chapters)
-            >>> print(book.spine)
-            ['nav', <EpubHtml: 'Chapter 1'>, <EpubHtml: 'Chapter 2'>]
         """
         book.toc = tuple(chapters)
         book.add_item(epub.EpubNcx())
@@ -1408,14 +1378,10 @@ class EPUBTranslator:
         database lookups, progress tracking, and timing statistics.
         
         Args:
-            chapter (dict): Chapter data containing paragraphs to translate
             chapter_number (int): Chapter number (1-based index)
             source_lang (str): Source language code
             target_lang (str): Target language code
             total_chapters (int): Total number of chapters in the book
-            
-        Returns:
-            epub.EpubHtml: Translated chapter as an EPUB HTML item
         """
         print(f"\n{'='*60}")
         print(f"Chapter {chapter_number}/{total_chapters}")
@@ -1678,44 +1644,13 @@ Return only a single number between 0 and 1."""
         """Convert text to HTML paragraphs with intelligent format detection.
         
         This method converts text content to HTML format, automatically detecting
-        whether the input is Markdown-formatted or plain text. It provides the
-        appropriate conversion method to preserve formatting and structure.
+        whether the input is Markdown-formatted or plain text.
         
         Args:
             text (str): Text content to convert to HTML
             
         Returns:
             str: HTML formatted text with appropriate tags and structure
-            
-        Format Detection:
-            - Detects Markdown presence by checking for common Markdown syntax:
-              * Headers (# ## ###)
-              * Bullet points (- item)
-              * Emphasis markers (*, _, ~, `)
-            - If Markdown detected: Uses _markdown_to_html() for conversion
-            - If plain text: Uses simple paragraph conversion
-            
-        Plain Text Conversion:
-            - Splits text by double newlines to identify paragraphs
-            - Wraps each paragraph in <p> tags
-            - Converts single line breaks to <br/> tags within paragraphs
-            - Preserves empty lines as paragraph separators
-            
-        Markdown Conversion:
-            - Processes headers, lists, and inline formatting
-            - Preserves document structure and formatting
-            - Converts Markdown syntax to equivalent HTML tags
-            
-        Example:
-            >>> translator = EPUBTranslator()
-            # Plain text example
-            >>> plain_html = translator._text_to_html("Hello world\\n\\nHow are you?")
-            >>> print(plain_html)
-            '<p>Hello world<br/>How are you?</p>'
-            # Markdown example
-            >>> markdown_html = translator._text_to_html("# Title\\n\\nThis is **bold** text")
-            >>> print(markdown_html)
-            '<h1>Title</h1>\\n\\n<p>This is <strong>bold</strong> text</p>'
         """
         # First try to convert from Markdown, fallback to plain text
         if '#' in text or '- ' in text or '*' in text or '_' in text or '~' in text or '`' in text:
