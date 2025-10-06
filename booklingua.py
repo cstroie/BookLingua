@@ -1117,11 +1117,13 @@ class EPUBTranslator:
         # Save all content to database
         self.content_to_database(chapters, source_lang, target_lang)
 
+        # Get chapter list first
+        chapter_list = self.db_get_chapters(source_lang, target_lang)
+        
         # Pre-fill context
         self.prefill_context(source_lang, target_lang, chapter_list[0] if chapter_list else None)
         
         # Process each chapter
-        chapter_list = self.db_get_chapters(source_lang, target_lang)
         for chapter_number in chapter_list:
             self.translate_chapter(chapter_number, source_lang, target_lang, len(chapter_list))
         
