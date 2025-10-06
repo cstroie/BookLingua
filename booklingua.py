@@ -1587,7 +1587,7 @@ Return only a single integer number between 0 and 100."""
         # Overall score (weighted average)
         avg_fluency = sum(report['fluency_scores']) / len(report['fluency_scores']) if report['fluency_scores'] else 0
         avg_adequacy = sum(report['adequacy_scores']) / len(report['adequacy_scores']) if report['adequacy_scores'] else 0
-        report['overall_score'] = (avg_fluency * 0.4 + avg_adequacy * 0.4 + report['consistency_score'] * 0.2)
+        report['overall_score'] = int(avg_fluency * 0.4 + avg_adequacy * 0.4 + report['consistency_score'] * 0.2)
         
         return report
 
