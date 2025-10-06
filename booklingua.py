@@ -107,7 +107,7 @@ class EPUBTranslator:
             base_url (str): The base URL for the API endpoint
             model (str): The model name used for translation
             verbose (bool): Whether verbose output is enabled
-            translation_contexts (dict): Cache for translation contexts to maintain
+            context (list): Cache for translation contexts to maintain
                 consistency across multiple translations
             db_path (str): Path to the SQLite database file
             conn (sqlite3.Connection): Database connection
@@ -125,7 +125,7 @@ class EPUBTranslator:
         self.base_url = base_url or "https://api.openai.com/v1"
         self.model = model
         self.verbose = verbose
-        self.translation_contexts = {}  # Store contexts for different language pairs
+        self.context = []
         
         # Initialize database
         self.epub_path = epub_path
@@ -754,13 +754,10 @@ class EPUBTranslator:
             result = cursor.fetchone()
             if result:
                 # Push to context list for continuity
-                context_key = f"{source_lang.lower()}_{target_lang.lower()}"
-                if context_key not in self.translation_contexts:
-                    self.translation_contexts[context_key] = []
-                self.translation_contexts[context_key].append((text, result[0]))
+                self.context.append((text, result[0]))
                 # Keep only the last N exchanges for better context
-                if len(self.translation_contexts[context_key]) > DEFAULT_CONTEXT_SIZE:
-                    self.translation_contexts[context_key].pop(0)
+                if len(self.context) > DEFAULT_CONTEXT_SIZE:
+                    self.context.pop(0)
                 return (result[0], result[1], result[2])  # (translated_text, processing_time, fluency_score)
             return None
         except Exception as e:
@@ -908,13 +905,8 @@ class EPUBTranslator:
                 }
             ]
             
-            # Create context key for this language pair
-            context_key = f"{source_lang.lower()}_{target_lang.lower()}"
-            if context_key not in self.translation_contexts:
-                self.translation_contexts[context_key] = []
-            
             # Add context from previous translations for this language pair
-            for user_msg, assistant_msg in self.translation_contexts[context_key]:
+            for user_msg, assistant_msg in self.context:
                 messages.append({"role": "user", "content": user_msg})
                 messages.append({"role": "assistant", "content": assistant_msg})
             
@@ -943,10 +935,10 @@ class EPUBTranslator:
             translation = result["choices"][0]["message"]["content"].strip()
             
             # Update translation context for this language pair
-            self.translation_contexts[context_key].append((text, translation))
+            self.context.append((text, translation))
             # Keep only the last N exchanges for better context
-            if len(self.translation_contexts[context_key]) > DEFAULT_CONTEXT_SIZE:
-                self.translation_contexts[context_key].pop(0)
+            if len(self.context) > DEFAULT_CONTEXT_SIZE:
+                self.context.pop(0)
             
             return translation
         except Exception as e:
@@ -1158,15 +1150,9 @@ class EPUBTranslator:
             source_lang (str): Source language code
             target_lang (str): Target language code
         """
-        # Create context key for this language pair
-        context_key = f"{source_lang.lower()}_{target_lang.lower()}"
-        
-        # Initialize context list if it doesn't exist
-        if context_key not in self.translation_contexts:
-            self.translation_contexts[context_key] = []
         
         # If context already has enough entries, skip
-        if len(self.translation_contexts[context_key]) >= DEFAULT_PREFILL_CONTEXT_SIZE:
+        if len(self.context) >= DEFAULT_PREFILL_CONTEXT_SIZE:
             return
         
         # Try to prefill from database first (only non-empty translations)
@@ -1182,7 +1168,7 @@ class EPUBTranslator:
                 
                 # Add to context in chronological order (oldest first)
                 for source_text, translated_text in reversed(results):
-                    self.translation_contexts[context_key].append((source_text, translated_text))
+                    self.context.append((source_text, translated_text))
                 
                 if len(results) >= DEFAULT_PREFILL_CONTEXT_SIZE:
                     print(f"Pre-filled context with {len(results)} existing translations from database")
@@ -1205,7 +1191,7 @@ class EPUBTranslator:
                 results = cursor.fetchall()
                 
                 # Calculate how many more we need (aim for at least DEFAULT_PREFILL_CONTEXT_SIZE)
-                current_count = len(self.translation_contexts[context_key])
+                current_count = len(self.context)
                 needed_count = max(0, DEFAULT_PREFILL_CONTEXT_SIZE - current_count)
                 selected_texts = [row[0] for row in results[:needed_count]]
                 
@@ -1233,7 +1219,7 @@ class EPUBTranslator:
                     print(f"Database random selection failed: {e}")
                 return
         
-        print(f"✓ Pre-filled context with {len(self.translation_contexts[context_key])} paragraph pairs")
+        print(f"✓ Pre-filled context with {len(self.context)} paragraph pairs")
     
     def _create_book_template(self, original_book):
         """Create a new EPUB book template with metadata copied from original book.
