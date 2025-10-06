@@ -1141,7 +1141,7 @@ class EPUBTranslator:
         self.content_to_database(chapters, source_lang, target_lang)
 
         # Pre-fill context
-        self.prefill_context(source_lang, target_lang)
+        self.prefill_context(source_lang, target_lang, chapter_list[0] if chapter_list else None)
         
         # Process each chapter
         chapter_list = self.db_get_chapters(source_lang, target_lang)
@@ -1172,7 +1172,7 @@ class EPUBTranslator:
         print("Translation complete! 🎉")
         print(f"{'='*60}")
 
-    def prefill_context(self, source_lang: str, target_lang: str):
+    def prefill_context(self, source_lang: str, target_lang: str, chapter_number: int = None):
         """Pre-fill translation context with existing translations or random paragraphs.
         
         This method first tries to use existing translations from the database to
@@ -1181,73 +1181,88 @@ class EPUBTranslator:
         translates them to fill the context. These translations are not used for the
         actual document translation and are not stored in the database.
         
+        The search priority is:
+        1. Translated pairs from the same chapter
+        2. Random untranslated texts from the same chapter
+        3. Translated pairs from all chapters
+        4. Random untranslated texts from all chapters
+        
         Args:
             source_lang (str): Source language code
             target_lang (str): Target language code
+            chapter_number (int, optional): Current chapter number for prioritized search
         """
         
         # If context already has enough entries, skip
         if len(self.context) >= DEFAULT_PREFILL_CONTEXT_SIZE:
             return
         
-        # Try to prefill from database with a combined query for both translated and untranslated content
+        # Try to prefill from database with prioritized search
         if self.conn:
             try:
                 cursor = self.conn.cursor()
                 
-                # First, try to get existing translations
-                cursor.execute('''
-                    SELECT source_text, translated_text FROM translations 
-                    WHERE source_lang = ? AND target_lang = ? AND translated_text != ''
-                    ORDER BY id DESC LIMIT ?
-                ''', (source_lang, target_lang, DEFAULT_PREFILL_CONTEXT_SIZE))
-                translated_results = cursor.fetchall()
+                # Priority 1: Try to get existing translations from the same chapter
+                if chapter_number:
+                    cursor.execute('''
+                        SELECT source_text, translated_text FROM translations 
+                        WHERE source_lang = ? AND target_lang = ? AND translated_text != '' 
+                        AND chapter_number = ?
+                        ORDER BY id DESC LIMIT ?
+                    ''', (source_lang, target_lang, chapter_number, DEFAULT_PREFILL_CONTEXT_SIZE))
+                    translated_results = cursor.fetchall()
+                    
+                    # Add to context in chronological order (oldest first)
+                    for source_text, translated_text in reversed(translated_results):
+                        self.context.append((source_text, translated_text))
                 
-                # Add to context in chronological order (oldest first)
-                for source_text, translated_text in reversed(translated_results):
-                    self.context.append((source_text, translated_text))
-                
-                # If we have enough context, we're done
-                if len(self.context) >= DEFAULT_PREFILL_CONTEXT_SIZE:
-                    print(f"Pre-filled context with {len(self.context)} existing translations from database")
-                    return
-                
-                # If we need more context, get untranslated paragraphs to translate
-                needed_count = DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context)
-                cursor.execute('''
-                    SELECT source_text FROM translations 
-                    WHERE source_lang = ? AND target_lang = ? AND translated_text = ''
-                    ORDER BY RANDOM() LIMIT ?
-                ''', (source_lang, target_lang, needed_count))
-                untranslated_results = cursor.fetchall()
-                
-                selected_texts = [row[0] for row in untranslated_results]
-                
-                if not selected_texts:
-                    print(f"Pre-filled context with {len(self.context)} existing translations from database")
-                    return
-                
-                # Translate selected paragraphs to establish context
-                print("Pre-filling translation context with random paragraphs...")
-                for i, text in enumerate(selected_texts):
-                    print(f"Context {i+1}/{len(selected_texts)}")
-                    if self.verbose:
-                        print(f"{source_lang}: {text}")
-                    try:
-                        # Translation without storing in database
-                        translation = self._translate_chunk(text, source_lang, target_lang, True)
-                        if self.verbose:
-                            print(f"{target_lang}: {translation}")
-                        # Add to context immediately
-                        self.context.append((text, translation))
-                        # Keep only the last N exchanges for better context
-                        if len(self.context) > DEFAULT_PREFILL_CONTEXT_SIZE:
-                            self.context.pop(0)
-                    except Exception as e:
-                        print(f"Warning: Failed to pre-translate context paragraph: {e}")
-                        continue
-                    finally:
-                        print()
+                # If we still need more context, continue with other priorities
+                if len(self.context) < DEFAULT_PREFILL_CONTEXT_SIZE:
+                    needed_count = DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context)
+                    
+                    # Priority 2: Get untranslated paragraphs from the same chapter
+                    if chapter_number:
+                        cursor.execute('''
+                            SELECT source_text FROM translations 
+                            WHERE source_lang = ? AND target_lang = ? AND translated_text = ''
+                            AND chapter_number = ?
+                            ORDER BY RANDOM() LIMIT ?
+                        ''', (source_lang, target_lang, chapter_number, needed_count))
+                        untranslated_results = cursor.fetchall()
+                        selected_texts = [row[0] for row in untranslated_results]
+                        
+                        if selected_texts:
+                            self._translate_and_add_context(selected_texts, source_lang, target_lang)
+                    
+                    # If we still need more context, extend search to all chapters
+                    if len(self.context) < DEFAULT_PREFILL_CONTEXT_SIZE:
+                        remaining_count = DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context)
+                        
+                        # Priority 3: Try to get existing translations from all chapters
+                        cursor.execute('''
+                            SELECT source_text, translated_text FROM translations 
+                            WHERE source_lang = ? AND target_lang = ? AND translated_text != ''
+                            ORDER BY id DESC LIMIT ?
+                        ''', (source_lang, target_lang, remaining_count))
+                        additional_translated_results = cursor.fetchall()
+                        
+                        # Add to context in chronological order (oldest first)
+                        for source_text, translated_text in reversed(additional_translated_results):
+                            self.context.append((source_text, translated_text))
+                        
+                        # Priority 4: Get random untranslated paragraphs from all chapters
+                        if len(self.context) < DEFAULT_PREFILL_CONTEXT_SIZE:
+                            final_count = DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context)
+                            cursor.execute('''
+                                SELECT source_text FROM translations 
+                                WHERE source_lang = ? AND target_lang = ? AND translated_text = ''
+                                ORDER BY RANDOM() LIMIT ?
+                            ''', (source_lang, target_lang, final_count))
+                            final_results = cursor.fetchall()
+                            final_texts = [row[0] for row in final_results]
+                            
+                            if final_texts:
+                                self._translate_and_add_context(final_texts, source_lang, target_lang)
                 
                 print(f"✓ Pre-filled context with {len(self.context)} paragraph pairs")
                 
@@ -1256,6 +1271,35 @@ class EPUBTranslator:
                     print(f"Database context prefill failed: {e}")
                 # Ensure we at least report what we have
                 print(f"Pre-filled context with {len(self.context)} paragraph pairs")
+    
+    def _translate_and_add_context(self, texts: List[str], source_lang: str, target_lang: str):
+        """Translate texts and add them to context without storing in database.
+        
+        Args:
+            texts (List[str]): List of texts to translate
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+        """
+        print("Pre-filling translation context with random paragraphs...")
+        for i, text in enumerate(texts):
+            print(f"Context {i+1}/{len(texts)}")
+            if self.verbose:
+                print(f"{source_lang}: {text}")
+            try:
+                # Translation without storing in database
+                translation = self._translate_chunk(text, source_lang, target_lang, True)
+                if self.verbose:
+                    print(f"{target_lang}: {translation}")
+                # Add to context immediately
+                self.context.append((text, translation))
+                # Keep only the last N exchanges for better context
+                if len(self.context) > DEFAULT_PREFILL_CONTEXT_SIZE:
+                    self.context.pop(0)
+            except Exception as e:
+                print(f"Warning: Failed to pre-translate context paragraph: {e}")
+                continue
+            finally:
+                print()
     
     def book_create_template(self, original_book):
         """Create a new EPUB book template with metadata copied from original book.
@@ -1404,6 +1448,8 @@ class EPUBTranslator:
         chapter_start_time = datetime.now()
         # Reset context for each chapter to avoid drift
         self.reset_context()
+        # Pre-fill context with chapter-specific data
+        self.prefill_context(source_lang, target_lang, chapter_number)
         # Get total paragraphs in chapter
         total_paragraphs = self.db_count_paragraphs(chapter_number, source_lang, target_lang)
         # Get the next chapter's paragraph from database
