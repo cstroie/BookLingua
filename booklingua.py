@@ -1023,103 +1023,9 @@ class EPUBTranslator:
         
         # Process each chapter
         for i, chapter in enumerate(chapters):
-            print(f"\n{'='*60}")
-            print(f"Chapter {i+1}/{len(chapters)}: {chapter['name']}")
-            print(f"{'='*60}")
-            
-            # Initialize timing statistics for this chapter
-            chapter_start_time = datetime.now()
-            paragraph_times = []
-            
-            original_text = chapter['content']
-            original_paragraphs = chapter.get('paragraphs', [])
-            
-            translated_text = None
-            
-            # First, try to get the entire chapter from database
-            translated_paragraphs = self._get_translated_chapter_from_db(i+1, source_lang, target_lang)
-            
-            if translated_paragraphs is not None and len(translated_paragraphs) == len(original_paragraphs):
-                # Chapter fully translated, use cached translations
-                if self.verbose:
-                    print("✓ Using cached chapter translation")
-                translated_text = '\n\n'.join(translated_paragraphs)
-            else:
-                # Need to translate chapter
-                chapter_paragraph_times = []  # Track times for this chapter only
-                for j, paragraph in enumerate(original_paragraphs):
-                    if self.verbose:
-                        print(f"\nTranslating chapter {i+1}/{len(chapters)}, paragraph {j+1}/{len(original_paragraphs)}")
-                    if paragraph.strip():
-                        if self.verbose:
-                            print(f"{source_lang}: {paragraph}")
-                        
-                        # Check if translation exists in database
-                        cached_result = self._get_translation_from_db(paragraph, source_lang, target_lang)
-                        if cached_result:
-                            translated_paragraph = cached_result[0]
-                            paragraph_time = cached_result[1] or 0.0
-                            fluency = cached_result[2] or 1.0  # Use cached fluency score or default to 1.0
-                            chapter_paragraph_times.append(paragraph_time)
-                            if self.verbose:
-                                print("✓ Using cached translation")
-                        else:
-                            # Time the translation
-                            start_time = datetime.now()
-                            translated_paragraph = self._translate_chunk(paragraph, source_lang, target_lang)
-                            end_time = datetime.now()
-                            
-                            # Calculate and store timing
-                            paragraph_time = (end_time - start_time).total_seconds()
-                            chapter_paragraph_times.append(paragraph_time)
-                            
-                            # Calculate fluency score
-                            fluency = self._calculate_fluency_score(translated_paragraph)
-                            
-                            # Save to database with timing and fluency info
-                            self._save_translation_to_db(paragraph, translated_paragraph, source_lang, target_lang, 
-                                                       i+1, j+1, paragraph_time, fluency)
-                        
-                        # Calculate statistics for current chapter only
-                        current_avg = sum(chapter_paragraph_times) / len(chapter_paragraph_times)
-                        remaining_paragraphs = len(original_paragraphs) - (j + 1)
-                        estimated_remaining = current_avg * remaining_paragraphs
-                        
-                        if self.verbose:
-                            print(f"{target_lang}: {translated_paragraph}")
-                        
-                        # Show timing statistics
-                        print(f"Time: {paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
-                        
-                        # Show fluency score
-                        print(f"Fluency score: {fluency:.2f}")
-                    else:
-                        # For empty paragraphs, we still need to handle them in the database reconstruction
-                        pass
-                
-                # After translating all paragraphs, get the complete chapter from database
-                translated_paragraphs = self._get_translated_chapter_from_db(i+1, source_lang, target_lang)
-                if translated_paragraphs is not None:
-                    translated_text = '\n\n'.join(translated_paragraphs)
-                else:
-                    # Fallback - this shouldn't happen but just in case
-                    translated_text = ""
-            
-            # Show chapter completion time
-            chapter_end_time = datetime.now()
-            chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
-            
-            # Create chapter for book
-            translated_chapter = epub.EpubHtml(
-                title=f'Chapter {i+1}',
-                file_name=f'chapter_{i+1}.xhtml',
-                lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
-            )
-            translated_chapter.content = f'<html><body>{self._text_to_html(translated_text)}</body></html>'
+            translated_chapter = self._translate_chapter(chapter, i+1, source_lang, target_lang, len(chapters))
             translated_book.add_item(translated_chapter)
             translated_chapters.append(translated_chapter)
-            
-            print(f"✓ Chapter {i+1} translation completed in {chapter_duration:.2f}s")
         
         # Finalize book
         self._finalize_book(translated_book, translated_chapters)
@@ -1325,6 +1231,117 @@ class EPUBTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Failed to save chapters to database: {e}")
+
+    def _translate_chapter(self, chapter: dict, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int) -> epub.EpubHtml:
+        """Translate a single chapter and return an EPUB HTML item.
+        
+        This method handles the translation of a single chapter, including
+        database lookups, progress tracking, and timing statistics.
+        
+        Args:
+            chapter (dict): Chapter data containing paragraphs to translate
+            chapter_number (int): Chapter number (1-based index)
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            total_chapters (int): Total number of chapters in the book
+            
+        Returns:
+            epub.EpubHtml: Translated chapter as an EPUB HTML item
+        """
+        print(f"\n{'='*60}")
+        print(f"Chapter {chapter_number}/{total_chapters}: {chapter['name']}")
+        print(f"{'='*60}")
+        
+        # Initialize timing statistics for this chapter
+        chapter_start_time = datetime.now()
+        
+        original_paragraphs = chapter.get('paragraphs', [])
+        
+        translated_text = None
+        
+        # First, try to get the entire chapter from database
+        translated_paragraphs = self._get_translated_chapter_from_db(chapter_number, source_lang, target_lang)
+        
+        if translated_paragraphs is not None and len(translated_paragraphs) == len(original_paragraphs):
+            # Chapter fully translated, use cached translations
+            if self.verbose:
+                print("✓ Using cached chapter translation")
+            translated_text = '\n\n'.join(translated_paragraphs)
+        else:
+            # Need to translate chapter
+            chapter_paragraph_times = []  # Track times for this chapter only
+            for j, paragraph in enumerate(original_paragraphs):
+                if self.verbose:
+                    print(f"\nTranslating chapter {chapter_number}/{total_chapters}, paragraph {j+1}/{len(original_paragraphs)}")
+                if paragraph.strip():
+                    if self.verbose:
+                        print(f"{source_lang}: {paragraph}")
+                    
+                    # Check if translation exists in database
+                    cached_result = self._get_translation_from_db(paragraph, source_lang, target_lang)
+                    if cached_result:
+                        translated_paragraph = cached_result[0]
+                        paragraph_time = cached_result[1] or 0.0
+                        fluency = cached_result[2] or 1.0  # Use cached fluency score or default to 1.0
+                        chapter_paragraph_times.append(paragraph_time)
+                        if self.verbose:
+                            print("✓ Using cached translation")
+                    else:
+                        # Time the translation
+                        start_time = datetime.now()
+                        translated_paragraph = self._translate_chunk(paragraph, source_lang, target_lang)
+                        end_time = datetime.now()
+                        
+                        # Calculate and store timing
+                        paragraph_time = (end_time - start_time).total_seconds()
+                        chapter_paragraph_times.append(paragraph_time)
+                        
+                        # Calculate fluency score
+                        fluency = self._calculate_fluency_score(translated_paragraph)
+                        
+                        # Save to database with timing and fluency info
+                        self._save_translation_to_db(paragraph, translated_paragraph, source_lang, target_lang, 
+                                                   chapter_number, j+1, paragraph_time, fluency)
+                    
+                    # Calculate statistics for current chapter only
+                    current_avg = sum(chapter_paragraph_times) / len(chapter_paragraph_times)
+                    remaining_paragraphs = len(original_paragraphs) - (j + 1)
+                    estimated_remaining = current_avg * remaining_paragraphs
+                    
+                    if self.verbose:
+                        print(f"{target_lang}: {translated_paragraph}")
+                    
+                    # Show timing statistics
+                    print(f"Time: {paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
+                    
+                    # Show fluency score
+                    print(f"Fluency score: {fluency:.2f}")
+                else:
+                    # For empty paragraphs, we still need to handle them in the database reconstruction
+                    pass
+            
+            # After translating all paragraphs, get the complete chapter from database
+            translated_paragraphs = self._get_translated_chapter_from_db(chapter_number, source_lang, target_lang)
+            if translated_paragraphs is not None:
+                translated_text = '\n\n'.join(translated_paragraphs)
+            else:
+                # Fallback - this shouldn't happen but just in case
+                translated_text = ""
+        
+        # Show chapter completion time
+        chapter_end_time = datetime.now()
+        chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
+        
+        # Create chapter for book
+        translated_chapter = epub.EpubHtml(
+            title=f'Chapter {chapter_number}',
+            file_name=f'chapter_{chapter_number}.xhtml',
+            lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
+        )
+        translated_chapter.content = f'<html><body>{self._text_to_html(translated_text)}</body></html>'
+        
+        print(f"✓ Chapter {chapter_number} translation completed in {chapter_duration:.2f}s")
+        return translated_chapter
 
     def _calculate_fluency_score(self, text: str) -> float:
         """Calculate fluency score based on linguistic patterns.
