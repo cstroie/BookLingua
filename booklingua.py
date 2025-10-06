@@ -922,7 +922,7 @@ class EPUBTranslator:
                 print(f"Database save failed: {e}")
             raise
 
-    def _translate_chunk(self, text: str, source_lang: str, target_lang: str, prefill: bool = False) -> str:
+    def translate_text(self, text: str, source_lang: str, target_lang: str, prefill: bool = False) -> str:
         """Translate a text chunk using OpenAI-compatible API with database caching.
         
         Args:
@@ -1075,7 +1075,7 @@ class EPUBTranslator:
         book = epub.read_epub(input_path, options={'ignore_ncx': False})
         chapters = self.book_extract_content(book)
         # Save all content to database
-        self.content_to_database(chapters, source_lang, target_lang)
+        self.db_save_chapters(chapters, source_lang, target_lang)
 
         # Get chapter list first
         chapter_list = self.db_get_chapters(source_lang, target_lang)
@@ -1186,7 +1186,7 @@ class EPUBTranslator:
                 print(f"{source_lang}: {text}")
             try:
                 # Translation without storing in database
-                translation = self._translate_chunk(text, source_lang, target_lang, True)
+                translation = self.translate_text(text, source_lang, target_lang, True)
                 if self.verbose:
                     print(f"{target_lang}: {translation}")
                 # Add to context immediately
@@ -1242,7 +1242,7 @@ class EPUBTranslator:
         book.add_item(epub.EpubNav())
         book.spine = ['nav'] + chapters
     
-    def content_to_database(self, chapters: List[dict], source_lang: str, target_lang: str):
+    def db_save_chapters(self, chapters: List[dict], source_lang: str, target_lang: str):
         """Save all paragraphs from all chapters to database with empty translations.
         
         This method saves all paragraphs from all chapters to the database with empty
@@ -1341,14 +1341,14 @@ class EPUBTranslator:
                         print(f"{source_lang}: {source_text}")
                     # Time the translation
                     start_time = datetime.now()
-                    translated_text = self._translate_chunk(source_text, source_lang, target_lang)
+                    translated_text = self.translate_text(source_text, source_lang, target_lang)
                     end_time = datetime.now()
                     if self.verbose:
                         print(f"{target_lang}: {translated_text}")
                     # Calculate and store timing
                     elapsed = int((end_time - start_time).total_seconds() * 1000)  # Convert to milliseconds
                     # Calculate fluency score
-                    fluency = self._calculate_fluency_score(translated_text)
+                    fluency = self.calculate_fluency_score(translated_text)
                     # Save to database with timing and fluency info
                     self.db_save_translation(source_text, translated_text, source_lang, target_lang,
                                              chapter_number, par, elapsed, fluency)
@@ -1374,11 +1374,11 @@ class EPUBTranslator:
                 chapter_content = '\n\n'.join(translated_texts)
                 
                 # Calculate fluency score for the chapter
-                fluency_score = self._calculate_fluency_score(chapter_content)
+                fluency_score = self.calculate_fluency_score(chapter_content)
                 print(f"Chapter {chapter_number} fluency score: {fluency_score}%")
                 
                 # Detect translation errors
-                error_counts = self._detect_translation_errors("", chapter_content, source_lang)
+                error_counts = self.detect_translation_errors("", chapter_content, source_lang)
                 total_errors = sum(error_counts.values())
                 if total_errors > 0:
                     print(f"Chapter {chapter_number} translation errors detected: {total_errors}")
@@ -1389,7 +1389,7 @@ class EPUBTranslator:
                     print(f"Chapter {chapter_number} passed error checks")
                 
                 # Check terminology consistency within the chapter
-                consistency_score = self._calculate_consistency_score([{'content': chapter_content}])
+                consistency_score = self.calculate_consistency_score([{'content': chapter_content}])
                 print(f"Chapter {chapter_number} consistency score: {consistency_score}%")
         except Exception as e:
             if self.verbose:
@@ -1419,11 +1419,11 @@ class EPUBTranslator:
             file_name=f'chapter_{chapter_number}.xhtml',
             lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
         )
-        translated_chapter.content = f'<html><body>{self._text_to_html(translated_content)}</body></html>'
+        translated_chapter.content = f'<html><body>{self.text_to_html(translated_content)}</body></html>'
         # Return the reconstructed chapter
         return translated_chapter
 
-    def _calculate_fluency_score(self, text: str) -> int:
+    def calculate_fluency_score(self, text: str) -> int:
         """Calculate fluency score based on linguistic patterns.
         
         Args:
@@ -1450,7 +1450,7 @@ class EPUBTranslator:
         # Convert to percentage (0-100 scale)
         return max(0, min(100, int(fluency * 100)))
 
-    def _calculate_adequacy_score(self, original: str, translated: str, source_lang: str, target_lang: str) -> int:
+    def calculate_adequacy_score(self, original: str, translated: str, source_lang: str, target_lang: str) -> int:
         """Calculate adequacy score using AI evaluation.
         
         Args:
@@ -1476,7 +1476,7 @@ Return only a single integer number between 0 and 100."""
         
         # Use the existing translation system to evaluate
         try:
-            result = self._translate_chunk(prompt, "English", "English", prefill=True)  # Evaluate in English
+            result = self.translate_text(prompt, "English", "English", prefill=True)  # Evaluate in English
             # Extract numerical score from response
             import re
             score_match = re.search(r'(\d+)', result)
@@ -1486,7 +1486,7 @@ Return only a single integer number between 0 and 100."""
         except Exception:
             return 50  # Default score on error
 
-    def _calculate_consistency_score(self, chapters: List[dict]) -> int:
+    def calculate_consistency_score(self, chapters: List[dict]) -> int:
         """Check terminology consistency across chapters.
         
         Args:
@@ -1515,7 +1515,7 @@ Return only a single integer number between 0 and 100."""
         consistency = 1.0 - (inconsistencies / total_terms) if total_terms > 0 else 1.0
         return max(0, min(100, int(consistency * 100)))
 
-    def _detect_translation_errors(self, original: str, translated: str, source_lang: str) -> Dict[str, int]:
+    def detect_translation_errors(self, original: str, translated: str, source_lang: str) -> Dict[str, int]:
         """Detect common translation errors.
         
         Args:
@@ -1549,7 +1549,7 @@ Return only a single integer number between 0 and 100."""
         
         return errors
 
-    def _generate_quality_report(self, chapters: List[dict], source_lang: str, target_lang: str) -> Dict:
+    def generate_quality_report(self, chapters: List[dict], source_lang: str, target_lang: str) -> Dict:
         """Generate comprehensive quality assessment report.
         
         Args:
@@ -1570,7 +1570,7 @@ Return only a single integer number between 0 and 100."""
         
         # Calculate fluency for each chapter
         for chapter in chapters:
-            fluency = self._calculate_fluency_score(chapter['content'])
+            fluency = self.calculate_fluency_score(chapter['content'])
             report['fluency_scores'].append(fluency)
         
         # Calculate adequacy for sample paragraphs
@@ -1578,11 +1578,11 @@ Return only a single integer number between 0 and 100."""
         for i in range(sample_size):
             original = chapters[i]['content']
             translated = self.translate_text(original, source_lang, target_lang)
-            adequacy = self._calculate_adequacy_score(original, translated, source_lang, target_lang)
+            adequacy = self.calculate_adequacy_score(original, translated, source_lang, target_lang)
             report['adequacy_scores'].append(adequacy)
         
         # Calculate consistency
-        report['consistency_score'] = self._calculate_consistency_score(chapters)
+        report['consistency_score'] = self.calculate_consistency_score(chapters)
 
         # Overall score (weighted average)
         avg_fluency = sum(report['fluency_scores']) / len(report['fluency_scores']) if report['fluency_scores'] else 0
@@ -1591,7 +1591,7 @@ Return only a single integer number between 0 and 100."""
         
         return report
 
-    def _text_to_html(self, text: str) -> str:
+    def text_to_html(self, text: str) -> str:
         """Convert text to HTML paragraphs with intelligent format detection.
         
         This method converts text content to HTML format, automatically detecting
