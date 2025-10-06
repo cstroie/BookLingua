@@ -947,12 +947,11 @@ class EPUBTranslator:
         """
         # Return empty dict if no database connection
         if not self.conn:
-            return {}
-        
+            return (None, None, None)
         try:
             cursor = self.conn.cursor()
-            
             # Single query to get all statistics
+            # FIXME remaining_time is 0
             cursor.execute('''
                 SELECT 
                     AVG(processing_time) as avg_time,
@@ -964,32 +963,24 @@ class EPUBTranslator:
                 AND processing_time IS NOT NULL
             ''', (chapter_number, source_lang, target_lang))
             result = cursor.fetchone()
-            
+            # Calculate
             if result:
-                avg_processing_time = result[0] if result[0] else 0.0
+                avg_time = result[0] if result[0] else 0.0
                 elapsed_time = result[1] if result[1] else 0.0
                 total_paragraphs = result[2] if result[2] else 0
                 translated_paragraphs = result[3] if result[3] else 0
-                
+                # Calculate remaining paragraphs and time
                 remaining_paragraphs = total_paragraphs - translated_paragraphs
-                remaining_time = avg_processing_time * remaining_paragraphs if avg_processing_time > 0 else 0.0
-                
-                return {
-                    'avg_processing_time': avg_processing_time,
-                    'elapsed_time': elapsed_time,
-                    'remaining_time': remaining_time
-                }
+                remaining_time = avg_time * remaining_paragraphs if avg_time > 0 else 0.0
+                # Return the calculated statistics
+                return (avg_time, elapsed_time, remaining_time)
             else:
                 # No data found, return default values
-                return {
-                    'avg_processing_time': 0.0,
-                    'elapsed_time': 0.0,
-                    'remaining_time': 0.0
-                }
+                return (0.0, 0.0, 0.0)
         except Exception as e:
             if self.verbose:
                 print(f"Database chapter stats query failed: {e}")
-            return {}
+            return (None, None, None)
 
     def _count_translated_paragraphs_in_chapter(self, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count the number of translated paragraphs in a specific chapter.
@@ -1603,6 +1594,8 @@ class EPUBTranslator:
                     start_time = datetime.now()
                     translated_text = self._translate_chunk(source_text, source_lang, target_lang)
                     end_time = datetime.now()
+                    if self.verbose:
+                        print(f"{target_lang}: {translated_text}")
                     # Calculate and store timing
                     elapsed = (end_time - start_time).total_seconds()
                     # Calculate fluency score
@@ -1611,29 +1604,23 @@ class EPUBTranslator:
                     self._save_translation_to_db(source_text, translated_text, source_lang, target_lang,
                                                 chapter_number, par, elapsed, fluency)
                     # Calculate statistics for current chapter only
-                    current_avg = sum(chapter_paragraph_times) / len(chapter_paragraph_times)
-                    remaining_paragraphs = len(paragraphs) - (j + 1)
-                    estimated_remaining = current_avg * remaining_paragraphs
-                    
-                    if self.verbose:
-                        print(f"{target_lang}: {translated_paragraph}")
-                    
-                    # Show timing statistics
-                    print(f"Time: {paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
-                    
+                    avg_time, elapsed_time, remaining_time = self.db_chapter_stats(chapter_number, source_lang, target_lang)                 
                     # Show fluency score
-                    print(f"Fluency score: {fluency:.2f}")
-
-
-
-                
+                    print(f"Fluency: {fluency:.2f}")
+                    # Show timing statistics
+                    print(f"Time: {elapsed:.2f}s | Avg: {avg_time:.2f}s | Remaining: {remaining_time:.2f}s")
             else:
+                # No more paragraphs to translate
                 break
+        # Show chapter completion time
+        chapter_end_time = datetime.now()
+        chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
+        print(f"Chapter {chapter_number} translation completed in {chapter_duration:.2f}s")
 
-        
-        # Get paragraphs from database
-        paragraphs = self.db_get_paragraphs(chapter_number, source_lang, target_lang)
-        print(paragraphs)
+
+
+
+
 
         # Extract only the paragraph texts
         return
