@@ -678,6 +678,37 @@ class EPUBTranslator:
                 print(f"Database lookup failed: {e}")
             return None
     
+    def _get_translated_chapter_from_db(self, chapter_number: int, source_lang: str, target_lang: str) -> Optional[List[str]]:
+        """Retrieve all translated paragraphs for a chapter from the database.
+        
+        Args:
+            chapter_number (int): Chapter number to retrieve
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            List[str]: List of translated paragraphs in order, or None if not found
+        """
+        if not self.conn:
+            return None
+            
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT source_text, translated_text FROM translations 
+                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
+                ORDER BY id ASC
+            ''', (chapter_number, source_lang, target_lang))
+            results = cursor.fetchall()
+            if results:
+                # Return list of translated paragraphs
+                return [result[1] for result in results]
+            return None
+        except Exception as e:
+            if self.verbose:
+                print(f"Database lookup for chapter failed: {e}")
+            return None
+    
     def _save_translation_to_db(self, text: str, translation: str, source_lang: str, target_lang: str, 
                                 chapter_number: int = None, processing_time: float = None, fluency_score: float = None):
         """Save a translation to the database.
@@ -953,8 +984,16 @@ Translation rules:
             translated_text = None
             
             # Direct translation
-            if original_paragraphs:
-                # Translate each paragraph separately for better quality
+            # First, try to get the entire chapter from database
+            translated_paragraphs = self._get_translated_chapter_from_db(i+1, source_lang, target_lang)
+            
+            if translated_paragraphs is not None:
+                # Chapter fully translated, use cached translations
+                if self.verbose:
+                    print("✓ Using cached chapter translation")
+                translated_text = '\n\n'.join(translated_paragraphs)
+            else:
+                # Need to translate chapter
                 translated_paragraphs = []
                 chapter_paragraph_times = []  # Track times for this chapter only
                 for j, paragraph in enumerate(original_paragraphs):
@@ -1008,8 +1047,6 @@ Translation rules:
                     else:
                         translated_paragraphs.append(paragraph)
                 translated_text = '\n\n'.join(translated_paragraphs)
-            else:
-                translated_text = self.translate_text(original_text, source_lang, target_lang)
             
             # Show chapter completion time
             chapter_end_time = datetime.now()
