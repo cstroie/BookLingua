@@ -1237,23 +1237,22 @@ class EPUBTranslator:
         
         print(f"  ✓ Pre-filled context with {len(self.translation_contexts[context_key])} paragraph pairs")
     
-    def _create_book_template(self, original_book, method_name: str):
+    def _create_book_template(self, original_book):
         """Create a new EPUB book template with metadata copied from original book.
         
         This method creates a new EPUB book object and copies essential metadata
-        from the original book, then modifies the title to indicate the translation
-        method used. This ensures the translated book maintains the original's
-        identifying information while clearly showing it's been translated.
+        from the original book. This ensures the translated book maintains the original's
+        identifying information.
         
         Args:
             original_book: The original EPUB book object (ebooklib.epub.EpubBook)
                 
         Returns:
-            epub.EpubBook: A new EPUB book object with copied metadata and modified title
+            epub.EpubBook: A new EPUB book object with copied metadata
             
         Metadata copied:
             - Identifier: Preserved from original book
-            - Title: Modified to include translation method (e.g., "Original Title")
+            - Title: Preserved from original book
             - Language: Set to target language code ('ro' for Romanian)
             - Authors: Copied from original book's creator metadata
             
@@ -1261,7 +1260,7 @@ class EPUBTranslator:
             >>> original_book = epub.read_epub("book.epub")
             >>> new_book = translator._create_book_template(original_book)
             >>> print(new_book.get_title())
-            'Original Title (Română - Direct Translation)'
+            'Original Title'
         """
         new_book = epub.EpubBook()
         new_book.set_identifier(original_book.get_metadata('DC', 'identifier')[0][0])
