@@ -1588,7 +1588,7 @@ def main():
     """
     parser = argparse.ArgumentParser(description="BookLingua - Translate EPUB books using various AI models")
     parser.add_argument("input", help="Input EPUB file path")
-    parser.add_argument("-o", "--output", default="output", help="Output directory (default: output)")
+    parser.add_argument("-o", "--output", default=None, help="Output directory (default: filename without extension)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("-s", "--source-lang", default="English", help="Source language (default: English)")
     parser.add_argument("-t", "--target-lang", default="Romanian", help="Target language (default: Romanian)")
@@ -1647,6 +1647,11 @@ def main():
     if not api_key:
         api_key = os.environ.get('OPENAI_API_KEY')
     
+    # Set default output directory to filename without extension if not specified
+    output_dir = args.output
+    if output_dir is None:
+        output_dir = os.path.splitext(os.path.basename(args.input))[0]
+    
     # Initialize translator
     translator = EPUBTranslator(
         api_key=api_key,
@@ -1663,7 +1668,7 @@ def main():
     # Run translation
     translator.translate_epub(
         input_path=args.input,
-        output_dir=args.output,
+        output_dir=output_dir,
         source_lang=source_lang,
         target_lang=target_lang
     )
