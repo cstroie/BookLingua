@@ -1355,7 +1355,7 @@ class EPUBTranslator:
                     # Calculate statistics for current chapter only
                     avg_time, elapsed_time, remaining_time = self.db_chapter_stats(chapter_number, source_lang, target_lang)                 
                     # Show fluency score
-                    print(f"Fluency: {fluency:.2f}")
+                    print(f"Fluency: {fluency}%")
                     # Show timing statistics
                     print(f"Time: {elapsed:.2f}s | Avg: {avg_time:.2f}s | Remaining: {remaining_time:.2f}s")
             else:
@@ -1375,7 +1375,7 @@ class EPUBTranslator:
                 
                 # Calculate fluency score for the chapter
                 fluency_score = self._calculate_fluency_score(chapter_content)
-                print(f"Chapter {chapter_number} fluency score: {fluency_score:.3f}")
+                print(f"Chapter {chapter_number} fluency score: {fluency_score}%")
                 
                 # Detect translation errors
                 error_counts = self._detect_translation_errors("", chapter_content, source_lang)
@@ -1423,19 +1423,19 @@ class EPUBTranslator:
         # Return the reconstructed chapter
         return translated_chapter
 
-    def _calculate_fluency_score(self, text: str) -> float:
+    def _calculate_fluency_score(self, text: str) -> int:
         """Calculate fluency score based on linguistic patterns.
         
         Args:
             text (str): Text to evaluate for fluency
             
         Returns:
-            float: Fluency score between 0.0 and 1.0 (higher is better)
+            int: Fluency score as percentage (0-100, higher is better)
         """
         # Check for sentence length variation
         sentences = [s.strip() for s in text.split('.') if s.strip()]
         if not sentences:
-            return 1.0
+            return 100
             
         avg_length = sum(len(s.split()) for s in sentences) / len(sentences)
         length_variance = sum((len(s.split()) - avg_length)**2 for s in sentences) / len(sentences)
@@ -1447,7 +1447,8 @@ class EPUBTranslator:
         max_freq = max(word_freq.values()) if word_freq else 0
         # Score calculation (0-1 scale, higher is better)
         fluency = 1.0 - (length_variance / 1000) - (max_freq / len(words))
-        return max(0.0, min(1.0, fluency))
+        # Convert to percentage (0-100 scale)
+        return max(0, min(100, int(fluency * 100)))
 
     def _calculate_adequacy_score(self, original: str, translated: str, source_lang: str, target_lang: str) -> float:
         """Calculate adequacy score using AI evaluation.
