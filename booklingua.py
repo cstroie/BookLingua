@@ -1445,6 +1445,31 @@ class EPUBTranslator:
         chapter_end_time = datetime.now()
         chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
         print(f"Chapter {chapter_number} translation completed in {chapter_duration:.2f}s")
+        
+        # Run quality checks at the end of chapter translation
+        try:
+            # Get all translated texts in the chapter for quality assessment
+            translated_texts = self.db_get_translated(chapter_number, source_lang, target_lang)
+            if translated_texts:
+                chapter_content = '\n\n'.join(translated_texts)
+                
+                # Calculate fluency score for the chapter
+                fluency_score = self._calculate_fluency_score(chapter_content)
+                print(f"Chapter {chapter_number} fluency score: {fluency_score:.3f}")
+                
+                # Detect translation errors
+                error_counts = self._detect_translation_errors("", chapter_content, source_lang)
+                total_errors = sum(error_counts.values())
+                if total_errors > 0:
+                    print(f"Chapter {chapter_number} translation errors detected: {total_errors}")
+                    for error_type, count in error_counts.items():
+                        if count > 0:
+                            print(f"  - {error_type.replace('_', ' ').title()}: {count}")
+                else:
+                    print(f"Chapter {chapter_number} passed error checks")
+        except Exception as e:
+            if self.verbose:
+                print(f"Warning: Quality checks failed for chapter {chapter_number}: {e}")
 
     def book_create_chapter(self, chapter_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
         """Create an EPUB chapter from translated texts in the database.
