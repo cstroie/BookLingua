@@ -693,6 +693,7 @@ class EPUBTranslator:
                     translated_text TEXT NOT NULL,
                     model TEXT NOT NULL,
                     chapter_number INTEGER,
+                    paragraph_number INTEGER,
                     processing_time REAL,
                     fluency_score REAL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -703,6 +704,12 @@ class EPUBTranslator:
             # Add new columns if they don't exist (for existing databases)
             try:
                 self.conn.execute('ALTER TABLE translations ADD COLUMN chapter_number INTEGER')
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+                
+            try:
+                self.conn.execute('ALTER TABLE translations ADD COLUMN paragraph_number INTEGER')
             except sqlite3.OperationalError:
                 # Column already exists
                 pass
@@ -793,7 +800,8 @@ class EPUBTranslator:
             return None
     
     def _save_translation_to_db(self, text: str, translation: str, source_lang: str, target_lang: str, 
-                                chapter_number: int = None, processing_time: float = None, fluency_score: float = None):
+                                chapter_number: int = None, paragraph_number: int = None, 
+                                processing_time: float = None, fluency_score: float = None):
         """Save a translation to the database.
         
         Args:
@@ -802,6 +810,7 @@ class EPUBTranslator:
             source_lang (str): Source language code
             target_lang (str): Target language code
             chapter_number (int, optional): Chapter number for this translation
+            paragraph_number (int, optional): Paragraph number within the chapter
             processing_time (float, optional): Time taken to process translation
             fluency_score (float, optional): Fluency score of the translation
         """
@@ -812,9 +821,9 @@ class EPUBTranslator:
             cursor = self.conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO translations 
-                (source_lang, target_lang, source_text, translated_text, model, chapter_number, processing_time, fluency_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (source_lang, target_lang, text, translation, self.model, chapter_number, processing_time, fluency_score))
+                (source_lang, target_lang, source_text, translated_text, model, chapter_number, paragraph_number, processing_time, fluency_score)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (source_lang, target_lang, text, translation, self.model, chapter_number, paragraph_number, processing_time, fluency_score))
             self.conn.commit()
         except Exception as e:
             if self.verbose:
@@ -1076,7 +1085,7 @@ class EPUBTranslator:
                             
                             # Save to database with timing and fluency info
                             self._save_translation_to_db(paragraph, translated_paragraph, source_lang, target_lang, 
-                                                       i+1, paragraph_time, fluency)
+                                                       i+1, j+1, paragraph_time, fluency)
                         
                         # Calculate statistics for current chapter only
                         current_avg = sum(chapter_paragraph_times) / len(chapter_paragraph_times)
