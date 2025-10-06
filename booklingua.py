@@ -1190,47 +1190,41 @@ class EPUBTranslator:
         if len(self.context) >= DEFAULT_PREFILL_CONTEXT_SIZE:
             return
         
-        # Try to prefill from database first (only non-empty translations)
+        # Try to prefill from database with a combined query for both translated and untranslated content
         if self.conn:
             try:
                 cursor = self.conn.cursor()
+                
+                # First, try to get existing translations
                 cursor.execute('''
                     SELECT source_text, translated_text FROM translations 
                     WHERE source_lang = ? AND target_lang = ? AND translated_text != ''
-                    ORDER BY id DESC LIMIT 10
-                ''', (source_lang, target_lang))
-                results = cursor.fetchall()
+                    ORDER BY id DESC LIMIT ?
+                ''', (source_lang, target_lang, DEFAULT_PREFILL_CONTEXT_SIZE))
+                translated_results = cursor.fetchall()
                 
                 # Add to context in chronological order (oldest first)
-                for source_text, translated_text in reversed(results):
+                for source_text, translated_text in reversed(translated_results):
                     self.context.append((source_text, translated_text))
                 
-                if len(results) >= DEFAULT_PREFILL_CONTEXT_SIZE:
-                    print(f"Pre-filled context with {len(results)} existing translations from database")
+                # If we have enough context, we're done
+                if len(self.context) >= DEFAULT_PREFILL_CONTEXT_SIZE:
+                    print(f"Pre-filled context with {len(self.context)} existing translations from database")
                     return
-                else:
-                    print(f"Found only {len(results)} existing translations, need more for adequate context")
-            except Exception as e:
-                if self.verbose:
-                    print(f"Database context prefill failed: {e}")
-        
-        # If we don't have enough, add random paragraphs with empty translations
-        if self.conn:
-            try:
-                cursor = self.conn.cursor()
+                
+                # If we need more context, get untranslated paragraphs to translate
+                needed_count = DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context)
                 cursor.execute('''
                     SELECT source_text FROM translations 
                     WHERE source_lang = ? AND target_lang = ? AND translated_text = ''
                     ORDER BY RANDOM() LIMIT ?
-                ''', (source_lang, target_lang, DEFAULT_PREFILL_CONTEXT_SIZE))
-                results = cursor.fetchall()
+                ''', (source_lang, target_lang, needed_count))
+                untranslated_results = cursor.fetchall()
                 
-                # Calculate how many more we need (aim for at least DEFAULT_PREFILL_CONTEXT_SIZE)
-                current_count = len(self.context)
-                needed_count = max(0, DEFAULT_PREFILL_CONTEXT_SIZE - current_count)
-                selected_texts = [row[0] for row in results[:needed_count]]
+                selected_texts = [row[0] for row in untranslated_results]
                 
                 if not selected_texts:
+                    print(f"Pre-filled context with {len(self.context)} existing translations from database")
                     return
                 
                 # Translate selected paragraphs to establish context
@@ -1244,17 +1238,24 @@ class EPUBTranslator:
                         translation = self._translate_chunk(text, source_lang, target_lang, True)
                         if self.verbose:
                             print(f"{target_lang}: {translation}")
+                        # Add to context immediately
+                        self.context.append((text, translation))
+                        # Keep only the last N exchanges for better context
+                        if len(self.context) > DEFAULT_PREFILL_CONTEXT_SIZE:
+                            self.context.pop(0)
                     except Exception as e:
                         print(f"Warning: Failed to pre-translate context paragraph: {e}")
                         continue
                     finally:
                         print()
+                
+                print(f"✓ Pre-filled context with {len(self.context)} paragraph pairs")
+                
             except Exception as e:
                 if self.verbose:
-                    print(f"Database random selection failed: {e}")
-                return
-        
-        print(f"✓ Pre-filled context with {len(self.context)} paragraph pairs")
+                    print(f"Database context prefill failed: {e}")
+                # Ensure we at least report what we have
+                print(f"Pre-filled context with {len(self.context)} paragraph pairs")
     
     def book_create_template(self, original_book):
         """Create a new EPUB book template with metadata copied from original book.
