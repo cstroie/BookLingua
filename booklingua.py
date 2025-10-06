@@ -31,7 +31,7 @@ from datetime import datetime
 # Constants for configurable values
 DEFAULT_CHUNK_SIZE = 3000
 DEFAULT_TEMPERATURE = 0.5
-DEFAULT_MAX_TOKENS = 4096
+DEFAULT_MAX_TOKENS = 20148
 DEFAULT_CONTEXT_SIZE = 10
 DEFAULT_PREFILL_CONTEXT_SIZE = 5
 DEFAULT_KEEP_ALIVE = "30m"
@@ -743,7 +743,7 @@ class EPUBTranslator:
             tuple: (translated_text, processing_time, fluency_score) if found, None otherwise
         """
         if not self.conn:
-            return None
+            return (None,) * 3
             
         try:
             cursor = self.conn.cursor()
@@ -759,11 +759,11 @@ class EPUBTranslator:
                 if len(self.context) > DEFAULT_CONTEXT_SIZE:
                     self.context.pop(0)
                 return (result[0], result[1], result[2])  # (translated_text, processing_time, fluency_score)
-            return None
+            return (None,) * 3
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup failed: {e}")
-            return None
+            return (None,) * 3
     
     def _get_translated_chapter_from_db(self, chapter_number: int, source_lang: str, target_lang: str) -> Optional[List[str]]:
         """Retrieve all translated paragraphs for a chapter from the database.
