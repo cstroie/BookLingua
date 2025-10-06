@@ -231,7 +231,7 @@ class EPUBTranslator:
                                     with open(filepath, 'w', encoding='utf-8') as f:
                                         f.write(markdown_content)
                                     if self.verbose:
-                                        print(f"Saved chapter {item.get_id()} as {filepath}")
+                                        print(f"  {item.get_id()}: {safe_name}")
                                 except Exception as e:
                                     print(f"Warning: Failed to save chapter {item.get_id()} as markdown: {e}")
             except Exception as e:
@@ -1011,17 +1011,15 @@ class EPUBTranslator:
         if output_dir:
             self.output_dir = output_dir
             os.makedirs(self.output_dir, exist_ok=True)
-        
+
+        print(f"Languages: {source_lang} → {target_lang}")
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path, options={'ignore_ncx': False})
         chapters = self.extract_text_from_epub(book)
-        
+        print(f"Found {len(chapters)} chapters to translate")
+
         # Save all paragraphs to database with empty translations for tracking
         self._save_chapters_to_db(chapters, source_lang, target_lang)
-        
-        print(f"Found {len(chapters)} chapters to translate")
-        print(f"Languages: {source_lang} → {target_lang}")
-        print()
         
         # Prepare output book
         translated_book = self._create_book_template(book)
@@ -1195,7 +1193,7 @@ class EPUBTranslator:
                 if self.verbose:
                     print(f"Database context prefill failed: {e}")
         
-        # If we don't have enough from database, add random paragraphs from database with empty translations
+        # If we don't have enough, add random paragraphs with empty translations
         if self.conn:
             try:
                 cursor = self.conn.cursor()
@@ -1209,73 +1207,33 @@ class EPUBTranslator:
                 # Calculate how many more we need (aim for at least DEFAULT_PREFILL_CONTEXT_SIZE)
                 current_count = len(self.translation_contexts[context_key])
                 needed_count = max(0, DEFAULT_PREFILL_CONTEXT_SIZE - current_count)
-                
-                # If we don't have enough paragraphs from database, fall back to random from chapters
-                if len(results) < needed_count:
-                    # Collect all paragraphs from all chapters
-                    all_paragraphs = []
-                    for chapter in chapters:
-                        paragraphs = chapter.get('paragraphs', [])
-                        all_paragraphs.extend([p for p in paragraphs if p.strip()])
-                    
-                    # Filter paragraphs to only include those with at least 5 words
-                    valid_paragraphs = [p for p in all_paragraphs if len(p.split()) >= 5]
-                    
-                    # Select needed random paragraphs
-                    additional_needed = needed_count - len(results)
-                    if valid_paragraphs and additional_needed > 0:
-                        selected_paragraphs = random.sample(valid_paragraphs, min(additional_needed, len(valid_paragraphs)))
-                        # Combine database paragraphs with randomly selected ones
-                        selected_texts = [row[0] for row in results] + selected_paragraphs
-                    else:
-                        selected_texts = [row[0] for row in results]
-                else:
-                    selected_texts = [row[0] for row in results[:needed_count]]
+                selected_texts = [row[0] for row in results[:needed_count]]
                 
                 if not selected_texts:
                     return
                 
-                print("Pre-filling translation context with random paragraphs...")
-                
                 # Translate selected paragraphs to establish context
+                print("Pre-filling translation context with random paragraphs...")
                 for i, text in enumerate(selected_texts):
-                    print(f"  Pre-translating context paragraph {i+1}/{len(selected_texts)}")
+                    print(f"Context paragraph {i+1}/{len(selected_texts)}")
                     if self.verbose:
                         print(f"{source_lang}: {text}")
-                    
                     try:
-                        # Direct translation context (without storing in database)
+                        # Translation without storing in database
                         translation = self._translate_chunk(text, source_lang, target_lang, True)
                         if self.verbose:
                             print(f"{target_lang}: {translation}")
-                        
                     except Exception as e:
-                        print(f"    Warning: Failed to pre-translate context paragraph: {e}")
+                        print(f"Warning: Failed to pre-translate context paragraph: {e}")
                         continue
-                
-                print(f"  ✓ Pre-filled context with {len(self.translation_contexts[context_key])} paragraph pairs")
+                    finally:
+                        print()
             except Exception as e:
                 if self.verbose:
                     print(f"Database random selection failed: {e}")
                 return
         
-        # Translate selected paragraphs to establish context
-        for i, paragraph in enumerate(selected_paragraphs):
-            print(f"  Pre-translating context paragraph {i+1}/{len(selected_paragraphs)}")
-            if self.verbose:
-                print(f"{source_lang}: {paragraph}")
-            
-            try:
-                # Direct translation context (without storing in database)
-                translation = self._translate_chunk(paragraph, source_lang, target_lang, True)
-                if self.verbose:
-                    print(f"{target_lang}: {translation}")
-                
-            except Exception as e:
-                print(f"    Warning: Failed to pre-translate context paragraph: {e}")
-                continue
-        
-        print(f"  ✓ Pre-filled context with {len(self.translation_contexts[context_key])} paragraph pairs")
+        print(f"✓ Pre-filled context with {len(self.translation_contexts[context_key])} paragraph pairs")
     
     def _create_book_template(self, original_book):
         """Create a new EPUB book template with metadata copied from original book.
