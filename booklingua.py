@@ -239,6 +239,76 @@ class EPUBTranslator:
         # Return the list of chapter data
         return chapters
     
+    def book_create_template(self, original_book):
+        """Create a new EPUB book template with metadata copied from original book.
+        
+        This method creates a new EPUB book object and copies essential metadata
+        from the original book. This ensures the translated book maintains the original's
+        identifying information.
+        
+        Args:
+            original_book: The original EPUB book object (ebooklib.epub.EpubBook)
+                
+        Returns:
+            epub.EpubBook: A new EPUB book object with copied metadata
+        """
+        new_book = epub.EpubBook()
+        new_book.set_identifier(original_book.get_metadata('DC', 'identifier')[0][0])
+        
+        original_title = original_book.get_metadata('DC', 'title')[0][0]
+        new_book.set_title(f"{original_title}")
+        # Default to English, will be overridden later
+        new_book.set_language('en')
+        
+        for author in original_book.get_metadata('DC', 'creator'):
+            new_book.add_author(author[0])
+        
+        return new_book
+
+    def book_create_chapter(self, chapter_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
+        """Create an EPUB chapter from translated texts in the database.
+        
+        This function retrieves all translated paragraphs for a chapter from the database,
+        joins them together, and creates an EPUB HTML item for the chapter.
+        
+        Args:
+            chapter_number (int): Chapter number to create
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            epub.EpubHtml: EPUB HTML item for the chapter
+        """
+        # Get all translated texts in the chapter
+        translated_texts = self.db_get_translated(chapter_number, source_lang, target_lang)
+        # Join all translated texts with double newlines
+        translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
+        # Create chapter for book
+        translated_chapter = epub.EpubHtml(
+            title=f'Chapter {chapter_number}',
+            file_name=f'chapter_{chapter_number}.xhtml',
+            lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
+        )
+        translated_chapter.content = f'<html><body>{self.text_to_html(translated_content)}</body></html>'
+        # Return the reconstructed chapter
+        return translated_chapter
+    
+    def book_finalize(self, book, chapters):
+        """Add navigation elements and finalize EPUB book structure.
+        
+        This method completes the EPUB book by adding essential navigation components
+        and setting up the table of contents and spine structure. This ensures the
+        generated EPUB file is properly formatted and compatible with e-readers.
+        
+        Args:
+            book (epub.EpubBook): The EPUB book object to finalize
+            chapters (List[epub.EpubHtml]): List of chapter objects to include in navigation
+        """
+        book.toc = tuple(chapters)
+        book.add_item(epub.EpubNcx())
+        book.add_item(epub.EpubNav())
+        book.spine = ['nav'] + chapters
+
     def html_to_markdown(self, soup) -> str:
         """Convert HTML BeautifulSoup object to Markdown format.
         
@@ -597,6 +667,27 @@ class EPUBTranslator:
             return text
         
         return text
+
+    def text_to_html(self, text: str) -> str:
+        """Convert text to HTML paragraphs with intelligent format detection.
+        
+        This method converts text content to HTML format, automatically detecting
+        whether the input is Markdown-formatted or plain text.
+        
+        Args:
+            text (str): Text content to convert to HTML
+            
+        Returns:
+            str: HTML formatted text with appropriate tags and structure
+        """
+        # First try to convert from Markdown, fallback to plain text
+        if '#' in text or '- ' in text or '*' in text or '_' in text or '~' in text or '`' in text:
+            return self.markdown_to_html(text)
+        else:
+            # Plain text conversion
+            paragraphs = text.split('\n\n')
+            html_paragraphs = [f'<p>{p.replace(chr(10), "<br/>")}</p>' for p in paragraphs if p.strip()]
+            return '\n'.join(html_paragraphs)
     
     def db_init(self):
         """Initialize the SQLite database for storing translations."""
@@ -921,6 +1012,46 @@ class EPUBTranslator:
             if self.verbose:
                 print(f"Database save failed: {e}")
             raise
+    
+    def db_save_chapters(self, chapters: List[dict], source_lang: str, target_lang: str):
+        """Save all paragraphs from all chapters to database with empty translations.
+        
+        This method saves all paragraphs from all chapters to the database with empty
+        translations. This allows for tracking progress and resuming translations.
+        
+        Args:
+            chapters (List[dict]): List of chapter dictionaries containing paragraphs
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Raises:
+            Exception: If database connection is not available
+        """
+        # We need the database connection
+        if not self.conn:
+            raise Exception("Database connection not available")
+        # Save all paragraphs with empty translations
+        try:
+            for ch, chapter in enumerate(chapters):
+                paragraphs = chapter.get('paragraphs', [])
+                print(f"{(ch+1):>4}: {(len(paragraphs)):>6}  {chapter.get('name', 'Untitled Chapter')}")
+                for par, paragraph in enumerate(paragraphs):
+                    # Only save non-empty paragraphs
+                    if paragraph.strip():
+                        # Insert with empty translation if not already there
+                        cursor = self.conn.cursor()
+                        cursor.execute('''
+                            INSERT OR IGNORE INTO translations 
+                            (source_lang, target_lang, source_text, translated_text, model, chapter_number, paragraph_number)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ''', (source_lang, target_lang, paragraph, '', self.model, ch+1, par+1))
+            self.conn.commit()
+            if self.verbose:
+                print(f"... with {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs from all chapters.")
+        except Exception as e:
+            if self.verbose:
+                print(f"Failed to save chapters to database: {e}")
+            raise
 
     def translate_text(self, text: str, source_lang: str, target_lang: str, prefill: bool = False) -> str:
         """Translate a text chunk using OpenAI-compatible API with database caching.
@@ -1111,6 +1242,35 @@ class EPUBTranslator:
         print(f"\n{'='*60}")
         print("Translation complete! 🎉")
         print(f"{'='*60}")
+    
+    def translate_context(self, texts: List[str], source_lang: str, target_lang: str):
+        """Translate texts and add them to context without storing in database.
+        
+        Args:
+            texts (List[str]): List of texts to translate
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+        """
+        print("Pre-filling translation context with random paragraphs...")
+        for i, text in enumerate(texts):
+            print(f"Context {i+1}/{len(texts)}")
+            if self.verbose:
+                print(f"{source_lang}: {text}")
+            try:
+                # Translation without storing in database
+                translation = self.translate_text(text, source_lang, target_lang, True)
+                if self.verbose:
+                    print(f"{target_lang}: {translation}")
+                # Add to context immediately
+                self.context.append((text, translation))
+                # Keep only the last N exchanges for better context
+                if len(self.context) > DEFAULT_PREFILL_CONTEXT_SIZE:
+                    self.context.pop(0)
+            except Exception as e:
+                print(f"Warning: Failed to pre-translate context paragraph: {e}")
+                continue
+            finally:
+                print()
 
     def prefill_context(self, source_lang: str, target_lang: str, chapter_number: int = None):
         """Pre-fill translation context with existing translations or random paragraphs.
@@ -1170,117 +1330,6 @@ class EPUBTranslator:
                     print(f"Database context prefill failed: {e}")
             # Ensure we at least report what we have
             print(f"Pre-filled context with {len(self.context)} paragraph pairs")
-    
-    def translate_context(self, texts: List[str], source_lang: str, target_lang: str):
-        """Translate texts and add them to context without storing in database.
-        
-        Args:
-            texts (List[str]): List of texts to translate
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-        """
-        print("Pre-filling translation context with random paragraphs...")
-        for i, text in enumerate(texts):
-            print(f"Context {i+1}/{len(texts)}")
-            if self.verbose:
-                print(f"{source_lang}: {text}")
-            try:
-                # Translation without storing in database
-                translation = self.translate_text(text, source_lang, target_lang, True)
-                if self.verbose:
-                    print(f"{target_lang}: {translation}")
-                # Add to context immediately
-                self.context.append((text, translation))
-                # Keep only the last N exchanges for better context
-                if len(self.context) > DEFAULT_PREFILL_CONTEXT_SIZE:
-                    self.context.pop(0)
-            except Exception as e:
-                print(f"Warning: Failed to pre-translate context paragraph: {e}")
-                continue
-            finally:
-                print()
-    
-    def book_create_template(self, original_book):
-        """Create a new EPUB book template with metadata copied from original book.
-        
-        This method creates a new EPUB book object and copies essential metadata
-        from the original book. This ensures the translated book maintains the original's
-        identifying information.
-        
-        Args:
-            original_book: The original EPUB book object (ebooklib.epub.EpubBook)
-                
-        Returns:
-            epub.EpubBook: A new EPUB book object with copied metadata
-        """
-        new_book = epub.EpubBook()
-        new_book.set_identifier(original_book.get_metadata('DC', 'identifier')[0][0])
-        
-        original_title = original_book.get_metadata('DC', 'title')[0][0]
-        new_book.set_title(f"{original_title}")
-        # Default to English, will be overridden later
-        new_book.set_language('en')
-        
-        for author in original_book.get_metadata('DC', 'creator'):
-            new_book.add_author(author[0])
-        
-        return new_book
-    
-    def book_finalize(self, book, chapters):
-        """Add navigation elements and finalize EPUB book structure.
-        
-        This method completes the EPUB book by adding essential navigation components
-        and setting up the table of contents and spine structure. This ensures the
-        generated EPUB file is properly formatted and compatible with e-readers.
-        
-        Args:
-            book (epub.EpubBook): The EPUB book object to finalize
-            chapters (List[epub.EpubHtml]): List of chapter objects to include in navigation
-        """
-        book.toc = tuple(chapters)
-        book.add_item(epub.EpubNcx())
-        book.add_item(epub.EpubNav())
-        book.spine = ['nav'] + chapters
-    
-    def db_save_chapters(self, chapters: List[dict], source_lang: str, target_lang: str):
-        """Save all paragraphs from all chapters to database with empty translations.
-        
-        This method saves all paragraphs from all chapters to the database with empty
-        translations. This allows for tracking progress and resuming translations.
-        
-        Args:
-            chapters (List[dict]): List of chapter dictionaries containing paragraphs
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-            
-        Raises:
-            Exception: If database connection is not available
-        """
-        # We need the database connection
-        if not self.conn:
-            raise Exception("Database connection not available")
-        # Save all paragraphs with empty translations
-        try:
-            for ch, chapter in enumerate(chapters):
-                paragraphs = chapter.get('paragraphs', [])
-                print(f"{(ch+1):>4}: {(len(paragraphs)):>6}  {chapter.get('name', 'Untitled Chapter')}")
-                for par, paragraph in enumerate(paragraphs):
-                    # Only save non-empty paragraphs
-                    if paragraph.strip():
-                        # Insert with empty translation if not already there
-                        cursor = self.conn.cursor()
-                        cursor.execute('''
-                            INSERT OR IGNORE INTO translations 
-                            (source_lang, target_lang, source_text, translated_text, model, chapter_number, paragraph_number)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ''', (source_lang, target_lang, paragraph, '', self.model, ch+1, par+1))
-            self.conn.commit()
-            if self.verbose:
-                print(f"... with {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs from all chapters.")
-        except Exception as e:
-            if self.verbose:
-                print(f"Failed to save chapters to database: {e}")
-            raise
 
     def reset_context(self):
         """Reset the translation context to avoid drift between chapters.
@@ -1395,33 +1444,6 @@ class EPUBTranslator:
             if self.verbose:
                 print(f"Warning: Quality checks failed for chapter {chapter_number}: {e}")
 
-    def book_create_chapter(self, chapter_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
-        """Create an EPUB chapter from translated texts in the database.
-        
-        This function retrieves all translated paragraphs for a chapter from the database,
-        joins them together, and creates an EPUB HTML item for the chapter.
-        
-        Args:
-            chapter_number (int): Chapter number to create
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-            
-        Returns:
-            epub.EpubHtml: EPUB HTML item for the chapter
-        """
-        # Get all translated texts in the chapter
-        translated_texts = self.db_get_translated(chapter_number, source_lang, target_lang)
-        # Join all translated texts with double newlines
-        translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
-        # Create chapter for book
-        translated_chapter = epub.EpubHtml(
-            title=f'Chapter {chapter_number}',
-            file_name=f'chapter_{chapter_number}.xhtml',
-            lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
-        )
-        translated_chapter.content = f'<html><body>{self.text_to_html(translated_content)}</body></html>'
-        # Return the reconstructed chapter
-        return translated_chapter
 
     def calculate_fluency_score(self, text: str) -> int:
         """Calculate fluency score based on linguistic patterns.
@@ -1590,27 +1612,6 @@ Return only a single integer number between 0 and 100."""
         report['overall_score'] = int(avg_fluency * 0.4 + avg_adequacy * 0.4 + report['consistency_score'] * 0.2)
         
         return report
-
-    def text_to_html(self, text: str) -> str:
-        """Convert text to HTML paragraphs with intelligent format detection.
-        
-        This method converts text content to HTML format, automatically detecting
-        whether the input is Markdown-formatted or plain text.
-        
-        Args:
-            text (str): Text content to convert to HTML
-            
-        Returns:
-            str: HTML formatted text with appropriate tags and structure
-        """
-        # First try to convert from Markdown, fallback to plain text
-        if '#' in text or '- ' in text or '*' in text or '_' in text or '~' in text or '`' in text:
-            return self.markdown_to_html(text)
-        else:
-            # Plain text conversion
-            paragraphs = text.split('\n\n')
-            html_paragraphs = [f'<p>{p.replace(chr(10), "<br/>")}</p>' for p in paragraphs if p.strip()]
-            return '\n'.join(html_paragraphs)
 
 def main():
     """Command-line interface for BookLingua EPUB translation tool.
