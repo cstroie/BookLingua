@@ -1305,7 +1305,7 @@ class EPUBTranslator:
                     WHERE source_lang = ? AND target_lang = ? AND translated_text != ''
                     AND length(source_text) > 50
                     ORDER BY id DESC LIMIT ?
-                ''', (source_lang, target_lang, chapter_number, DEFAULT_PREFILL_CONTEXT_SIZE))
+                ''', (source_lang, target_lang, DEFAULT_PREFILL_CONTEXT_SIZE))
                 translated_results = cursor.fetchall()
                 # Add to context in chronological order (oldest first)
                 for source_text, translated_text in reversed(translated_results):
@@ -1319,7 +1319,7 @@ class EPUBTranslator:
                     WHERE source_lang = ? AND target_lang = ? AND translated_text = ''
                     AND length(source_text) > 50
                     ORDER BY RANDOM() LIMIT ?
-                ''', (source_lang, target_lang, chapter_number, needed_count))
+                ''', (source_lang, target_lang, needed_count))
                 untranslated_results = cursor.fetchall()
                 # Get the texts and translate them
                 selected_texts = [row[0] for row in untranslated_results]
