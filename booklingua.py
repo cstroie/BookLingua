@@ -1357,14 +1357,14 @@ class EPUBTranslator:
                     # Show fluency score
                     print(f"Fluency: {fluency}%")
                     # Show timing statistics
-                    print(f"Time: {elapsed}ms | Avg: {avg_time:.2f}ms | Remaining: {remaining_time:.2f}ms")
+                    print(f"Time: {elapsed/1000:.2f}s | Avg: {avg_time/1000:.2f}s | Remaining: {remaining_time/1000:.2f}s")
             else:
                 # No more paragraphs to translate
                 break
         # Show chapter completion time
         chapter_end_time = datetime.now()
         chapter_duration_ms = int((chapter_end_time - chapter_start_time).total_seconds() * 1000)
-        print(f"Chapter {chapter_number} translation completed in {chapter_duration_ms}ms")
+        print(f"Chapter {chapter_number} translation completed in {chapter_duration_ms/1000:.2f}s")
         
         # Run quality checks at the end of chapter translation
         try:
