@@ -913,7 +913,7 @@ class EPUBTranslator:
         if not prefill:
             # Check database first
             cached_result = self._get_translation_from_db(text, source_lang, target_lang)
-            if cached_result:
+            if cached_result[0]:
                 if self.verbose:
                     print("✓ Using cached translation")
                 return cached_result[0]  # Return only the translated text
@@ -1347,19 +1347,16 @@ class EPUBTranslator:
             for j, paragraph in enumerate(original_paragraphs):
                 if self.verbose:
                     print(f"\nTranslating chapter {chapter_number}/{total_chapters}, paragraph {j+1}/{len(original_paragraphs)}")
-                if paragraph.strip():
+                if paragraph.strip() and len(paragraph.split()) < 1000:
                     if self.verbose:
                         print(f"{source_lang}: {paragraph}")
                     
                     # Check if translation exists in database
-                    cached_result = self._get_translation_from_db(paragraph, source_lang, target_lang)
-                    if cached_result:
-                        translated_paragraph = cached_result[0]
-                        paragraph_time = cached_result[1] or 0.0
-                        fluency = cached_result[2] or 1.0  # Use cached fluency score or default to 1.0
+                    (translated_paragraph, paragraph_time, fluency) = self._get_translation_from_db(paragraph, source_lang, target_lang)
+                    if translated_paragraph:
                         chapter_paragraph_times.append(paragraph_time)
                         if self.verbose:
-                            print("✓ Using cached translation")
+                            print("✓ Using cached paragraph translation")
                     else:
                         # Time the translation
                         start_time = datetime.now()
