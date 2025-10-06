@@ -1199,8 +1199,15 @@ class EPUBTranslator:
         
         print("Pre-filling translation context with random paragraphs...")
         
+        # Filter paragraphs to only include those with at least 5 words
+        valid_paragraphs = [p for p in all_paragraphs if len(p.split()) >= 5]
+        
+        # If we don't have enough valid paragraphs, skip
+        if len(valid_paragraphs) < needed_count or needed_count <= 0:
+            return
+        
         # Select needed random paragraphs
-        selected_paragraphs = random.sample(all_paragraphs, min(needed_count, len(all_paragraphs)))
+        selected_paragraphs = random.sample(valid_paragraphs, min(needed_count, len(valid_paragraphs)))
         
         # Translate selected paragraphs to establish context
         for i, paragraph in enumerate(selected_paragraphs):
