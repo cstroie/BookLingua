@@ -749,7 +749,7 @@ class EPUBTranslator:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT translated_text, processing_time, fluency_score FROM translations 
-                WHERE source_lang = ? AND target_lang = ? AND source_text = ?
+                WHERE source_lang = ? AND target_lang = ? AND source_text = ? AND translated_text != ''
             ''', (source_lang, target_lang, text))
             result = cursor.fetchone()
             if result:
