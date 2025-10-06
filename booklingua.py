@@ -31,11 +31,10 @@ from datetime import datetime
 # Constants for configurable values
 DEFAULT_CHUNK_SIZE = 3000
 DEFAULT_TEMPERATURE = 0.5
-DEFAULT_MAX_TOKENS = 2048
+DEFAULT_MAX_TOKENS = 4096
 DEFAULT_CONTEXT_SIZE = 5
 DEFAULT_PREFILL_CONTEXT_SIZE = 5
 DEFAULT_KEEP_ALIVE = "30m"
-DEFAULT_OUTPUT_DIR = "output"
 
 # System prompt template - will be formatted with actual languages when used
 SYSTEM_PROMPT = """You are an expert fiction writer and translator specializing in literary translation from {source_lang} to {target_lang}. 
@@ -134,7 +133,7 @@ class EPUBTranslator:
         self.conn = None
         if epub_path:
             self.db_path = os.path.splitext(epub_path)[0] + '.db'
-            self._init_database()
+            self.db_init()
         
         print(f"Initialized with model: {model}")
         if base_url:
@@ -147,7 +146,7 @@ class EPUBTranslator:
         if self.conn:
             self.conn.close()
     
-    def extract_book_content(self, book) -> List[dict]:
+    def book_extract_content(self, book) -> List[dict]:
         """Extract text content from an already opened EPUB book object.
         
         This method processes an already opened EPUB book object, extracts all 
@@ -198,7 +197,7 @@ class EPUBTranslator:
                         continue
                     # Convert HTML to Markdown
                     try:
-                        markdown_content = self._html_to_markdown(soup)
+                        markdown_content = self.html_to_markdown(soup)
                     except Exception as e:
                         print(f"Warning: Failed to convert HTML to Markdown for item {item.get_id()}: {e}")
                         markdown_content = ""
@@ -240,7 +239,7 @@ class EPUBTranslator:
         # Return the list of chapter data
         return chapters
     
-    def _html_to_markdown(self, soup) -> str:
+    def html_to_markdown(self, soup) -> str:
         """Convert HTML BeautifulSoup object to Markdown format.
         
         This method processes HTML content from an EPUB file and converts it to
@@ -263,7 +262,7 @@ class EPUBTranslator:
         Example:
             >>> html = "<h1>Title</h1><p>Paragraph text</p>"
             >>> soup = BeautifulSoup(html, 'html.parser')
-            >>> markdown = translator._html_to_markdown(soup)
+            >>> markdown = translator.html_to_markdown(soup)
             >>> print(markdown)
             '# Title\n\nParagraph text'
         """
@@ -284,7 +283,7 @@ class EPUBTranslator:
             for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'br']):
                 try:
                     # Process inline tags within the element
-                    processed_element = self._process_inline_tags(element)
+                    processed_element = self.process_inline_tags(element)
                     text = processed_element.get_text(separator=' ', strip=True)
                     if not text:
                         continue
@@ -313,7 +312,7 @@ class EPUBTranslator:
             print(f"Warning: Failed to join markdown lines: {e}")
             return ""
     
-    def _process_inline_tags(self, element) -> BeautifulSoup:
+    def process_inline_tags(self, element) -> BeautifulSoup:
         """Process inline HTML tags and convert them to Markdown-style formatting.
         
         This method processes inline HTML elements within a BeautifulSoup object and
@@ -345,7 +344,7 @@ class EPUBTranslator:
         Example:
             >>> html = '<p>This is <strong>bold</strong> and <em>italic</em> text</p>'
             >>> soup = BeautifulSoup(html, 'html.parser')
-            >>> processed = translator._process_inline_tags(soup.p)
+            >>> processed = translator.process_inline_tags(soup.p)
             >>> print(processed.get_text())
             'This is **bold** and *italic* text'
         """
@@ -429,7 +428,7 @@ class EPUBTranslator:
         
         return element_copy
     
-    def _markdown_to_html(self, markdown_text: str) -> str:
+    def markdown_to_html(self, markdown_text: str) -> str:
         """Convert Markdown text back to HTML format.
         
         This method converts Markdown-formatted text back to HTML tags, preserving
@@ -457,7 +456,7 @@ class EPUBTranslator:
             
         Example:
             >>> markdown = "# Title\\n\\nThis is **bold** text"
-            >>> html = translator._markdown_to_html(markdown)
+            >>> html = translator.markdown_to_html(markdown)
             >>> print(html)
             '<h1>Title</h1>\\n\\n<p>This is <strong>bold</strong> text</p>'
         """
@@ -481,42 +480,42 @@ class EPUBTranslator:
                 # Handle headers
                 if line.startswith('###### '):
                     try:
-                        content = self._process_inline_markdown(line[7:])
+                        content = self.process_inline_markdown(line[7:])
                         html_lines.append(f'<h6>{content}</h6>')
                     except Exception as e:
                         print(f"Warning: Error processing h6 header: {e}")
                         html_lines.append(f'<h6>{line[7:]}</h6>')
                 elif line.startswith('##### '):
                     try:
-                        content = self._process_inline_markdown(line[6:])
+                        content = self.process_inline_markdown(line[6:])
                         html_lines.append(f'<h5>{content}</h5>')
                     except Exception as e:
                         print(f"Warning: Error processing h5 header: {e}")
                         html_lines.append(f'<h5>{line[6:]}</h5>')
                 elif line.startswith('#### '):
                     try:
-                        content = self._process_inline_markdown(line[5:])
+                        content = self.process_inline_markdown(line[5:])
                         html_lines.append(f'<h4>{content}</h4>')
                     except Exception as e:
                         print(f"Warning: Error processing h4 header: {e}")
                         html_lines.append(f'<h4>{line[5:]}</h4>')
                 elif line.startswith('### '):
                     try:
-                        content = self._process_inline_markdown(line[4:])
+                        content = self.process_inline_markdown(line[4:])
                         html_lines.append(f'<h3>{content}</h3>')
                     except Exception as e:
                         print(f"Warning: Error processing h3 header: {e}")
                         html_lines.append(f'<h3>{line[4:]}</h3>')
                 elif line.startswith('## '):
                     try:
-                        content = self._process_inline_markdown(line[3:])
+                        content = self.process_inline_markdown(line[3:])
                         html_lines.append(f'<h2>{content}</h2>')
                     except Exception as e:
                         print(f"Warning: Error processing h2 header: {e}")
                         html_lines.append(f'<h2>{line[3:]}</h2>')
                 elif line.startswith('# '):
                     try:
-                        content = self._process_inline_markdown(line[2:])
+                        content = self.process_inline_markdown(line[2:])
                         html_lines.append(f'<h1>{content}</h1>')
                     except Exception as e:
                         print(f"Warning: Error processing h1 header: {e}")
@@ -524,7 +523,7 @@ class EPUBTranslator:
                 # Handle lists
                 elif line.startswith('- '):
                     try:
-                        content = self._process_inline_markdown(line[2:])
+                        content = self.process_inline_markdown(line[2:])
                         html_lines.append(f'<li>{content}</li>')
                     except Exception as e:
                         print(f"Warning: Error processing list item: {e}")
@@ -532,7 +531,7 @@ class EPUBTranslator:
                 # Handle regular paragraphs
                 else:
                     try:
-                        content = self._process_inline_markdown(line)
+                        content = self.process_inline_markdown(line)
                         html_lines.append(f'<p>{content}</p>')
                     except Exception as e:
                         print(f"Warning: Error processing paragraph: {e}")
@@ -547,7 +546,7 @@ class EPUBTranslator:
             print(f"Warning: Failed to join HTML lines: {e}")
             return ""
     
-    def _process_inline_markdown(self, text: str) -> str:
+    def process_inline_markdown(self, text: str) -> str:
         """Convert Markdown inline formatting back to HTML tags.
         
         This method processes Markdown-style inline formatting and converts it to
@@ -574,7 +573,7 @@ class EPUBTranslator:
             
         Example:
             >>> markdown_text = "This is **bold** and *italic* text with `code`"
-            >>> html_text = translator._process_inline_markdown(markdown_text)
+            >>> html_text = translator.process_inline_markdown(markdown_text)
             >>> print(html_text)
             'This is <strong>bold</strong> and <em>italic</em> text with <code>code</code>'
         """
@@ -599,12 +598,11 @@ class EPUBTranslator:
         
         return text
     
-    def _init_database(self):
+    def db_init(self):
         """Initialize the SQLite database for storing translations."""
         if not self.db_path:
             self.conn = None
             return
-            
         try:
             self.conn = sqlite3.connect(self.db_path)
             self.conn.execute('''
@@ -620,16 +618,15 @@ class EPUBTranslator:
                     processing_time REAL,
                     fluency_score REAL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(source_lang, target_lang, source_text, model)
+                    UNIQUE(source_lang, target_lang, chapter_number, paragraph_number)
                 )
             ''')
-            
             self.conn.commit()
         except Exception as e:
             print(f"Warning: Could not initialize database: {e}")
             self.conn = None
     
-    def _get_translation_from_db(self, text: str, source_lang: str, target_lang: str) -> tuple:
+    def db_get_translation(self, text: str, source_lang: str, target_lang: str) -> tuple:
         """Retrieve a translation from the database if it exists.
         
         Args:
@@ -664,40 +661,6 @@ class EPUBTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup failed: {e}")
-            raise
-    
-    def _get_translated_chapter_from_db(self, chapter_number: int, source_lang: str, target_lang: str) -> Optional[List[str]]:
-        """Retrieve all translated paragraphs for a chapter from the database.
-        
-        Args:
-            chapter_number (int): Chapter number to retrieve
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-            
-        Returns:
-            List[str]: List of translated paragraphs in order, or None if not found
-            
-        Raises:
-            Exception: If database connection is not available
-        """
-        if not self.conn:
-            raise Exception("Database connection not available")
-            
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT source_text, translated_text FROM translations 
-                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
-                ORDER BY paragraph_number ASC
-            ''', (chapter_number, source_lang, target_lang))
-            results = cursor.fetchall()
-            if results:
-                # Return list of translated paragraphs
-                return [result[1] for result in results]
-            return None
-        except Exception as e:
-            if self.verbose:
-                print(f"Database lookup for chapter failed: {e}")
             raise
 
     def db_get_translated(self, chapter_number: int, source_lang: str, target_lang: str) -> List[str]:
@@ -767,7 +730,6 @@ class EPUBTranslator:
             if self.verbose:
                 print(f"Database lookup for chapters failed: {e}")
             raise
-
 
     def db_get_next_paragraph(self, chapter_number: int, paragraph_number: int, source_lang: str, target_lang: str) -> tuple:
         """Get the next paragraph in a chapter after the specified paragraph number.
@@ -886,8 +848,7 @@ class EPUBTranslator:
                 print(f"Database chapter stats query failed: {e}")
             raise
 
-
-    def db_chapter_translated(self, chapter_number: int, source_lang: str, target_lang: str) -> bool:
+    def db_chapter_is_translated(self, chapter_number: int, source_lang: str, target_lang: str) -> bool:
         """Check if a chapter is fully translated.
         
         Args:
@@ -928,9 +889,9 @@ class EPUBTranslator:
                 print(f"Database check for chapter translation status failed: {e}")
             raise
     
-    def _save_translation_to_db(self, text: str, translation: str, source_lang: str, target_lang: str, 
-                                chapter_number: int = None, paragraph_number: int = None, 
-                                processing_time: float = None, fluency_score: float = None):
+    def db_save_translation(self, text: str, translation: str, source_lang: str, target_lang: str, 
+                            chapter_number: int = None, paragraph_number: int = None, 
+                            processing_time: float = None, fluency_score: float = None):
         """Save a translation to the database.
         
         Args:
@@ -948,7 +909,6 @@ class EPUBTranslator:
         """
         if not self.conn:
             raise Exception("Database connection not available")
-            
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
@@ -985,7 +945,7 @@ class EPUBTranslator:
         
         if not prefill:
             # Check database first
-            cached_result = self._get_translation_from_db(text, source_lang, target_lang)
+            cached_result = self.db_get_translation(text, source_lang, target_lang)
             if cached_result[0]:
                 if self.verbose:
                     print("✓ Using cached translation")
@@ -1101,7 +1061,7 @@ class EPUBTranslator:
         # Update database path if not set during initialization
         if not self.db_path and input_path:
             self.db_path = os.path.splitext(input_path)[0] + '.db'
-            self._init_database()
+            self.db_init()
 
         # Create output directory if it doesn't exist
         if output_dir:
@@ -1113,7 +1073,7 @@ class EPUBTranslator:
         print(f"Translating from {source_lang} to {target_lang}")
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path, options={'ignore_ncx': False})
-        chapters = self.extract_book_content(book)
+        chapters = self.book_extract_content(book)
         # Save all content to database
         self.content_to_database(chapters, source_lang, target_lang)
 
@@ -1348,7 +1308,7 @@ class EPUBTranslator:
         print(f"{'='*60}")
 
         # Check if chapter is fully translated
-        if self.db_chapter_translated(chapter_number, source_lang, target_lang):
+        if self.db_chapter_is_translated(chapter_number, source_lang, target_lang):
             print("✓ Chapter is fully translated")
             return
 
@@ -1390,8 +1350,8 @@ class EPUBTranslator:
                     # Calculate fluency score
                     fluency = self._calculate_fluency_score(translated_text)
                     # Save to database with timing and fluency info
-                    self._save_translation_to_db(source_text, translated_text, source_lang, target_lang,
-                                                chapter_number, par, elapsed, fluency)
+                    self.db_save_translation(source_text, translated_text, source_lang, target_lang,
+                                             chapter_number, par, elapsed, fluency)
                     # Calculate statistics for current chapter only
                     avg_time, elapsed_time, remaining_time = self.db_chapter_stats(chapter_number, source_lang, target_lang)                 
                     # Show fluency score
@@ -1643,7 +1603,7 @@ Return only a single number between 0 and 1."""
         """
         # First try to convert from Markdown, fallback to plain text
         if '#' in text or '- ' in text or '*' in text or '_' in text or '~' in text or '`' in text:
-            return self._markdown_to_html(text)
+            return self.markdown_to_html(text)
         else:
             # Plain text conversion
             paragraphs = text.split('\n\n')
