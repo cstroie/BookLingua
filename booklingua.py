@@ -1467,6 +1467,10 @@ class EPUBTranslator:
                             print(f"  - {error_type.replace('_', ' ').title()}: {count}")
                 else:
                     print(f"Chapter {chapter_number} passed error checks")
+                
+                # Check terminology consistency within the chapter
+                consistency_score = self._calculate_consistency_score([{'content': chapter_content}])
+                print(f"Chapter {chapter_number} consistency score: {consistency_score:.3f}")
         except Exception as e:
             if self.verbose:
                 print(f"Warning: Quality checks failed for chapter {chapter_number}: {e}")
