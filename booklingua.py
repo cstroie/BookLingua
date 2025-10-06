@@ -847,13 +847,13 @@ class EPUBTranslator:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT source_text FROM translations 
+                SELECT paragraph_number, source_text FROM translations 
                 WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
                 ORDER BY paragraph_number ASC
             ''', (chapter_number, source_lang, target_lang))
             results = cursor.fetchall()
             # Return list of paragraph texts
-            return [result[0] for result in results] if results else []
+            return [(result[0], result[1]) for result in results if result[1] is not None] if results else []
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup for paragraphs failed: {e}")
@@ -1375,7 +1375,7 @@ class EPUBTranslator:
             if self.verbose:
                 print(f"Failed to save chapters to database: {e}")
 
-    def translate_chapter(self, ch: int, source_lang: str, target_lang: str, total_ch: int) -> epub.EpubHtml:
+    def translate_chapter(self, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int) -> epub.EpubHtml:
         """Translate a single chapter and return an EPUB HTML item.
         
         This method handles the translation of a single chapter, including
@@ -1383,29 +1383,30 @@ class EPUBTranslator:
         
         Args:
             chapter (dict): Chapter data containing paragraphs to translate
-            ch (int): Chapter number (1-based index)
+            chapter_number (int): Chapter number (1-based index)
             source_lang (str): Source language code
             target_lang (str): Target language code
-            total_ch (int): Total number of chapters in the book
+            total_chapters (int): Total number of chapters in the book
             
         Returns:
             epub.EpubHtml: Translated chapter as an EPUB HTML item
         """
         print(f"\n{'='*60}")
-        print(f"Chapter {ch}/{total_ch}")
+        print(f"Chapter {chapter_number}/{total_chapters}")
         print(f"{'='*60}")
         
         # Initialize timing statistics for this chapter
         chapter_start_time = datetime.now()
-        original_paragraphs = chapter.get('paragraphs', [])
+        # Get paragraphs from database
+        paragraphs = self.db_get_paragraphs(chapter_number, source_lang, target_lang)
         translated_text = None
         
         # First, try to get the entire chapter from database
-        translated_paragraphs = self._get_translated_chapter_from_db(ch, source_lang, target_lang)
+        translated_paragraphs = self._get_translated_chapter_from_db(chapter_number, source_lang, target_lang)
         
         # Check if chapter is fully translated by counting non-null translations
-        translated_count = self._count_translated_paragraphs_in_chapter(ch, source_lang, target_lang)
-        non_empty_paragraphs = len([p for p in original_paragraphs if p.strip()])
+        translated_count = self._count_translated_paragraphs_in_chapter(chapter_number, source_lang, target_lang)
+        non_empty_paragraphs = len([p for p in paragraphs if p.strip()])
         
         if translated_count >= non_empty_paragraphs:
             # Chapter fully translated, use cached translations
@@ -1419,9 +1420,9 @@ class EPUBTranslator:
         else:
             # Need to translate chapter
             chapter_paragraph_times = []  # Track times for this chapter only
-            for j, paragraph in enumerate(original_paragraphs):
+            for j, paragraph in enumerate(paragraphs):
                 if self.verbose:
-                    print(f"\nTranslating chapter {ch}/{total_ch}, paragraph {j+1}/{len(original_paragraphs)}")
+                    print(f"\nTranslating chapter {chapter_number}/{total_chapters}, paragraph {j+1}/{len(paragraphs)}")
                 if paragraph.strip() and len(paragraph.split()) < 1000:
                     if self.verbose:
                         print(f"{source_lang}: {paragraph}")
@@ -1447,11 +1448,11 @@ class EPUBTranslator:
                         
                         # Save to database with timing and fluency info
                         self._save_translation_to_db(paragraph, translated_paragraph, source_lang, target_lang, 
-                                                   ch, j+1, paragraph_time, fluency)
+                                                   chapter_number, j+1, paragraph_time, fluency)
                     
                     # Calculate statistics for current chapter only
                     current_avg = sum(chapter_paragraph_times) / len(chapter_paragraph_times)
-                    remaining_paragraphs = len(original_paragraphs) - (j + 1)
+                    remaining_paragraphs = len(paragraphs) - (j + 1)
                     estimated_remaining = current_avg * remaining_paragraphs
                     
                     if self.verbose:
@@ -1467,7 +1468,7 @@ class EPUBTranslator:
                     pass
             
             # After translating all paragraphs, get the complete chapter from database
-            translated_paragraphs = self._get_translated_chapter_from_db(ch, source_lang, target_lang)
+            translated_paragraphs = self._get_translated_chapter_from_db(chapter_number, source_lang, target_lang)
             if translated_paragraphs is not None:
                 translated_text = '\n\n'.join(translated_paragraphs)
             else:
@@ -1480,13 +1481,13 @@ class EPUBTranslator:
         
         # Create chapter for book
         translated_chapter = epub.EpubHtml(
-            title=f'Chapter {ch}',
-            file_name=f'chapter_{ch}.xhtml',
+            title=f'Chapter {chapter_number}',
+            file_name=f'chapter_{chapter_number}.xhtml',
             lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
         )
         translated_chapter.content = f'<html><body>{self._text_to_html(translated_text)}</body></html>'
         
-        print(f"✓ Chapter {ch} translation completed in {chapter_duration:.2f}s")
+        print(f"✓ Chapter {chapter_number} translation completed in {chapter_duration:.2f}s")
         return translated_chapter
 
     def _calculate_fluency_score(self, text: str) -> float:
