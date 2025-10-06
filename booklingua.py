@@ -807,7 +807,7 @@ class EPUBTranslator:
             target_lang (str): Target language code
             
         Returns:
-            tuple: (avg_processing_time, elapsed_time, remaining_time)
+            tuple: (avg_processing_time_ms, elapsed_time_ms, remaining_time_ms)
                 
         Raises:
             Exception: If database connection is not available
@@ -1363,8 +1363,8 @@ class EPUBTranslator:
                 break
         # Show chapter completion time
         chapter_end_time = datetime.now()
-        chapter_duration = (chapter_end_time - chapter_start_time).total_seconds()
-        print(f"Chapter {chapter_number} translation completed in {chapter_duration:.2f}s")
+        chapter_duration_ms = int((chapter_end_time - chapter_start_time).total_seconds() * 1000)
+        print(f"Chapter {chapter_number} translation completed in {chapter_duration_ms}ms")
         
         # Run quality checks at the end of chapter translation
         try:
