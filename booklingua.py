@@ -640,7 +640,7 @@ class EPUBTranslator:
             print(f"Warning: Could not initialize database: {e}")
             self.conn = None
     
-    def _get_translation_from_db(self, text: str, source_lang: str, target_lang: str) -> Optional[str]:
+    def _get_translation_from_db(self, text: str, source_lang: str, target_lang: str) -> Optional[tuple]:
         """Check if a translation exists in the database.
         
         Args:
@@ -649,7 +649,7 @@ class EPUBTranslator:
             target_lang (str): Target language code
             
         Returns:
-            str: Cached translation if found, None otherwise
+            tuple: (translated_text, processing_time) if found, None otherwise
         """
         if not self.conn:
             return None
@@ -657,7 +657,7 @@ class EPUBTranslator:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT translated_text FROM translations 
+                SELECT translated_text, processing_time FROM translations 
                 WHERE source_lang = ? AND target_lang = ? AND source_text = ?
             ''', (source_lang, target_lang, text))
             result = cursor.fetchone()
@@ -670,7 +670,7 @@ class EPUBTranslator:
                 # Keep only the last N exchanges for better context
                 if len(self.translation_contexts[context_key]) > DEFAULT_CONTEXT_SIZE:
                     self.translation_contexts[context_key].pop(0)
-                return result[0]
+                return (result[0], result[1])  # (translated_text, processing_time)
             return None
         except Exception as e:
             if self.verbose:
@@ -760,11 +760,11 @@ class EPUBTranslator:
         
         if not prefill:
             # Check database first
-            cached_translation = self._get_translation_from_db(text, source_lang, target_lang)
-            if cached_translation:
+            cached_result = self._get_translation_from_db(text, source_lang, target_lang)
+            if cached_result:
                 if self.verbose:
                     print("✓ Using cached translation")
-                return cached_translation
+                return cached_result[0]  # Return only the translated text
 
         try:
             headers = {
@@ -961,26 +961,36 @@ Translation rules:
                         if self.verbose:
                             print(f"{source_lang}: {paragraph}")
                         
-                        # Time the translation
-                        start_time = datetime.now()
-                        translated_paragraph = self._translate_chunk(paragraph, source_lang, target_lang)
-                        end_time = datetime.now()
-                        
-                        # Calculate and store timing
-                        paragraph_time = (end_time - start_time).total_seconds()
-                        paragraph_times.append(paragraph_time)
+                        # Check if translation exists in database
+                        cached_result = self._get_translation_from_db(paragraph, source_lang, target_lang)
+                        if cached_result:
+                            translated_paragraph = cached_result[0]
+                            paragraph_time = cached_result[1] or 0.0
+                            paragraph_times.append(paragraph_time)
+                            
+                            if self.verbose:
+                                print("✓ Using cached translation")
+                        else:
+                            # Time the translation
+                            start_time = datetime.now()
+                            translated_paragraph = self._translate_chunk(paragraph, source_lang, target_lang)
+                            end_time = datetime.now()
+                            
+                            # Calculate and store timing
+                            paragraph_time = (end_time - start_time).total_seconds()
+                            paragraph_times.append(paragraph_time)
+                            
+                            # Calculate fluency score
+                            fluency = self._calculate_fluency_score(translated_paragraph)
+                            
+                            # Save to database with timing and fluency info
+                            self._save_translation_to_db(paragraph, translated_paragraph, source_lang, target_lang, 
+                                                       paragraph_time, fluency)
                         
                         # Calculate statistics
                         current_avg = sum(paragraph_times) / len(paragraph_times)
                         remaining_paragraphs = len(original_paragraphs) - (j + 1)
                         estimated_remaining = current_avg * remaining_paragraphs
-                        
-                        # Calculate fluency score
-                        fluency = self._calculate_fluency_score(translated_paragraph)
-                        
-                        # Save to database with timing and fluency info
-                        self._save_translation_to_db(paragraph, translated_paragraph, source_lang, target_lang, 
-                                                   paragraph_time, fluency)
                         
                         translated_paragraphs.append(translated_paragraph)
                         if self.verbose:
@@ -989,8 +999,10 @@ Translation rules:
                         # Show timing statistics
                         print(f"Time: {paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
                         
-                        # Show fluency score for this paragraph
-                        print(f"Fluency score: {fluency:.2f}")
+                        # Show fluency score for cached translations
+                        if not cached_result:  # Only calculate fluency for new translations
+                            fluency = self._calculate_fluency_score(translated_paragraph)
+                            print(f"Fluency score: {fluency:.2f}")
                     else:
                         translated_paragraphs.append(paragraph)
                 translated_text = '\n\n'.join(translated_paragraphs)
