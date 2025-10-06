@@ -38,7 +38,7 @@ DEFAULT_KEEP_ALIVE = "30m"
 DEFAULT_OUTPUT_DIR = "output"
 
 # System prompt template - will be formatted with actual languages when used
-SYSTEM_PROMPT_TEMPLATE = """/no_think You are an expert fiction writer and translator specializing in literary translation from {source_lang} to {target_lang}. 
+SYSTEM_PROMPT = """/no_think You are an expert fiction writer and translator specializing in literary translation from {source_lang} to {target_lang}. 
 You excel at translating fictional works while preserving the author's narrative voice, character personalities, and emotional depth.
 
 Your expertise includes:
@@ -895,7 +895,7 @@ class EPUBTranslator:
             messages = [
                 {
                     "role": "system",
-                    "content": SYSTEM_PROMPT
+                    "content": SYSTEM_PROMPT.format(source_lang=source_lang, target_lang=target_lang)
                 }
             ]
             
