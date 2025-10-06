@@ -147,7 +147,7 @@ class EPUBTranslator:
         if self.conn:
             self.conn.close()
     
-    def extract_text_from_epub(self, book) -> List[dict]:
+    def extract_book_content(self, book) -> List[dict]:
         """Extract text content from an already opened EPUB book object.
         
         This method processes an already opened EPUB book object, extracts all 
@@ -165,51 +165,50 @@ class EPUBTranslator:
                 - html (str): Original HTML content
                 - paragraphs (List[str]): Individual paragraphs extracted from content
         """
+        # List to hold chapter data
         chapters = []
-        
+        # Check if book is valid
         if not book:
             print("Warning: No book provided to extract text from.")
             return chapters
-            
+        # Get all items in the book
         try:
             items = book.get_items()
         except Exception as e:
             print(f"Warning: Failed to get items from book: {e}")
             return chapters
-            
+        # Process each item
         for item in items:
             try:
                 if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                    # Extract HTML content
                     try:
                         html_content = item.get_content()
                     except Exception as e:
                         print(f"Warning: Failed to get content from item {item.get_id()}: {e}")
                         continue
-                        
                     if not html_content:
                         continue
-                        
+                    # Parse HTML with BeautifulSoup
                     try:
                         soup = BeautifulSoup(html_content, 'html.parser')
                     except Exception as e:
                         print(f"Warning: Failed to parse HTML content from item {item.get_id()}: {e}")
                         continue
-                    
                     # Convert HTML to Markdown
                     try:
                         markdown_content = self._html_to_markdown(soup)
                     except Exception as e:
                         print(f"Warning: Failed to convert HTML to Markdown for item {item.get_id()}: {e}")
                         markdown_content = ""
-                    
                     # Extract paragraphs from Markdown
                     try:
                         paragraphs = [p.strip() for p in markdown_content.split('\n\n') if p.strip()]
                     except Exception as e:
                         print(f"Warning: Failed to extract paragraphs from item {item.get_id()}: {e}")
                         paragraphs = []
-                    
-                    if markdown_content.strip():  # Only include non-empty chapters
+                    # Only include non-empty chapters
+                    if markdown_content.strip():
                         chapter_data = {
                             'id': item.get_id(),
                             'name': item.get_name(),
@@ -217,8 +216,8 @@ class EPUBTranslator:
                             'html': html_content,
                             'paragraphs': paragraphs
                         }
+                        # Append chapter data to list
                         chapters.append(chapter_data)
-                        
                         # Save chapter as markdown if output directory exists
                         if self.output_dir:
                             if os.path.exists(self.output_dir):
@@ -227,7 +226,7 @@ class EPUBTranslator:
                                     safe_name = re.sub(r'[^\w\-_\. ]', '_', item.get_name())
                                     filename = f"{item.get_id()}_{safe_name}.md"
                                     filepath = os.path.join(self.output_dir, filename)
-                                    
+                                    # Write markdown content to file
                                     with open(filepath, 'w', encoding='utf-8') as f:
                                         f.write(markdown_content)
                                     if self.verbose:
@@ -237,7 +236,9 @@ class EPUBTranslator:
             except Exception as e:
                 print(f"Warning: Error processing item: {e}")
                 continue
-        
+        # Summary of chapters found
+        print(f"Found {len(chapters)} chapters to translate")
+        # Return the list of chapter data
         return chapters
     
     def _html_to_markdown(self, soup) -> str:
@@ -1030,22 +1031,25 @@ class EPUBTranslator:
             self.db_path = os.path.splitext(input_path)[0] + '.db'
             self._init_database()
 
+        # Create output directory if it doesn't exist
         if output_dir:
             self.output_dir = output_dir
             os.makedirs(self.output_dir, exist_ok=True)
 
-        print(f"Languages: {source_lang} → {target_lang}")
+        # Load book and extract text
+        print(f"{'='*60}")
+        print(f"Translating from {source_lang} to {target_lang}")
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path, options={'ignore_ncx': False})
-        chapters = self.extract_text_from_epub(book)
-        print(f"Found {len(chapters)} chapters to translate")
-
-        # Save all paragraphs to database with empty translations for tracking
-        self._save_chapters_to_db(chapters, source_lang, target_lang)
-        
+        chapters = self.extract_book_content(book)
+        # Save all content to database
+        self.content_to_database(chapters, source_lang, target_lang)
         # Prepare output book
         translated_book = self._create_book_template(book)
-        
+    
+        return
+
+
         # Pre-fill context
         self._prefill_context(chapters, source_lang, target_lang)
         
@@ -1265,7 +1269,7 @@ class EPUBTranslator:
         book.add_item(epub.EpubNav())
         book.spine = ['nav'] + chapters
     
-    def _save_chapters_to_db(self, chapters: List[dict], source_lang: str, target_lang: str):
+    def content_to_database(self, chapters: List[dict], source_lang: str, target_lang: str):
         """Save all paragraphs from all chapters to database with empty translations.
         
         This method saves all paragraphs from all chapters to the database with empty
@@ -1276,21 +1280,23 @@ class EPUBTranslator:
             source_lang (str): Source language code
             target_lang (str): Target language code
         """
+        # We need the database connection
         if not self.conn:
             return
-            
+        # Save all paragraphs with empty translations
         try:
-            for i, chapter in enumerate(chapters):
-                original_paragraphs = chapter.get('paragraphs', [])
-                for j, paragraph in enumerate(original_paragraphs):
-                    if paragraph.strip():  # Only save non-empty paragraphs
-                        # Insert with empty translation if not already exists
+            for ch, chapter in enumerate(chapters):
+                paragraphs = chapter.get('paragraphs', [])
+                for par, paragraph in enumerate(paragraphs):
+                    # Only save non-empty paragraphs
+                    if paragraph.strip():
+                        # Insert with empty translation if not already there
                         cursor = self.conn.cursor()
-                        cursor.execute('''
+                        count = cursor.execute('''
                             INSERT OR IGNORE INTO translations 
                             (source_lang, target_lang, source_text, translated_text, model, chapter_number, paragraph_number)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ''', (source_lang, target_lang, paragraph, '', self.model, i+1, j+1))
+                        ''', (source_lang, target_lang, paragraph, '', self.model, ch+1, par+1))
             self.conn.commit()
             if self.verbose:
                 print(f"Saved {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs to database")
@@ -1795,5 +1801,6 @@ def main():
         target_lang=target_lang
     )
 
+# Run main function if executed as script
 if __name__ == "__main__":
     main()
