@@ -1328,11 +1328,19 @@ class EPUBTranslator:
         # First, try to get the entire chapter from database
         translated_paragraphs = self._get_translated_chapter_from_db(chapter_number, source_lang, target_lang)
         
-        if translated_paragraphs is not None and len(translated_paragraphs) == len(original_paragraphs):
+        # Check if chapter is fully translated by counting non-null translations
+        translated_count = self._count_translated_paragraphs_in_chapter(chapter_number, source_lang, target_lang)
+        non_empty_paragraphs = len([p for p in original_paragraphs if p.strip()])
+        
+        if translated_count >= non_empty_paragraphs:
             # Chapter fully translated, use cached translations
             if self.verbose:
                 print("✓ Using cached chapter translation")
-            translated_text = '\n\n'.join(translated_paragraphs)
+            # Get the actual translated paragraphs from database
+            if translated_paragraphs is not None:
+                translated_text = '\n\n'.join(translated_paragraphs)
+            else:
+                translated_text = ""
         else:
             # Need to translate chapter
             chapter_paragraph_times = []  # Track times for this chapter only
