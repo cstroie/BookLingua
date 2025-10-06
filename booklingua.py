@@ -1016,6 +1016,9 @@ class EPUBTranslator:
         book = epub.read_epub(input_path, options={'ignore_ncx': False})
         chapters = self.extract_text_from_epub(book)
         
+        # Save all paragraphs to database with empty translations for tracking
+        self._save_chapters_to_db(chapters, source_lang, target_lang)
+        
         print(f"Found {len(chapters)} chapters to translate")
         print(f"Languages: {source_lang} → {target_lang}")
         print()
@@ -1309,6 +1312,39 @@ class EPUBTranslator:
         book.add_item(epub.EpubNav())
         book.spine = ['nav'] + chapters
     
+    def _save_chapters_to_db(self, chapters: List[dict], source_lang: str, target_lang: str):
+        """Save all paragraphs from all chapters to database with empty translations.
+        
+        This method saves all paragraphs from all chapters to the database with empty
+        translations. This allows for tracking progress and resuming translations.
+        
+        Args:
+            chapters (List[dict]): List of chapter dictionaries containing paragraphs
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+        """
+        if not self.conn:
+            return
+            
+        try:
+            for i, chapter in enumerate(chapters):
+                original_paragraphs = chapter.get('paragraphs', [])
+                for j, paragraph in enumerate(original_paragraphs):
+                    if paragraph.strip():  # Only save non-empty paragraphs
+                        # Insert with empty translation if not already exists
+                        cursor = self.conn.cursor()
+                        cursor.execute('''
+                            INSERT OR IGNORE INTO translations 
+                            (source_lang, target_lang, source_text, translated_text, model, chapter_number, paragraph_number)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ''', (source_lang, target_lang, paragraph, '', self.model, i+1, j+1))
+            self.conn.commit()
+            if self.verbose:
+                print(f"Saved {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs to database")
+        except Exception as e:
+            if self.verbose:
+                print(f"Failed to save chapters to database: {e}")
+
     def _calculate_fluency_score(self, text: str) -> float:
         """Calculate fluency score based on linguistic patterns.
         
