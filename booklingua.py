@@ -636,6 +636,26 @@ class EPUBTranslator:
                     UNIQUE(source_lang, target_lang, source_text, model)
                 )
             ''')
+            
+            # Add new columns if they don't exist (for existing databases)
+            try:
+                self.conn.execute('ALTER TABLE translations ADD COLUMN chapter_number INTEGER')
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+                
+            try:
+                self.conn.execute('ALTER TABLE translations ADD COLUMN processing_time REAL')
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+                
+            try:
+                self.conn.execute('ALTER TABLE translations ADD COLUMN fluency_score REAL')
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
+                
             self.conn.commit()
         except Exception as e:
             print(f"Warning: Could not initialize database: {e}")
