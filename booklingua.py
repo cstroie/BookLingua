@@ -1226,10 +1226,11 @@ class EPUBTranslator:
                             SELECT source_text FROM translations 
                             WHERE source_lang = ? AND target_lang = ? AND translated_text = ''
                             AND chapter_number = ?
-                            ORDER BY RANDOM() LIMIT ?
-                        ''', (source_lang, target_lang, chapter_number, needed_count))
+                            ORDER BY RANDOM()
+                        ''', (source_lang, target_lang, chapter_number))
                         untranslated_results = cursor.fetchall()
-                        selected_texts = [row[0] for row in untranslated_results]
+                        # Filter for texts with at least 50 characters
+                        selected_texts = [row[0] for row in untranslated_results if len(row[0]) >= 50][:needed_count]
                         
                         if selected_texts:
                             self._translate_and_add_context(selected_texts, source_lang, target_lang)
@@ -1256,10 +1257,11 @@ class EPUBTranslator:
                             cursor.execute('''
                                 SELECT source_text FROM translations 
                                 WHERE source_lang = ? AND target_lang = ? AND translated_text = ''
-                                ORDER BY RANDOM() LIMIT ?
-                            ''', (source_lang, target_lang, final_count))
+                                ORDER BY RANDOM()
+                            ''', (source_lang, target_lang))
                             final_results = cursor.fetchall()
-                            final_texts = [row[0] for row in final_results]
+                            # Filter for texts with at least 50 characters
+                            final_texts = [row[0] for row in final_results if len(row[0]) >= 50][:final_count]
                             
                             if final_texts:
                                 self._translate_and_add_context(final_texts, source_lang, target_lang)
