@@ -954,6 +954,7 @@ Translation rules:
             if original_paragraphs:
                 # Translate each paragraph separately for better quality
                 translated_paragraphs = []
+                chapter_paragraph_times = []  # Track times for this chapter only
                 for j, paragraph in enumerate(original_paragraphs):
                     if self.verbose:
                         print(f"\nTranslating chapter {i+1}/{len(chapters)}, paragraph {j+1}/{len(original_paragraphs)}")
@@ -966,7 +967,7 @@ Translation rules:
                         if cached_result:
                             translated_paragraph = cached_result[0]
                             paragraph_time = cached_result[1] or 0.0
-                            paragraph_times.append(paragraph_time)
+                            chapter_paragraph_times.append(paragraph_time)
                             
                             if self.verbose:
                                 print("✓ Using cached translation")
@@ -978,7 +979,7 @@ Translation rules:
                             
                             # Calculate and store timing
                             paragraph_time = (end_time - start_time).total_seconds()
-                            paragraph_times.append(paragraph_time)
+                            chapter_paragraph_times.append(paragraph_time)
                             
                             # Calculate fluency score
                             fluency = self._calculate_fluency_score(translated_paragraph)
@@ -987,8 +988,8 @@ Translation rules:
                             self._save_translation_to_db(paragraph, translated_paragraph, source_lang, target_lang, 
                                                        paragraph_time, fluency)
                         
-                        # Calculate statistics
-                        current_avg = sum(paragraph_times) / len(paragraph_times)
+                        # Calculate statistics for current chapter only
+                        current_avg = sum(chapter_paragraph_times) / len(chapter_paragraph_times)
                         remaining_paragraphs = len(original_paragraphs) - (j + 1)
                         estimated_remaining = current_avg * remaining_paragraphs
                         
