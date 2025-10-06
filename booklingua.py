@@ -178,6 +178,7 @@ class EPUBTranslator:
             print(f"Warning: Failed to get items from book: {e}")
             return chapters
         # Process each item
+        print("Extracting chapters from EPUB ...")
         for item in items:
             try:
                 if item.get_type() == ebooklib.ITEM_DOCUMENT:
@@ -229,15 +230,13 @@ class EPUBTranslator:
                                     # Write markdown content to file
                                     with open(filepath, 'w', encoding='utf-8') as f:
                                         f.write(markdown_content)
-                                    if self.verbose:
-                                        print(f"  {item.get_id()}: {safe_name}")
                                 except Exception as e:
                                     print(f"Warning: Failed to save chapter {item.get_id()} as markdown: {e}")
             except Exception as e:
                 print(f"Warning: Error processing item: {e}")
                 continue
         # Summary of chapters found
-        print(f"Found {len(chapters)} chapters to translate")
+        print(f"Found {len(chapters)} chapters to translate ...")
         # Return the list of chapter data
         return chapters
     
@@ -1044,14 +1043,10 @@ class EPUBTranslator:
         chapters = self.extract_book_content(book)
         # Save all content to database
         self.content_to_database(chapters, source_lang, target_lang)
-        # Prepare output book
-        translated_book = self._create_book_template(book)
-    
-        return
-
 
         # Pre-fill context
-        self._prefill_context(chapters, source_lang, target_lang)
+        # TODO
+        #self._prefill_context(chapters, source_lang, target_lang)
         
         translated_chapters = []
         
@@ -1094,6 +1089,11 @@ class EPUBTranslator:
                     print(f"Failed to retrieve chapters from database: {e}")
         
         # Finalize book
+
+        # Prepare output book
+        translated_book = self._create_book_template(book)
+
+
         # Use the database-retrieved chapters if available, otherwise use the translated chapters
         if self.conn and translated_chapters:
             self._finalize_book(translated_book, translated_chapters)
@@ -1287,19 +1287,20 @@ class EPUBTranslator:
         try:
             for ch, chapter in enumerate(chapters):
                 paragraphs = chapter.get('paragraphs', [])
+                print(f"{(ch+1):>4}: {(len(paragraphs)):>6}  {chapter.get('name', 'Untitled Chapter')}")
                 for par, paragraph in enumerate(paragraphs):
                     # Only save non-empty paragraphs
                     if paragraph.strip():
                         # Insert with empty translation if not already there
                         cursor = self.conn.cursor()
-                        count = cursor.execute('''
+                        cursor.execute('''
                             INSERT OR IGNORE INTO translations 
                             (source_lang, target_lang, source_text, translated_text, model, chapter_number, paragraph_number)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
                         ''', (source_lang, target_lang, paragraph, '', self.model, ch+1, par+1))
             self.conn.commit()
             if self.verbose:
-                print(f"Saved {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs to database")
+                print(f"... with {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs from all chapters.")
         except Exception as e:
             if self.verbose:
                 print(f"Failed to save chapters to database: {e}")
