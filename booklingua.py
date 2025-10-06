@@ -784,7 +784,7 @@ class EPUBTranslator:
             cursor.execute('''
                 SELECT source_text, translated_text FROM translations 
                 WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
-                ORDER BY id ASC
+                ORDER BY paragraph_number ASC
             ''', (chapter_number, source_lang, target_lang))
             results = cursor.fetchall()
             if results:
@@ -1024,8 +1024,6 @@ class EPUBTranslator:
         # Process each chapter
         for i, chapter in enumerate(chapters):
             translated_chapter = self._translate_chapter(chapter, i+1, source_lang, target_lang, len(chapters))
-            translated_book.add_item(translated_chapter)
-            translated_chapters.append(translated_chapter)
         
         # Alternative approach: retrieve all translated chapters from database
         if self.conn:
@@ -1049,14 +1047,14 @@ class EPUBTranslator:
                         translated_text = '\n\n'.join(translated_paragraphs)
                         
                         # Create chapter for book
-                        translated_chapter_db = epub.EpubHtml(
+                        translated_chapter = epub.EpubHtml(
                             title=f'Chapter {chapter_num}',
                             file_name=f'chapter_{chapter_num}.xhtml',
                             lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
                         )
-                        translated_chapter_db.content = f'<html><body>{self._text_to_html(translated_text)}</body></html>'
-                        translated_book.add_item(translated_chapter_db)
-                        translated_chapters.append(translated_chapter_db)
+                        translated_chapter.content = f'<html><body>{self._text_to_html(translated_text)}</body></html>'
+                        translated_book.add_item(translated_chapter)
+                        translated_chapters.append(translated_chapter)
             except Exception as e:
                 if self.verbose:
                     print(f"Failed to retrieve chapters from database: {e}")
