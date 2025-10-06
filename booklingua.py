@@ -629,6 +629,7 @@ class EPUBTranslator:
                     source_text TEXT NOT NULL,
                     translated_text TEXT NOT NULL,
                     model TEXT NOT NULL,
+                    chapter_number INTEGER,
                     processing_time REAL,
                     fluency_score REAL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -678,7 +679,7 @@ class EPUBTranslator:
             return None
     
     def _save_translation_to_db(self, text: str, translation: str, source_lang: str, target_lang: str, 
-                                processing_time: float = None, fluency_score: float = None):
+                                chapter_number: int = None, processing_time: float = None, fluency_score: float = None):
         """Save a translation to the database.
         
         Args:
@@ -686,6 +687,7 @@ class EPUBTranslator:
             translation (str): Translated text
             source_lang (str): Source language code
             target_lang (str): Target language code
+            chapter_number (int, optional): Chapter number for this translation
             processing_time (float, optional): Time taken to process translation
             fluency_score (float, optional): Fluency score of the translation
         """
@@ -696,9 +698,9 @@ class EPUBTranslator:
             cursor = self.conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO translations 
-                (source_lang, target_lang, source_text, translated_text, model, processing_time, fluency_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (source_lang, target_lang, text, translation, self.model, processing_time, fluency_score))
+                (source_lang, target_lang, source_text, translated_text, model, chapter_number, processing_time, fluency_score)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (source_lang, target_lang, text, translation, self.model, chapter_number, processing_time, fluency_score))
             self.conn.commit()
         except Exception as e:
             if self.verbose:
@@ -987,7 +989,7 @@ Translation rules:
                             
                             # Save to database with timing and fluency info
                             self._save_translation_to_db(paragraph, translated_paragraph, source_lang, target_lang, 
-                                                       paragraph_time, fluency)
+                                                       i+1, paragraph_time, fluency)
                         
                         # Calculate statistics for current chapter only
                         current_avg = sum(chapter_paragraph_times) / len(chapter_paragraph_times)
