@@ -956,7 +956,7 @@ Translation rules:
                 translated_paragraphs = []
                 for j, paragraph in enumerate(original_paragraphs):
                     if self.verbose:
-                        print(f"\nTranslating paragraph {j+1}/{len(original_paragraphs)}")
+                        print(f"\nTranslating chapter {i+1}/{len(chapters)}, paragraph {j+1}/{len(original_paragraphs)}")
                     if paragraph.strip():
                         if self.verbose:
                             print(f"{source_lang}: {paragraph}")
