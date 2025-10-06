@@ -952,38 +952,40 @@ class EPUBTranslator:
         try:
             cursor = self.conn.cursor()
             
-            # Get average processing time for translated paragraphs
+            # Single query to get all statistics
             cursor.execute('''
-                SELECT AVG(processing_time) FROM translations 
+                SELECT 
+                    AVG(processing_time) as avg_time,
+                    SUM(processing_time) as elapsed_time,
+                    COUNT(*) as total_paragraphs,
+                    COUNT(CASE WHEN translated_text IS NOT NULL AND translated_text != '' THEN 1 END) as translated_paragraphs
+                FROM translations 
                 WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
-                AND translated_text IS NOT NULL AND translated_text != '' 
                 AND processing_time IS NOT NULL
             ''', (chapter_number, source_lang, target_lang))
-            avg_result = cursor.fetchone()
-            avg_processing_time = avg_result[0] if avg_result and avg_result[0] else 0.0
+            result = cursor.fetchone()
             
-            # Get elapsed time (sum of all processing times for translated paragraphs)
-            cursor.execute('''
-                SELECT SUM(processing_time) FROM translations 
-                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
-                AND translated_text IS NOT NULL AND translated_text != '' 
-                AND processing_time IS NOT NULL
-            ''', (chapter_number, source_lang, target_lang))
-            elapsed_result = cursor.fetchone()
-            elapsed_time = elapsed_result[0] if elapsed_result and elapsed_result[0] else 0.0
-            
-            # Calculate remaining time
-            total_paragraphs = self.db_count_paragraphs(chapter_number, source_lang, target_lang)
-            translated_paragraphs = self._count_translated_paragraphs_in_chapter(
-                chapter_number, source_lang, target_lang)
-            remaining_paragraphs = total_paragraphs - translated_paragraphs
-            remaining_time = avg_processing_time * remaining_paragraphs if avg_processing_time > 0 else 0.0
-            
-            return {
-                'avg_processing_time': avg_processing_time,
-                'elapsed_time': elapsed_time,
-                'remaining_time': remaining_time
-            }
+            if result:
+                avg_processing_time = result[0] if result[0] else 0.0
+                elapsed_time = result[1] if result[1] else 0.0
+                total_paragraphs = result[2] if result[2] else 0
+                translated_paragraphs = result[3] if result[3] else 0
+                
+                remaining_paragraphs = total_paragraphs - translated_paragraphs
+                remaining_time = avg_processing_time * remaining_paragraphs if avg_processing_time > 0 else 0.0
+                
+                return {
+                    'avg_processing_time': avg_processing_time,
+                    'elapsed_time': elapsed_time,
+                    'remaining_time': remaining_time
+                }
+            else:
+                # No data found, return default values
+                return {
+                    'avg_processing_time': 0.0,
+                    'elapsed_time': 0.0,
+                    'remaining_time': 0.0
+                }
         except Exception as e:
             if self.verbose:
                 print(f"Database chapter stats query failed: {e}")
