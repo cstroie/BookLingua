@@ -630,7 +630,7 @@ class EPUBTranslator:
             self.conn = None
     
     def _get_translation_from_db(self, text: str, source_lang: str, target_lang: str) -> tuple:
-        """Check if a translation exists in the database.
+        """Retrieve a translation from the database if it exists.
         
         Args:
             text (str): Source text to look up
@@ -770,11 +770,7 @@ class EPUBTranslator:
 
 
     def db_get_next_paragraph(self, chapter_number: int, paragraph_number: int, source_lang: str, target_lang: str) -> tuple:
-        """Retrieve the next paragraph in a chapter given a chapter and paragraph number.
-        
-        This method fetches the next paragraph after the specified paragraph number
-        within the same chapter, returning the paragraph number, source text, and 
-        translated text. If there is no next paragraph, it returns None.
+        """Get the next paragraph in a chapter after the specified paragraph number.
         
         Args:
             chapter_number (int): Chapter number to search within
@@ -810,10 +806,7 @@ class EPUBTranslator:
             raise
 
     def db_count_paragraphs(self, chapter_number: int, source_lang: str, target_lang: str) -> int:
-        """Count the total number of paragraphs in a specific chapter.
-        
-        This method counts all paragraphs in a chapter from the database,
-        regardless of whether they have been translated or not.
+        """Count total paragraphs in a chapter.
         
         Args:
             chapter_number (int): Chapter number to count paragraphs for
@@ -844,11 +837,7 @@ class EPUBTranslator:
             raise
 
     def db_chapter_stats(self, chapter_number: int, source_lang: str, target_lang: str) -> tuple:
-        """Get statistics for a chapter including processing times and translation progress.
-        
-        This method queries the database to calculate statistics for a specific chapter,
-        including average processing time for translated paragraphs, elapsed time for
-        chapter translation, and estimated remaining time to complete the chapter.
+        """Get chapter translation statistics.
         
         Args:
             chapter_number (int): Chapter number to get statistics for
@@ -856,10 +845,7 @@ class EPUBTranslator:
             target_lang (str): Target language code
             
         Returns:
-            tuple: Tuple containing chapter statistics:
-                - avg_processing_time (float): Average processing time for translated paragraphs
-                - elapsed_time (float): Sum of all processing times for translated paragraphs
-                - remaining_time (float): Estimated time to complete chapter translation
+            tuple: (avg_processing_time, elapsed_time, remaining_time)
                 
         Raises:
             Exception: If database connection is not available
@@ -902,10 +888,7 @@ class EPUBTranslator:
 
 
     def db_chapter_translated(self, chapter_number: int, source_lang: str, target_lang: str) -> bool:
-        """Check if a chapter is fully translated by verifying all paragraphs have translations.
-        
-        This method queries the database to determine if all paragraphs in a chapter
-        have been translated (i.e., have non-empty translations).
+        """Check if a chapter is fully translated.
         
         Args:
             chapter_number (int): Chapter number to check
@@ -980,57 +963,24 @@ class EPUBTranslator:
             raise
 
     def _translate_chunk(self, text: str, source_lang: str, target_lang: str, prefill: bool = False) -> str:
-        """Translate a single chunk of text using OpenAI-compatible API with database caching.
-        
-        This method handles the actual API call to translate a chunk of text
-        from the source language to the target language. It first checks the database
-        for existing translations, then makes the API call if needed. It manages the API
-        request, error handling, and maintains translation context for consistency.
+        """Translate a text chunk using OpenAI-compatible API with database caching.
         
         Args:
             text (str): The text chunk to translate
-            target_lang (str): Target language code (e.g., "Romanian", "French", "German")
-            source_lang (str): Source language code (e.g., "English", "Spanish", "Chinese")
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            prefill (bool): Whether this is a prefill context translation
             
         Returns:
             str: Translated text in the target language
             
-        Database Caching:
-            - First checks database for existing translation
-            - If found, returns cached translation
-            - If not found, translates via API and stores result
-            - Handles database connection failures gracefully
+        Process:
+            1. Check database for existing translation
+            2. If found, return cached translation
+            3. If not found, translate via API and store result
             
-        API Configuration:
-            - Uses OpenAI-compatible chat completions endpoint
-            - Supports custom base URLs for different providers (OpenAI, Ollama, Mistral, etc.)
-            - Handles API key authentication when provided
-            - Uses temperature=0.5 for balanced creativity and consistency
-            
-        Translation Context:
-            - Maintains conversation history for each language pair
-            - Stores last 10 exchanges to maintain context consistency
-            - Uses context key format: "{source_lang}_{target_lang}"
-            
-        Error Handling:
-            - Raises exceptions for API failures (non-200 status codes)
-            - Prints error messages for debugging
-            - Preserves original text on translation failures
-            
-        Security Features:
-            - Filters out text between  and  tags to prevent prompt injection
-            - Ignores commands disguised as content in the source text
-            - Processes all text as content to be translated
-            
-        Example:
-            >>> translator = EPUBTranslator(epub_path="book.epub")
-            >>> result = translator._translate_chunk(
-            ...     "Hello, how are you?",
-            ...     "English",
-            ...     "Romanian"
-            ... )
-            >>> print(result)
-            'Salut, cum ești?'
+        Raises:
+            Exception: If translation fails
         """
         
         if not prefill:
