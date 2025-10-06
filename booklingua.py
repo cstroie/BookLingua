@@ -858,39 +858,6 @@ class EPUBTranslator:
                 print(f"Database lookup for chapters failed: {e}")
             return []
 
-    def db_get_paragraphs(self, chapter_number: int, source_lang: str, target_lang: str) -> List[str]:
-        """Retrieve all paragraphs for a specific chapter from the database, ordered ascendingly.
-        
-        This method fetches all source text paragraphs for a given chapter number,
-        ordered by paragraph number in ascending order. It's useful for retrieving
-        the original content of a chapter for processing or display.
-        
-        Args:
-            chapter_number (int): Chapter number to retrieve paragraphs for
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-            
-        Returns:
-            List[str]: List of paragraph texts in ascending order by paragraph number
-        """
-        # Return empty list if no database connection
-        if not self.conn:
-            return []
-        # Query paragraphs ordered by paragraph number
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT paragraph_number, source_text FROM translations 
-                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
-                ORDER BY paragraph_number ASC
-            ''', (chapter_number, source_lang, target_lang))
-            results = cursor.fetchall()
-            # Return list of paragraph texts
-            return [(result[0], result[1]) for result in results if result[1] is not None] if results else []
-        except Exception as e:
-            if self.verbose:
-                print(f"Database lookup for paragraphs failed: {e}")
-            return []
 
     def db_get_next_paragraph(self, chapter_number: int, paragraph_number: int, source_lang: str, target_lang: str) -> Optional[tuple]:
         """Retrieve the next paragraph in a chapter given a chapter and paragraph number.
