@@ -796,6 +796,38 @@ class EPUBTranslator:
                 print(f"Database lookup for chapter failed: {e}")
             return None
 
+    def _get_all_translated_texts_in_chapter(self, chapter_number: int, source_lang: str, target_lang: str) -> List[str]:
+        """Get all translated texts in a chapter from the database.
+        
+        This helper function retrieves all translated paragraphs for a specific chapter
+        from the database, ordered by paragraph number.
+        
+        Args:
+            chapter_number (int): Chapter number to retrieve
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            List[str]: List of translated texts in chapter order
+        """
+        if not self.conn:
+            return []
+            
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT translated_text FROM translations 
+                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
+                ORDER BY paragraph_number ASC
+            ''', (chapter_number, source_lang, target_lang))
+            results = cursor.fetchall()
+            # Return list of translated texts
+            return [result[0] for result in results if result[0] is not None] if results else []
+        except Exception as e:
+            if self.verbose:
+                print(f"Database lookup for chapter texts failed: {e}")
+            return []
+
     def db_get_chapters(self, source_lang: str, target_lang: str) -> List[int]:
         """Retrieve all chapter numbers from the database, ordered ascending.
         
@@ -1622,8 +1654,35 @@ class EPUBTranslator:
 
 
 
-        # Extract only the paragraph texts
-        return
+    def book_create_chapter(self, chapter_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
+        """Create an EPUB chapter from translated texts in the database.
+        
+        This function retrieves all translated paragraphs for a chapter from the database,
+        joins them together, and creates an EPUB HTML item for the chapter.
+        
+        Args:
+            chapter_number (int): Chapter number to create
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            epub.EpubHtml: EPUB HTML item for the chapter
+        """
+        # Get all translated texts in the chapter
+        translated_texts = self._get_all_translated_texts_in_chapter(chapter_number, source_lang, target_lang)
+        
+        # Join all translated texts with double newlines
+        translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
+        
+        # Create chapter for book
+        translated_chapter = epub.EpubHtml(
+            title=f'Chapter {chapter_number}',
+            file_name=f'chapter_{chapter_number}.xhtml',
+            lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
+        )
+        translated_chapter.content = f'<html><body>{self._text_to_html(translated_content)}</body></html>'
+        
+        return translated_chapter
 
 
             
