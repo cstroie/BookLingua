@@ -38,7 +38,7 @@ DEFAULT_KEEP_ALIVE = "30m"
 DEFAULT_OUTPUT_DIR = "output"
 
 # System prompt template - will be formatted with actual languages when used
-SYSTEM_PROMPT = """/no_think You are an expert fiction writer and translator specializing in literary translation from {source_lang} to {target_lang}. 
+SYSTEM_PROMPT = """You are an expert fiction writer and translator specializing in literary translation from {source_lang} to {target_lang}. 
 You excel at translating fictional works while preserving the author's narrative voice, character personalities, and emotional depth.
 
 Your expertise includes:
@@ -1305,7 +1305,7 @@ class EPUBTranslator:
         self.content_to_database(chapters, source_lang, target_lang)
 
         # Pre-fill context
-        self.prefill_context(chapters, source_lang, target_lang)
+        self.prefill_context(source_lang, target_lang)
         
         # Process each chapter
         chapter_list = self.db_get_chapters(source_lang, target_lang)
