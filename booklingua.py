@@ -1027,6 +1027,34 @@ class EPUBTranslator:
             translated_book.add_item(translated_chapter)
             translated_chapters.append(translated_chapter)
         
+        # If we have a database, we can also retrieve all translated chapters from database
+        if self.conn:
+            try:
+                # Get the maximum chapter number to know how many chapters we have
+                cursor = self.conn.cursor()
+                cursor.execute('''
+                    SELECT MAX(chapter_number) FROM translations 
+                    WHERE source_lang = ? AND target_lang = ?
+                ''', (source_lang, target_lang))
+                max_chapter_result = cursor.fetchone()
+                max_chapters = max_chapter_result[0] if max_chapter_result and max_chapter_result[0] else len(chapters)
+                
+                # Retrieve all translated chapters from database
+                translated_chapters_from_db = []
+                for chapter_num in range(1, max_chapters + 1):
+                    translated_paragraphs = self._get_translated_chapter_from_db(chapter_num, source_lang, target_lang)
+                    if translated_paragraphs:
+                        translated_text = '\n\n'.join(translated_paragraphs)
+                        
+                        # Create chapter for book
+                        translated_chapter_db = epub.EpubHtml(
+                            title=f'Chapter {chapter_num}',
+                            file_name=f'chapter_{chapter_num}_db.xhtml',
+                            lang=target_lang.lower()[:2]  # Use first 2 letters of target language code
+                        )
+                        translated_chapter_db.content = f'<html><body>{self._text_to_html(translated_text)}</body></html>'
+                        translated_chapters_from_db.append(translated_chapter_db)
+        
         # Finalize book
         self._finalize_book(translated_book, translated_chapters)
         
