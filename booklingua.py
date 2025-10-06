@@ -1003,11 +1003,10 @@ Translation rules:
             
             translated_text = None
             
-            # Direct translation
             # First, try to get the entire chapter from database
             translated_paragraphs = self._get_translated_chapter_from_db(i+1, source_lang, target_lang)
             
-            if translated_paragraphs is not None:
+            if translated_paragraphs is not None and len(translated_paragraphs) == len(original_paragraphs):
                 # Chapter fully translated, use cached translations
                 if self.verbose:
                     print("✓ Using cached chapter translation")
@@ -1029,7 +1028,6 @@ Translation rules:
                             paragraph_time = cached_result[1] or 0.0
                             fluency = cached_result[2] or 1.0  # Use cached fluency score or default to 1.0
                             chapter_paragraph_times.append(paragraph_time)
-                            
                             if self.verbose:
                                 print("✓ Using cached translation")
                         else:
