@@ -639,9 +639,12 @@ class EPUBTranslator:
             
         Returns:
             tuple: (translated_text, processing_time, fluency_score) if found, None otherwise
+            
+        Raises:
+            Exception: If database connection is not available
         """
         if not self.conn:
-            return (None,) * 3
+            raise Exception("Database connection not available")
             
         try:
             cursor = self.conn.cursor()
@@ -657,11 +660,11 @@ class EPUBTranslator:
                 if len(self.context) > DEFAULT_CONTEXT_SIZE:
                     self.context.pop(0)
                 return (result[0], result[1], result[2])  # (translated_text, processing_time, fluency_score)
-            return (None,) * 3
+            return (None, None, None)
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup failed: {e}")
-            return (None,) * 3
+            raise
     
     def _get_translated_chapter_from_db(self, chapter_number: int, source_lang: str, target_lang: str) -> Optional[List[str]]:
         """Retrieve all translated paragraphs for a chapter from the database.
@@ -673,9 +676,12 @@ class EPUBTranslator:
             
         Returns:
             List[str]: List of translated paragraphs in order, or None if not found
+            
+        Raises:
+            Exception: If database connection is not available
         """
         if not self.conn:
-            return None
+            raise Exception("Database connection not available")
             
         try:
             cursor = self.conn.cursor()
@@ -692,7 +698,7 @@ class EPUBTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup for chapter failed: {e}")
-            return None
+            raise
 
     def db_get_translated(self, chapter_number: int, source_lang: str, target_lang: str) -> List[str]:
         """Get all translated texts in a chapter from the database.
@@ -707,10 +713,13 @@ class EPUBTranslator:
             
         Returns:
             List[str]: List of translated texts in chapter order
+            
+        Raises:
+            Exception: If database connection is not available
         """
-        # Return empty list if no database connection
+        # Raise exception if no database connection
         if not self.conn:
-            return []
+            raise Exception("Database connection not available")
         # Query all translations in chapter
         try:
             cursor = self.conn.cursor()
@@ -725,7 +734,7 @@ class EPUBTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup for chapter texts failed: {e}")
-            return []
+            raise
 
     def db_get_chapters(self, source_lang: str, target_lang: str) -> List[int]:
         """Retrieve all chapter numbers from the database, ordered ascending.
@@ -736,10 +745,13 @@ class EPUBTranslator:
             
         Returns:
             List[int]: List of chapter numbers in ascending order
+            
+        Raises:
+            Exception: If database connection is not available
         """
-        # Return empty list if no database connection
+        # Raise exception if no database connection
         if not self.conn:
-            return []
+            raise Exception("Database connection not available")
         # Query distinct chapter numbers
         try:
             cursor = self.conn.cursor()
@@ -754,7 +766,7 @@ class EPUBTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup for chapters failed: {e}")
-            return []
+            raise
 
 
     def db_get_next_paragraph(self, chapter_number: int, paragraph_number: int, source_lang: str, target_lang: str) -> Optional[tuple]:
@@ -773,10 +785,13 @@ class EPUBTranslator:
         Returns:
             tuple: (paragraph_number, source_text, translated_text) of the next paragraph,
                    or None if there is no next paragraph
+                   
+        Raises:
+            Exception: If database connection is not available
         """
-        # Return None if no database connection
+        # Raise exception if no database connection
         if not self.conn:
-            return (None, None, None)
+            raise Exception("Database connection not available")
         # Query the next paragraph ordered by paragraph number
         try:
             cursor = self.conn.cursor()
@@ -792,7 +807,7 @@ class EPUBTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup for next paragraph failed: {e}")
-            return (None, None, None)
+            raise
 
     def db_count_paragraphs(self, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count the total number of paragraphs in a specific chapter.
@@ -807,10 +822,13 @@ class EPUBTranslator:
             
         Returns:
             int: Total number of paragraphs in the chapter
+            
+        Raises:
+            Exception: If database connection is not available
         """
-        # Return 0 if no database connection
+        # Raise exception if no database connection
         if not self.conn:
-            return 0
+            raise Exception("Database connection not available")
         # Count all paragraphs in the chapter
         try:
             cursor = self.conn.cursor()
@@ -823,7 +841,7 @@ class EPUBTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Database count for chapter paragraphs failed: {e}")
-            return 0
+            raise
 
     def db_chapter_stats(self, chapter_number: int, source_lang: str, target_lang: str) -> dict:
         """Get statistics for a chapter including processing times and translation progress.
@@ -842,14 +860,16 @@ class EPUBTranslator:
                 - avg_processing_time (float): Average processing time for translated paragraphs
                 - elapsed_time (float): Sum of all processing times for translated paragraphs
                 - remaining_time (float): Estimated time to complete chapter translation
+                
+        Raises:
+            Exception: If database connection is not available
         """
-        # Return empty dict if no database connection
+        # Raise exception if no database connection
         if not self.conn:
-            return (None, None, None)
+            raise Exception("Database connection not available")
         try:
             cursor = self.conn.cursor()
             # Single query to get all statistics
-            # FIXME remaining_time is 0
             cursor.execute('''
                 SELECT 
                     AVG(processing_time) as avg_time,
@@ -878,7 +898,7 @@ class EPUBTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Database chapter stats query failed: {e}")
-            return (None, None, None)
+            raise
 
 
     def db_chapter_translated(self, chapter_number: int, source_lang: str, target_lang: str) -> bool:
@@ -894,10 +914,13 @@ class EPUBTranslator:
             
         Returns:
             bool: True if chapter is fully translated, False otherwise
+            
+        Raises:
+            Exception: If database connection is not available
         """
-        # Return False if no database connection
+        # Raise exception if no database connection
         if not self.conn:
-            return False
+            raise Exception("Database connection not available")
         try:
             cursor = self.conn.cursor()
             # Count total paragraphs in the chapter
@@ -920,7 +943,7 @@ class EPUBTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Database check for chapter translation status failed: {e}")
-            return False
+            raise
     
     def _save_translation_to_db(self, text: str, translation: str, source_lang: str, target_lang: str, 
                                 chapter_number: int = None, paragraph_number: int = None, 
@@ -936,9 +959,12 @@ class EPUBTranslator:
             paragraph_number (int, optional): Paragraph number within the chapter
             processing_time (float, optional): Time taken to process translation
             fluency_score (float, optional): Fluency score of the translation
+            
+        Raises:
+            Exception: If database connection is not available
         """
         if not self.conn:
-            return
+            raise Exception("Database connection not available")
             
         try:
             cursor = self.conn.cursor()
@@ -951,6 +977,7 @@ class EPUBTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Database save failed: {e}")
+            raise
 
     def _translate_chunk(self, text: str, source_lang: str, target_lang: str, prefill: bool = False) -> str:
         """Translate a single chunk of text using OpenAI-compatible API with database caching.
@@ -1385,10 +1412,13 @@ class EPUBTranslator:
             chapters (List[dict]): List of chapter dictionaries containing paragraphs
             source_lang (str): Source language code
             target_lang (str): Target language code
+            
+        Raises:
+            Exception: If database connection is not available
         """
         # We need the database connection
         if not self.conn:
-            return
+            raise Exception("Database connection not available")
         # Save all paragraphs with empty translations
         try:
             for ch, chapter in enumerate(chapters):
@@ -1410,6 +1440,7 @@ class EPUBTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Failed to save chapters to database: {e}")
+            raise
 
     def reset_context(self):
         """Reset the translation context to avoid drift between chapters.
