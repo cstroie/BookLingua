@@ -1171,13 +1171,13 @@ class EPUBTranslator:
         if len(self.translation_contexts[context_key]) >= DEFAULT_PREFILL_CONTEXT_SIZE:
             return
         
-        # Try to prefill from database first
+        # Try to prefill from database first (only non-empty translations)
         if self.conn:
             try:
                 cursor = self.conn.cursor()
                 cursor.execute('''
                     SELECT source_text, translated_text FROM translations 
-                    WHERE source_lang = ? AND target_lang = ? 
+                    WHERE source_lang = ? AND target_lang = ? AND translated_text != ''
                     ORDER BY id DESC LIMIT 10
                 ''', (source_lang, target_lang))
                 results = cursor.fetchall()
@@ -1195,32 +1195,69 @@ class EPUBTranslator:
                 if self.verbose:
                     print(f"Database context prefill failed: {e}")
         
-        # If we don't have enough from database, add random paragraphs
-        # Collect all paragraphs from all chapters
-        all_paragraphs = []
-        for chapter in chapters:
-            paragraphs = chapter.get('paragraphs', [])
-            all_paragraphs.extend([p for p in paragraphs if p.strip()])
-        
-        # Calculate how many more we need (aim for at least DEFAULT_PREFILL_CONTEXT_SIZE)
-        current_count = len(self.translation_contexts[context_key])
-        needed_count = max(0, DEFAULT_PREFILL_CONTEXT_SIZE - current_count)
-        
-        # If we don't have enough paragraphs, skip
-        if len(all_paragraphs) < needed_count or needed_count <= 0:
-            return
-        
-        print("Pre-filling translation context with random paragraphs...")
-        
-        # Filter paragraphs to only include those with at least 5 words
-        valid_paragraphs = [p for p in all_paragraphs if len(p.split()) >= 5]
-        
-        # If we don't have enough valid paragraphs, skip
-        if len(valid_paragraphs) < needed_count or needed_count <= 0:
-            return
-        
-        # Select needed random paragraphs
-        selected_paragraphs = random.sample(valid_paragraphs, min(needed_count, len(valid_paragraphs)))
+        # If we don't have enough from database, add random paragraphs from database with empty translations
+        if self.conn:
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute('''
+                    SELECT source_text FROM translations 
+                    WHERE source_lang = ? AND target_lang = ? AND translated_text = ''
+                    ORDER BY RANDOM() LIMIT ?
+                ''', (source_lang, target_lang, DEFAULT_PREFILL_CONTEXT_SIZE))
+                results = cursor.fetchall()
+                
+                # Calculate how many more we need (aim for at least DEFAULT_PREFILL_CONTEXT_SIZE)
+                current_count = len(self.translation_contexts[context_key])
+                needed_count = max(0, DEFAULT_PREFILL_CONTEXT_SIZE - current_count)
+                
+                # If we don't have enough paragraphs from database, fall back to random from chapters
+                if len(results) < needed_count:
+                    # Collect all paragraphs from all chapters
+                    all_paragraphs = []
+                    for chapter in chapters:
+                        paragraphs = chapter.get('paragraphs', [])
+                        all_paragraphs.extend([p for p in paragraphs if p.strip()])
+                    
+                    # Filter paragraphs to only include those with at least 5 words
+                    valid_paragraphs = [p for p in all_paragraphs if len(p.split()) >= 5]
+                    
+                    # Select needed random paragraphs
+                    additional_needed = needed_count - len(results)
+                    if valid_paragraphs and additional_needed > 0:
+                        selected_paragraphs = random.sample(valid_paragraphs, min(additional_needed, len(valid_paragraphs)))
+                        # Combine database paragraphs with randomly selected ones
+                        selected_texts = [row[0] for row in results] + selected_paragraphs
+                    else:
+                        selected_texts = [row[0] for row in results]
+                else:
+                    selected_texts = [row[0] for row in results[:needed_count]]
+                
+                if not selected_texts:
+                    return
+                
+                print("Pre-filling translation context with random paragraphs...")
+                
+                # Translate selected paragraphs to establish context
+                for i, text in enumerate(selected_texts):
+                    print(f"  Pre-translating context paragraph {i+1}/{len(selected_texts)}")
+                    if self.verbose:
+                        print(f"{source_lang}: {text}")
+                    
+                    try:
+                        # Direct translation context (without storing in database)
+                        translation = self._translate_chunk(text, source_lang, target_lang, True)
+                        if self.verbose:
+                            print(f"{target_lang}: {translation}")
+                        
+                    except Exception as e:
+                        print(f"    Warning: Failed to pre-translate context paragraph: {e}")
+                        continue
+                
+                print(f"  ✓ Pre-filled context with {len(self.translation_contexts[context_key])} paragraph pairs")
+            except Exception as e:
+                if self.verbose:
+                    print(f"Database random selection failed: {e}")
+                return
         
         # Translate selected paragraphs to establish context
         for i, paragraph in enumerate(selected_paragraphs):
