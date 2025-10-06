@@ -649,7 +649,7 @@ class EPUBTranslator:
             target_lang (str): Target language code
             
         Returns:
-            tuple: (translated_text, processing_time) if found, None otherwise
+            tuple: (translated_text, processing_time, fluency_score) if found, None otherwise
         """
         if not self.conn:
             return None
@@ -657,7 +657,7 @@ class EPUBTranslator:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT translated_text, processing_time FROM translations 
+                SELECT translated_text, processing_time, fluency_score FROM translations 
                 WHERE source_lang = ? AND target_lang = ? AND source_text = ?
             ''', (source_lang, target_lang, text))
             result = cursor.fetchone()
@@ -670,7 +670,7 @@ class EPUBTranslator:
                 # Keep only the last N exchanges for better context
                 if len(self.translation_contexts[context_key]) > DEFAULT_CONTEXT_SIZE:
                     self.translation_contexts[context_key].pop(0)
-                return (result[0], result[1])  # (translated_text, processing_time)
+                return (result[0], result[1], result[2])  # (translated_text, processing_time, fluency_score)
             return None
         except Exception as e:
             if self.verbose:
@@ -967,6 +967,7 @@ Translation rules:
                         if cached_result:
                             translated_paragraph = cached_result[0]
                             paragraph_time = cached_result[1] or 0.0
+                            fluency = cached_result[2] or 1.0  # Use cached fluency score or default to 1.0
                             chapter_paragraph_times.append(paragraph_time)
                             
                             if self.verbose:
@@ -1000,10 +1001,8 @@ Translation rules:
                         # Show timing statistics
                         print(f"Time: {paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
                         
-                        # Show fluency score for cached translations
-                        if not cached_result:  # Only calculate fluency for new translations
-                            fluency = self._calculate_fluency_score(translated_paragraph)
-                            print(f"Fluency score: {fluency:.2f}")
+                        # Show fluency score
+                        print(f"Fluency score: {fluency:.2f}")
                     else:
                         translated_paragraphs.append(paragraph)
                 translated_text = '\n\n'.join(translated_paragraphs)
