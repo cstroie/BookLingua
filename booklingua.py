@@ -1389,6 +1389,15 @@ class EPUBTranslator:
             if self.verbose:
                 print(f"Failed to save chapters to database: {e}")
 
+    def reset_context(self):
+        """Reset the translation context to avoid drift between chapters.
+        
+        This method clears the context cache that maintains translation history
+        to ensure each chapter starts with a clean context. This prevents
+        context drift that could affect translation consistency across chapters.
+        """
+        self.context = []
+
     def translate_chapter(self, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int):
         """Translate a single chapter and return an EPUB HTML item.
         
@@ -1418,8 +1427,7 @@ class EPUBTranslator:
         # Initialize timing statistics for this chapter
         chapter_start_time = datetime.now()
         # Reset context for each chapter to avoid drift
-        # TODO
-        #self.reset_context()
+        self.reset_context()
         # Get total paragraphs in chapter
         total_paragraphs = self.db_count_paragraphs(chapter_number, source_lang, target_lang)
         # Get the next chapter's paragraph from database
