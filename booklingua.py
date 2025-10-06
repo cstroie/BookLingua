@@ -927,6 +927,75 @@ class EPUBTranslator:
                 print(f"Database count for chapter paragraphs failed: {e}")
             return 0
 
+    def db_chapter_stats(self, chapter_number: int, source_lang: str, target_lang: str) -> dict:
+        """Get statistics for a chapter including processing times and translation progress.
+        
+        This method queries the database to calculate statistics for a specific chapter,
+        including average processing time for translated paragraphs, elapsed time for
+        chapter translation, and estimated remaining time to complete the chapter.
+        
+        Args:
+            chapter_number (int): Chapter number to get statistics for
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            dict: Dictionary containing chapter statistics:
+                - avg_processing_time (float): Average processing time for translated paragraphs
+                - elapsed_time (float): Elapsed time since first translation in chapter
+                - remaining_time (float): Estimated time to complete chapter translation
+        """
+        # Return empty dict if no database connection
+        if not self.conn:
+            return {}
+        
+        try:
+            cursor = self.conn.cursor()
+            
+            # Get average processing time for translated paragraphs
+            cursor.execute('''
+                SELECT AVG(processing_time) FROM translations 
+                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
+                AND translated_text IS NOT NULL AND translated_text != '' 
+                AND processing_time IS NOT NULL
+            ''', (chapter_number, source_lang, target_lang))
+            avg_result = cursor.fetchone()
+            avg_processing_time = avg_result[0] if avg_result and avg_result[0] else 0.0
+            
+            # Get elapsed time (time since first translation)
+            cursor.execute('''
+                SELECT MIN(created_at), MAX(created_at) FROM translations 
+                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
+                AND translated_text IS NOT NULL AND translated_text != ''
+            ''', (chapter_number, source_lang, target_lang))
+            time_result = cursor.fetchone()
+            elapsed_time = 0.0
+            if time_result and time_result[0] and time_result[1]:
+                try:
+                    from datetime import datetime
+                    start_time = datetime.fromisoformat(time_result[0])
+                    end_time = datetime.fromisoformat(time_result[1])
+                    elapsed_time = (end_time - start_time).total_seconds()
+                except Exception:
+                    elapsed_time = 0.0
+            
+            # Calculate remaining time
+            total_paragraphs = self.db_count_paragraphs(chapter_number, source_lang, target_lang)
+            translated_paragraphs = self._count_translated_paragraphs_in_chapter(
+                chapter_number, source_lang, target_lang)
+            remaining_paragraphs = total_paragraphs - translated_paragraphs
+            remaining_time = avg_processing_time * remaining_paragraphs if avg_processing_time > 0 else 0.0
+            
+            return {
+                'avg_processing_time': avg_processing_time,
+                'elapsed_time': elapsed_time,
+                'remaining_time': remaining_time
+            }
+        except Exception as e:
+            if self.verbose:
+                print(f"Database chapter stats query failed: {e}")
+            return {}
+
     def _count_translated_paragraphs_in_chapter(self, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count the number of translated paragraphs in a specific chapter.
         
