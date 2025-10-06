@@ -891,7 +891,7 @@ class EPUBTranslator:
     
     def db_save_translation(self, text: str, translation: str, source_lang: str, target_lang: str, 
                             chapter_number: int = None, paragraph_number: int = None, 
-                            processing_time: float = None, fluency_score: float = None):
+                            processing_time: float = None, fluency_score: int = None):
         """Save a translation to the database.
         
         Args:
@@ -902,7 +902,7 @@ class EPUBTranslator:
             chapter_number (int, optional): Chapter number for this translation
             paragraph_number (int, optional): Paragraph number within the chapter
             processing_time (float, optional): Time taken to process translation
-            fluency_score (float, optional): Fluency score of the translation
+            fluency_score (int, optional): Fluency score of the translation as percentage
             
         Raises:
             Exception: If database connection is not available
