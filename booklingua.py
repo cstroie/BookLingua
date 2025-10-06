@@ -629,7 +629,7 @@ class EPUBTranslator:
             print(f"Warning: Could not initialize database: {e}")
             self.conn = None
     
-    def _get_translation_from_db(self, text: str, source_lang: str, target_lang: str) -> Optional[tuple]:
+    def _get_translation_from_db(self, text: str, source_lang: str, target_lang: str) -> tuple:
         """Check if a translation exists in the database.
         
         Args:
@@ -638,7 +638,7 @@ class EPUBTranslator:
             target_lang (str): Target language code
             
         Returns:
-            tuple: (translated_text, processing_time, fluency_score) if found, None otherwise
+            tuple: (translated_text, processing_time, fluency_score) if found, (None, None, None) otherwise
             
         Raises:
             Exception: If database connection is not available
@@ -769,7 +769,7 @@ class EPUBTranslator:
             raise
 
 
-    def db_get_next_paragraph(self, chapter_number: int, paragraph_number: int, source_lang: str, target_lang: str) -> Optional[tuple]:
+    def db_get_next_paragraph(self, chapter_number: int, paragraph_number: int, source_lang: str, target_lang: str) -> tuple:
         """Retrieve the next paragraph in a chapter given a chapter and paragraph number.
         
         This method fetches the next paragraph after the specified paragraph number
@@ -784,7 +784,7 @@ class EPUBTranslator:
             
         Returns:
             tuple: (paragraph_number, source_text, translated_text) of the next paragraph,
-                   or None if there is no next paragraph
+                   or (None, None, None) if there is no next paragraph
                    
         Raises:
             Exception: If database connection is not available
@@ -843,7 +843,7 @@ class EPUBTranslator:
                 print(f"Database count for chapter paragraphs failed: {e}")
             raise
 
-    def db_chapter_stats(self, chapter_number: int, source_lang: str, target_lang: str) -> dict:
+    def db_chapter_stats(self, chapter_number: int, source_lang: str, target_lang: str) -> tuple:
         """Get statistics for a chapter including processing times and translation progress.
         
         This method queries the database to calculate statistics for a specific chapter,
@@ -856,7 +856,7 @@ class EPUBTranslator:
             target_lang (str): Target language code
             
         Returns:
-            dict: Dictionary containing chapter statistics:
+            tuple: Tuple containing chapter statistics:
                 - avg_processing_time (float): Average processing time for translated paragraphs
                 - elapsed_time (float): Sum of all processing times for translated paragraphs
                 - remaining_time (float): Estimated time to complete chapter translation
