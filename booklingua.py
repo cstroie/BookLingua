@@ -615,7 +615,7 @@ class EPUBTranslator:
                     model TEXT NOT NULL,
                     chapter_number INTEGER,
                     paragraph_number INTEGER,
-                    processing_time REAL,
+                    processing_time INTEGER,
                     fluency_score INTEGER,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(source_lang, target_lang, chapter_number, paragraph_number)
@@ -891,7 +891,7 @@ class EPUBTranslator:
     
     def db_save_translation(self, text: str, translation: str, source_lang: str, target_lang: str, 
                             chapter_number: int = None, paragraph_number: int = None, 
-                            processing_time: float = None, fluency_score: int = None):
+                            processing_time: int = None, fluency_score: int = None):
         """Save a translation to the database.
         
         Args:
@@ -901,7 +901,7 @@ class EPUBTranslator:
             target_lang (str): Target language code
             chapter_number (int, optional): Chapter number for this translation
             paragraph_number (int, optional): Paragraph number within the chapter
-            processing_time (float, optional): Time taken to process translation
+            processing_time (int, optional): Time taken to process translation in milliseconds
             fluency_score (int, optional): Fluency score of the translation as percentage
             
         Raises:
@@ -1346,7 +1346,7 @@ class EPUBTranslator:
                     if self.verbose:
                         print(f"{target_lang}: {translated_text}")
                     # Calculate and store timing
-                    elapsed = (end_time - start_time).total_seconds()
+                    elapsed = int((end_time - start_time).total_seconds() * 1000)  # Convert to milliseconds
                     # Calculate fluency score
                     fluency = self._calculate_fluency_score(translated_text)
                     # Save to database with timing and fluency info
@@ -1357,7 +1357,7 @@ class EPUBTranslator:
                     # Show fluency score
                     print(f"Fluency: {fluency}%")
                     # Show timing statistics
-                    print(f"Time: {elapsed:.2f}s | Avg: {avg_time:.2f}s | Remaining: {remaining_time:.2f}s")
+                    print(f"Time: {elapsed}ms | Avg: {avg_time:.2f}ms | Remaining: {remaining_time:.2f}ms")
             else:
                 # No more paragraphs to translate
                 break
