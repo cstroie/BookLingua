@@ -37,7 +37,8 @@ DEFAULT_PREFILL_CONTEXT_SIZE = 5
 DEFAULT_KEEP_ALIVE = "30m"
 DEFAULT_OUTPUT_DIR = "output"
 
-SYSTEM_PROPMPT=f"""/no_think You are an expert fiction writer and translator specializing in literary translation from {source_lang} to {target_lang}. 
+# System prompt template - will be formatted with actual languages when used
+SYSTEM_PROMPT_TEMPLATE = """/no_think You are an expert fiction writer and translator specializing in literary translation from {source_lang} to {target_lang}. 
 You excel at translating fictional works while preserving the author's narrative voice, character personalities, and emotional depth.
 
 Your expertise includes:
