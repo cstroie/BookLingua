@@ -796,6 +796,34 @@ class EPUBTranslator:
                 print(f"Database lookup for chapter failed: {e}")
             return None
 
+    def _get_all_chapters_from_db(self, source_lang: str, target_lang: str) -> List[int]:
+        """Retrieve all chapter numbers from the database, ordered ascending.
+        
+        Args:
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            List[int]: List of chapter numbers in ascending order
+        """
+        if not self.conn:
+            return []
+            
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT DISTINCT chapter_number FROM translations 
+                WHERE source_lang = ? AND target_lang = ? 
+                ORDER BY chapter_number ASC
+            ''', (source_lang, target_lang))
+            results = cursor.fetchall()
+            # Return list of chapter numbers
+            return [result[0] for result in results] if results else []
+        except Exception as e:
+            if self.verbose:
+                print(f"Database lookup for chapters failed: {e}")
+            return []
+
     def _count_translated_paragraphs_in_chapter(self, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count the number of translated paragraphs in a specific chapter.
         
