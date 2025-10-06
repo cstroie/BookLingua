@@ -629,6 +629,8 @@ class EPUBTranslator:
                     source_text TEXT NOT NULL,
                     translated_text TEXT NOT NULL,
                     model TEXT NOT NULL,
+                    processing_time REAL,
+                    fluency_score REAL,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(source_lang, target_lang, source_text, model)
                 )
@@ -675,7 +677,8 @@ class EPUBTranslator:
                 print(f"Database lookup failed: {e}")
             return None
     
-    def _save_translation_to_db(self, text: str, translation: str, source_lang: str, target_lang: str):
+    def _save_translation_to_db(self, text: str, translation: str, source_lang: str, target_lang: str, 
+                                processing_time: float = None, fluency_score: float = None):
         """Save a translation to the database.
         
         Args:
@@ -683,6 +686,8 @@ class EPUBTranslator:
             translation (str): Translated text
             source_lang (str): Source language code
             target_lang (str): Target language code
+            processing_time (float, optional): Time taken to process translation
+            fluency_score (float, optional): Fluency score of the translation
         """
         if not self.conn:
             return
@@ -691,9 +696,9 @@ class EPUBTranslator:
             cursor = self.conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO translations 
-                (source_lang, target_lang, source_text, translated_text, model)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (source_lang, target_lang, text, translation, self.model))
+                (source_lang, target_lang, source_text, translated_text, model, processing_time, fluency_score)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (source_lang, target_lang, text, translation, self.model, processing_time, fluency_score))
             self.conn.commit()
         except Exception as e:
             if self.verbose:
@@ -846,11 +851,6 @@ Translation rules:
             result = response.json()
             translation = result["choices"][0]["message"]["content"].strip()
             
-
-            if not prefill:
-                # Save to database
-                self._save_translation_to_db(text, translation, source_lang, target_lang)
-
             # Update translation context for this language pair
             self.translation_contexts[context_key].append((text, translation))
             # Keep only the last N exchanges for better context
@@ -975,6 +975,13 @@ Translation rules:
                         remaining_paragraphs = len(original_paragraphs) - (j + 1)
                         estimated_remaining = current_avg * remaining_paragraphs
                         
+                        # Calculate fluency score
+                        fluency = self._calculate_fluency_score(translated_paragraph)
+                        
+                        # Save to database with timing and fluency info
+                        self._save_translation_to_db(paragraph, translated_paragraph, source_lang, target_lang, 
+                                                   paragraph_time, fluency)
+                        
                         translated_paragraphs.append(translated_paragraph)
                         if self.verbose:
                             print(f"{target_lang}: {translated_paragraph}")
@@ -983,7 +990,6 @@ Translation rules:
                         print(f"Time: {paragraph_time:.2f}s | Avg: {current_avg:.2f}s | Est. remaining: {estimated_remaining:.2f}s")
                         
                         # Show fluency score for this paragraph
-                        fluency = self._calculate_fluency_score(translated_paragraph)
                         print(f"Fluency score: {fluency:.2f}")
                     else:
                         translated_paragraphs.append(paragraph)
