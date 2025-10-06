@@ -896,6 +896,37 @@ class EPUBTranslator:
                 print(f"Database lookup for next paragraph failed: {e}")
             return (None, None, None)
 
+    def db_count_paragraphs(self, chapter_number: int, source_lang: str, target_lang: str) -> int:
+        """Count the total number of paragraphs in a specific chapter.
+        
+        This method counts all paragraphs in a chapter from the database,
+        regardless of whether they have been translated or not.
+        
+        Args:
+            chapter_number (int): Chapter number to count paragraphs for
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            int: Total number of paragraphs in the chapter
+        """
+        # Return 0 if no database connection
+        if not self.conn:
+            return 0
+        # Count all paragraphs in the chapter
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT COUNT(*) FROM translations 
+                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ?
+            ''', (chapter_number, source_lang, target_lang))
+            result = cursor.fetchone()
+            return result[0] if result else 0
+        except Exception as e:
+            if self.verbose:
+                print(f"Database count for chapter paragraphs failed: {e}")
+            return 0
+
     def _count_translated_paragraphs_in_chapter(self, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count the number of translated paragraphs in a specific chapter.
         
