@@ -1,20 +1,20 @@
 # BookLingua
 
-**Translate EPUB books using AI models. Supports direct, pivot, and comparison translations for high-quality multilingual book conversion.**
+**Translate EPUB books using AI models with database caching and context preservation.**
 
-A Python tool for translating EPUB books using various AI models through their API endpoints. The tool supports multiple translation methods including direct translation and pivot translation (via an intermediate language) with side-by-side comparisons.
+A Python tool for translating EPUB books using various AI models through their API endpoints. The tool focuses on direct translation with advanced features like database caching, context management, and quality assessment.
 
 ## Features
 
 - Translate EPUB books between any languages using various AI models
 - Support for multiple translation services (OpenAI, Ollama, Mistral, DeepSeek, Together AI, LM Studio, OpenRouter)
-- Two translation methods:
-  - **Direct**: Source → Target (single step)
-  - **Pivot**: Source → Intermediate → Target (two steps)
-- Side-by-side comparison of translation methods
+- Direct translation method (Source → Target)
 - Preserves original formatting and structure
 - Chunked translation for handling large texts
-- HTML comparison output for evaluating translation quality
+- Database caching for reliability and resume capability
+- Context preservation for consistency across chapters
+- Quality assessment with fluency scoring
+- Progress tracking with timing statistics
 
 ## Installation
 
@@ -39,33 +39,29 @@ python booklingua.py input.epub -s German -t Spanish
 
 # Verbose mode
 python booklingua.py input.epub --verbose
-
-# Both translation methods with comparison
-python booklingua.py input.epub --mode both
 ```
 
 ## Usage
 
-### Translation Modes
+### Basic Translation
 
 ```bash
-# Direct translation only (default)
-python booklingua.py input.epub --mode direct
+# Direct translation with default settings
+python booklingua.py input.epub
 
-# Pivot translation only  
-python booklingua.py input.epub --mode pivot
+# Custom languages
+python booklingua.py input.epub -s German -t Spanish
 
-# Both methods with comparison
-python booklingua.py input.epub --mode both
+# Verbose mode for detailed progress
+python booklingua.py input.epub --verbose
 ```
 
 ### Language Configuration
 
 ```bash
-# Set source, pivot, and target languages
+# Set source and target languages
 python booklingua.py input.epub \
   --source-lang English \
-  --pivot-lang French \
   --target-lang Romanian
 ```
 
@@ -117,17 +113,17 @@ python booklingua.py input.epub \
 
 ## Output Files
 
-- `direct_translation.epub` - Direct translation (direct mode)
-- `pivot_translation.epub` - Pivot translation (pivot mode)  
-- `comparison.html` - Side-by-side comparison (both mode)
+- `translated.epub` - The translated book
+- `book.db` - SQLite database with cached translations (same name as input EPUB)
 
 ## How It Works
 
 1. **Extract** text content from EPUB chapters
-2. **Chunk** large content into manageable pieces
-3. **Translate** using AI models with formatting preservation
-4. **Reconstruct** translated content into complete chapters
-5. **Generate** new EPUB files and comparison HTML
+2. **Initialize** SQLite database for caching translations
+3. **Prefill** context with existing translations
+4. **Translate** each chapter with progress tracking
+5. **Reconstruct** translated content into complete chapters
+6. **Generate** new EPUB file with preserved structure
 
 ## Customization
 
@@ -146,37 +142,29 @@ BookLingua uses SQLite database caching to improve reliability and performance:
   - Resume interrupted translations
   - Avoid re-translating identical content
   - Faster subsequent translations of the same content
+  - Track translation progress and statistics
 - **Automatic**: Enabled by default when an EPUB path is provided
 - **Persistence**: Database remains after translation for future use
 
-### Context Length Management
+### Context Management
 
 The tool manages translation context to maintain consistency:
 
-- **Context Window**: Maintains the last 10 translation exchanges for each language pair
-- **Context Key Format**: `{source_lang}_{target_lang}` (e.g., "english_romanian")
+- **Context Window**: Maintains the last 5 translation exchanges for continuity
 - **Benefits**: 
   - Consistent terminology across chapters
   - Better handling of repeated phrases
   - Improved coherence in long documents
-- **Per-Language Pair**: Separate context for each translation combination
-- **Automatic**: Context is built incrementally during translation
+- **Chapter-based Reset**: Context is reset between chapters to prevent drift
+- **Prefill Strategy**: Uses existing translations and random paragraphs to initialize context
 
-### Temperature Control
+### Quality Assessment
 
-Temperature controls the randomness/creativity of AI translations:
+The tool includes built-in quality assessment features:
 
-- **Default Value**: 0.5 (balanced between creativity and consistency)
-- **Range**: 0.0 to 1.0
-- **Effects**:
-  - **Low (0.0-0.3)**: More deterministic, factual translations
-  - **Medium (0.4-0.6)**: Balanced creativity and accuracy (default)
-  - **High (0.7-1.0)**: More creative, varied translations
-- **Use Cases**:
-  - Technical content: Lower temperature for precision
-  - Literary content: Higher temperature for natural flow
-  - Consistency needs: Lower temperature
-- **Adjustment**: Modify the `temperature` parameter in the `_translate_chunk` method
+- **Fluency Scoring**: Evaluates translation quality based on linguistic patterns
+- **Progress Tracking**: Shows real-time statistics and estimated completion times
+- **Error Detection**: Identifies common translation issues
 
 ## License
 
@@ -206,32 +194,9 @@ python booklingua.py book.epub
 ```
 
 This will create:
-- `output/direct_translation.epub` - The translated book
+- `output/translated.epub` - The translated book
+- `output/book.db` - SQLite database with cached translations
 - `output/` directory (if it doesn't exist)
-
-#### Pivot Translation
-
-Translate using French as an intermediate language:
-
-```bash
-python booklingua.py book.epub -M pivot -p French
-```
-
-This creates:
-- `output/pivot_translation.epub` - The pivot-translated book
-
-#### Both Methods with Comparison
-
-Generate both direct and pivot translations with a comparison HTML:
-
-```bash
-python booklingua.py book.epub -M both -o translations
-```
-
-This creates:
-- `translations/direct_translation.epub`
-- `translations/pivot_translation.epub`
-- `translations/comparison.html` - Side-by-side comparison
 
 ### Advanced Usage
 
@@ -241,12 +206,6 @@ Translate from English to Spanish:
 
 ```bash
 python booklingua.py book.epub -t Spanish -s English
-```
-
-Translate from French to German:
-
-```bash
-python booklingua.py book.epub -s French -t German -p English
 ```
 
 #### Verbose Output
@@ -272,7 +231,7 @@ python booklingua.py book.epub -o my_translations
 Use OpenAI's GPT models:
 
 ```bash
-python booklingua.py book.epub --openai -m gpt-4-turbo
+python booklingua.py book.epub --openai -m gpt-4o
 ```
 
 #### Ollama (Local)
@@ -280,7 +239,7 @@ python booklingua.py book.epub --openai -m gpt-4-turbo
 Use Ollama with local models:
 
 ```bash
-python booklingua.py book.epub --ollama -m qwen2.5:72b
+python booklingua.py book.epub --ollama -m gemma3n:e4b
 ```
 
 #### Mistral AI
@@ -338,7 +297,7 @@ python booklingua.py book.epub -u https://api.example.com/v1 -k your-api-key
 Use a specific model with default OpenAI endpoint:
 
 ```bash
-python booklingua.py book.epub -m gpt-3.5-turbo
+python booklingua.py book.epub -m gpt-4o
 ```
 
 ### Environment Variables
@@ -371,14 +330,14 @@ translator = EPUBTranslator(
     api_key="your-api-key",
     base_url="https://api.openai.com/v1",
     model="gpt-4o",
-    verbose=True
+    verbose=True,
+    epub_path="book.epub"
 )
 
 # Translate EPUB
-translator.translate_epub_with_comparison(
+translator.translate_epub(
     input_path="book.epub",
     output_dir="output",
-    mode="both",
     source_lang="English",
     target_lang="Romanian"
 )
@@ -388,43 +347,11 @@ translator.translate_epub_with_comparison(
 
 ```python
 # Translate from English to Spanish
-translator.translate_epub_with_comparison(
+translator.translate_epub(
     input_path="book.epub",
-    mode="direct",
     source_lang="English",
     target_lang="Spanish"
 )
-
-# Translate using pivot method
-translator.translate_epub_with_comparison(
-    input_path="book.epub",
-    mode="pivot",
-    source_lang="English",
-    pivot_lang="French",
-    target_lang="German"
-)
-```
-
-#### Individual Text Translation
-
-```python
-# Translate individual text
-result = translator.translate_direct(
-    "Hello, how are you?",
-    source_lang="English",
-    target_lang="Romanian"
-)
-print(result)  # "Salut, cum ești?"
-
-# Use pivot translation for individual text
-pivot_result = translator.translate_pivot(
-    "Hello, how are you?",
-    source_lang="English",
-    pivot_lang="French",
-    target_lang="Romanian"
-)
-print(pivot_result['intermediate'])  # "Bonjour, comment allez-vous?"
-print(pivot_result['final'])  # "Salut, cum ești?"
 ```
 
 ### Troubleshooting
@@ -447,12 +374,10 @@ Ensure you have write permissions for the output directory.
 
 **Poor Translation Quality**
 - Try different models using `-m` option
-- Use pivot translation with `-M pivot`
 - Enable verbose mode with `-v` to see intermediate results
 
 **Slow Translation**
 - Reduce verbose output
-- Use smaller chunk sizes (modify source code)
 - Use a faster model or local server
 
 #### Error Messages
@@ -471,10 +396,8 @@ Ensure you have write permissions for the output directory.
 1. **Always backup your original EPUB files** before translation
 2. **Use verbose mode** (`-v`) for the first translation to monitor progress
 3. **Test with small sections** first before translating entire books
-4. **Compare different methods** using `-M both` for quality assessment
-5. **Use appropriate models** for your content type (technical vs. literary)
-6. **Set environment variables** for API keys to avoid exposing them in command history
-7. **Customize pivot language** based on source-target language pair for best results
+4. **Use appropriate models** for your content type (technical vs. literary)
+5. **Set environment variables** for API keys to avoid exposing them in command history
 
 ### Integration Examples
 
@@ -486,7 +409,7 @@ Ensure you have write permissions for the output directory.
 
 for book in *.epub; do
     echo "Translating $book..."
-    python booklingua.py "$book" -M both -o "translations_${book%.epub}"
+    python booklingua.py "$book" -o "translations_${book%.epub}"
 done
 ```
 
@@ -504,10 +427,9 @@ translator = EPUBTranslator(api_key="your-api-key")
 for filename in os.listdir("."):
     if filename.endswith(".epub"):
         print(f"Processing {filename}...")
-        translator.translate_epub_with_comparison(
+        translator.translate_epub(
             input_path=filename,
-            output_dir="output",
-            mode="both"
+            output_dir="output"
         )
 ```
 
