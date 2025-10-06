@@ -208,13 +208,31 @@ class EPUBTranslator:
                         paragraphs = []
                     
                     if markdown_content.strip():  # Only include non-empty chapters
-                        chapters.append({
+                        chapter_data = {
                             'id': item.get_id(),
                             'name': item.get_name(),
                             'content': markdown_content,
                             'html': html_content,
                             'paragraphs': paragraphs
-                        })
+                        }
+                        chapters.append(chapter_data)
+                        
+                        # Save chapter as markdown if output directory exists
+                        if self.db_path:
+                            output_dir = os.path.dirname(self.db_path)
+                            if os.path.exists(output_dir):
+                                try:
+                                    # Create a safe filename from the chapter name
+                                    safe_name = re.sub(r'[^\w\-_\. ]', '_', item.get_name())
+                                    filename = f"{item.get_id()}_{safe_name}.md"
+                                    filepath = os.path.join(output_dir, filename)
+                                    
+                                    with open(filepath, 'w', encoding='utf-8') as f:
+                                        f.write(markdown_content)
+                                    if self.verbose:
+                                        print(f"Saved chapter {item.get_id()} as {filepath}")
+                                except Exception as e:
+                                    print(f"Warning: Failed to save chapter {item.get_id()} as markdown: {e}")
             except Exception as e:
                 print(f"Warning: Error processing item: {e}")
                 continue
