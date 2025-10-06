@@ -889,7 +889,7 @@ class EPUBTranslator:
                 print(f"Database count for chapter translations failed: {e}")
             return 0
 
-    def is_chapter_fully_translated(self, chapter_number: int, source_lang: str, target_lang: str) -> bool:
+    def db_chapter_translated(self, chapter_number: int, source_lang: str, target_lang: str) -> bool:
         """Check if a chapter is fully translated by verifying all paragraphs have translations.
         
         This method queries the database to determine if all paragraphs in a chapter
@@ -903,9 +903,9 @@ class EPUBTranslator:
         Returns:
             bool: True if chapter is fully translated, False otherwise
         """
+        # Return False if no database connection
         if not self.conn:
             return False
-            
         try:
             cursor = self.conn.cursor()
             # Count total paragraphs in the chapter
@@ -915,7 +915,6 @@ class EPUBTranslator:
             ''', (chapter_number, source_lang, target_lang))
             total_result = cursor.fetchone()
             total_paragraphs = total_result[0] if total_result else 0
-            
             # Count paragraphs with empty translations
             cursor.execute('''
                 SELECT COUNT(*) FROM translations 
@@ -924,7 +923,6 @@ class EPUBTranslator:
             ''', (chapter_number, source_lang, target_lang))
             empty_result = cursor.fetchone()
             empty_paragraphs = empty_result[0] if empty_result else 0
-            
             # Chapter is fully translated if there are no empty paragraphs
             return empty_paragraphs == 0 and total_paragraphs > 0
         except Exception as e:
@@ -1437,11 +1435,24 @@ class EPUBTranslator:
         print(f"\n{'='*60}")
         print(f"Chapter {chapter_number}/{total_chapters}")
         print(f"{'='*60}")
-        
+
+        # Check if chapter is fully translated
+        if self.db_chapter_translated(chapter_number, source_lang, target_lang):
+            print("✓ Chapter is fully translated")
+            return
+
+        print("✗ Chapter is not fully translated")
         # Initialize timing statistics for this chapter
         chapter_start_time = datetime.now()
         # Get paragraphs from database
         paragraphs = self.db_get_paragraphs(chapter_number, source_lang, target_lang)
+        print(paragraphs)
+
+        # Extract only the paragraph texts
+        return
+
+
+            
         translated_text = None
         
         # First, try to get the entire chapter from database
