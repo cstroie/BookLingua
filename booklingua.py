@@ -37,7 +37,7 @@ DEFAULT_PREFILL_CONTEXT_SIZE = 5
 DEFAULT_KEEP_ALIVE = "30m"
 DEFAULT_OUTPUT_DIR = "output"
 
-SYSTEM_PROPMPT=f"""/no_think You are an expert fiction writer and translator specializing in literary translation from {source_lang.upper()} to {target_lang.upper()}. 
+SYSTEM_PROPMPT=f"""/no_think You are an expert fiction writer and translator specializing in literary translation from {source_lang} to {target_lang}. 
 You excel at translating fictional works while preserving the author's narrative voice, character personalities, and emotional depth.
 
 Your expertise includes:
@@ -129,6 +129,7 @@ class EPUBTranslator:
         # Initialize database
         self.epub_path = epub_path
         self.db_path = None
+        self.output_dir = None
         self.conn = None
         if epub_path:
             self.db_path = os.path.splitext(epub_path)[0] + '.db'
@@ -218,8 +219,7 @@ class EPUBTranslator:
                         chapters.append(chapter_data)
                         
                         # Save chapter as markdown if output directory exists
-                        if self.db_path:
-                            output_dir = os.path.dirname(self.db_path)
+                        if self.output_dir:
                             if os.path.exists(output_dir):
                                 try:
                                     # Create a safe filename from the chapter name
@@ -998,7 +998,8 @@ class EPUBTranslator:
             self.db_path = os.path.splitext(input_path)[0] + '.db'
             self._init_database()
 
-        os.makedirs(output_dir, exist_ok=True)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
         
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path, options={'ignore_ncx': False})
