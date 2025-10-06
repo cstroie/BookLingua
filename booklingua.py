@@ -942,7 +942,7 @@ class EPUBTranslator:
         Returns:
             dict: Dictionary containing chapter statistics:
                 - avg_processing_time (float): Average processing time for translated paragraphs
-                - elapsed_time (float): Elapsed time since first translation in chapter
+                - elapsed_time (float): Sum of all processing times for translated paragraphs
                 - remaining_time (float): Estimated time to complete chapter translation
         """
         # Return empty dict if no database connection
@@ -962,22 +962,15 @@ class EPUBTranslator:
             avg_result = cursor.fetchone()
             avg_processing_time = avg_result[0] if avg_result and avg_result[0] else 0.0
             
-            # Get elapsed time (time since first translation)
+            # Get elapsed time (sum of all processing times for translated paragraphs)
             cursor.execute('''
-                SELECT MIN(created_at), MAX(created_at) FROM translations 
+                SELECT SUM(processing_time) FROM translations 
                 WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
-                AND translated_text IS NOT NULL AND translated_text != ''
+                AND translated_text IS NOT NULL AND translated_text != '' 
+                AND processing_time IS NOT NULL
             ''', (chapter_number, source_lang, target_lang))
-            time_result = cursor.fetchone()
-            elapsed_time = 0.0
-            if time_result and time_result[0] and time_result[1]:
-                try:
-                    from datetime import datetime
-                    start_time = datetime.fromisoformat(time_result[0])
-                    end_time = datetime.fromisoformat(time_result[1])
-                    elapsed_time = (end_time - start_time).total_seconds()
-                except Exception:
-                    elapsed_time = 0.0
+            elapsed_result = cursor.fetchone()
+            elapsed_time = elapsed_result[0] if elapsed_result and elapsed_result[0] else 0.0
             
             # Calculate remaining time
             total_paragraphs = self.db_count_paragraphs(chapter_number, source_lang, target_lang)
