@@ -1390,7 +1390,7 @@ class EPUBTranslator:
                 
                 # Check terminology consistency within the chapter
                 consistency_score = self._calculate_consistency_score([{'content': chapter_content}])
-                print(f"Chapter {chapter_number} consistency score: {consistency_score:.3f}")
+                print(f"Chapter {chapter_number} consistency score: {consistency_score}%")
         except Exception as e:
             if self.verbose:
                 print(f"Warning: Quality checks failed for chapter {chapter_number}: {e}")
@@ -1450,7 +1450,7 @@ class EPUBTranslator:
         # Convert to percentage (0-100 scale)
         return max(0, min(100, int(fluency * 100)))
 
-    def _calculate_adequacy_score(self, original: str, translated: str, source_lang: str, target_lang: str) -> float:
+    def _calculate_adequacy_score(self, original: str, translated: str, source_lang: str, target_lang: str) -> int:
         """Calculate adequacy score using AI evaluation.
         
         Args:
@@ -1460,40 +1460,40 @@ class EPUBTranslator:
             target_lang (str): Target language code
             
         Returns:
-            float: Adequacy score between 0.0 and 1.0 (higher is better)
+            int: Adequacy score as percentage (0-100, higher is better)
         """
-        prompt = f"""Rate the translation quality on a scale of 0-1:
+        prompt = f"""Rate the translation quality on a scale of 0-100:
         
 Original ({source_lang}): {original}
 Translation ({target_lang}): {translated}
 
 Criteria:
-- Meaning preservation (0.5)
-- Completeness (0.3) 
-- Naturalness (0.2)
+- Meaning preservation (50% weight)
+- Completeness (30% weight) 
+- Naturalness (20% weight)
 
-Return only a single number between 0 and 1."""
+Return only a single integer number between 0 and 100."""
         
         # Use the existing translation system to evaluate
         try:
             result = self._translate_chunk(prompt, "English", "English", prefill=True)  # Evaluate in English
             # Extract numerical score from response
             import re
-            score_match = re.search(r'(\d+\.?\d*)', result)
+            score_match = re.search(r'(\d+)', result)
             if score_match:
-                return min(1.0, float(score_match.group(1)))
-            return 0.5  # Default score if parsing fails
+                return min(100, max(0, int(score_match.group(1))))
+            return 50  # Default score if parsing fails
         except Exception:
-            return 0.5  # Default score on error
+            return 50  # Default score on error
 
-    def _calculate_consistency_score(self, chapters: List[dict]) -> float:
+    def _calculate_consistency_score(self, chapters: List[dict]) -> int:
         """Check terminology consistency across chapters.
         
         Args:
             chapters (List[dict]): List of chapter dictionaries
             
         Returns:
-            float: Consistency score between 0.0 and 1.0 (higher is better)
+            int: Consistency score as percentage (0-100, higher is better)
         """
         all_terms = {}
         inconsistencies = 0
@@ -1512,7 +1512,8 @@ Return only a single number between 0 and 1."""
                     all_terms[term] = term
                 total_terms += 1
         
-        return 1.0 - (inconsistencies / total_terms) if total_terms > 0 else 1.0
+        consistency = 1.0 - (inconsistencies / total_terms) if total_terms > 0 else 1.0
+        return max(0, min(100, int(consistency * 100)))
 
     def _detect_translation_errors(self, original: str, translated: str, source_lang: str) -> Dict[str, int]:
         """Detect common translation errors.
