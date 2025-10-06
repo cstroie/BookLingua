@@ -1014,7 +1014,6 @@ Translation rules:
                 translated_text = '\n\n'.join(translated_paragraphs)
             else:
                 # Need to translate chapter
-                translated_paragraphs = []
                 chapter_paragraph_times = []  # Track times for this chapter only
                 for j, paragraph in enumerate(original_paragraphs):
                     if self.verbose:
@@ -1055,7 +1054,6 @@ Translation rules:
                         remaining_paragraphs = len(original_paragraphs) - (j + 1)
                         estimated_remaining = current_avg * remaining_paragraphs
                         
-                        translated_paragraphs.append(translated_paragraph)
                         if self.verbose:
                             print(f"{target_lang}: {translated_paragraph}")
                         
@@ -1065,8 +1063,16 @@ Translation rules:
                         # Show fluency score
                         print(f"Fluency score: {fluency:.2f}")
                     else:
-                        translated_paragraphs.append(paragraph)
-                translated_text = '\n\n'.join(translated_paragraphs)
+                        # For empty paragraphs, we still need to handle them in the database reconstruction
+                        pass
+                
+                # After translating all paragraphs, get the complete chapter from database
+                translated_paragraphs = self._get_translated_chapter_from_db(i+1, source_lang, target_lang)
+                if translated_paragraphs is not None:
+                    translated_text = '\n\n'.join(translated_paragraphs)
+                else:
+                    # Fallback - this shouldn't happen but just in case
+                    translated_text = ""
             
             # Show chapter completion time
             chapter_end_time = datetime.now()
