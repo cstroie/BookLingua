@@ -859,6 +859,43 @@ class EPUBTranslator:
                 print(f"Database lookup for paragraphs failed: {e}")
             return []
 
+    def db_get_next_paragraph(self, chapter_number: int, paragraph_number: int, source_lang: str, target_lang: str) -> Optional[tuple]:
+        """Retrieve the next paragraph in a chapter given a chapter and paragraph number.
+        
+        This method fetches the next paragraph after the specified paragraph number
+        within the same chapter, returning the paragraph number, source text, and 
+        translated text. If there is no next paragraph, it returns None.
+        
+        Args:
+            chapter_number (int): Chapter number to search within
+            paragraph_number (int): Current paragraph number
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            tuple: (paragraph_number, source_text, translated_text) of the next paragraph,
+                   or None if there is no next paragraph
+        """
+        # Return None if no database connection
+        if not self.conn:
+            return None
+        # Query the next paragraph ordered by paragraph number
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT paragraph_number, source_text, translated_text FROM translations 
+                WHERE chapter_number = ? AND paragraph_number > ? 
+                AND source_lang = ? AND target_lang = ? 
+                ORDER BY paragraph_number ASC LIMIT 1
+            ''', (chapter_number, paragraph_number, source_lang, target_lang))
+            result = cursor.fetchone()
+            # Return the result or None if not found
+            return result if result else None
+        except Exception as e:
+            if self.verbose:
+                print(f"Database lookup for next paragraph failed: {e}")
+            return None
+
     def _count_translated_paragraphs_in_chapter(self, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count the number of translated paragraphs in a specific chapter.
         
