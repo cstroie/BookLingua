@@ -1121,7 +1121,8 @@ class EPUBTranslator:
         chapter_list = self.db_get_chapters(source_lang, target_lang)
         
         # Pre-fill context
-        self.prefill_context(source_lang, target_lang, chapter_list[0] if chapter_list else None)
+        first_chapter = chapter_list[0] if chapter_list else None
+        self.prefill_context(source_lang, target_lang, first_chapter)
         
         # Process each chapter
         for chapter_number in chapter_list:
