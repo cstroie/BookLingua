@@ -888,6 +888,49 @@ class EPUBTranslator:
             if self.verbose:
                 print(f"Database count for chapter translations failed: {e}")
             return 0
+
+    def is_chapter_fully_translated(self, chapter_number: int, source_lang: str, target_lang: str) -> bool:
+        """Check if a chapter is fully translated by verifying all paragraphs have translations.
+        
+        This method queries the database to determine if all paragraphs in a chapter
+        have been translated (i.e., have non-empty translations).
+        
+        Args:
+            chapter_number (int): Chapter number to check
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            bool: True if chapter is fully translated, False otherwise
+        """
+        if not self.conn:
+            return False
+            
+        try:
+            cursor = self.conn.cursor()
+            # Count total paragraphs in the chapter
+            cursor.execute('''
+                SELECT COUNT(*) FROM translations 
+                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ?
+            ''', (chapter_number, source_lang, target_lang))
+            total_result = cursor.fetchone()
+            total_paragraphs = total_result[0] if total_result else 0
+            
+            # Count paragraphs with empty translations
+            cursor.execute('''
+                SELECT COUNT(*) FROM translations 
+                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
+                AND (translated_text IS NULL OR translated_text = '')
+            ''', (chapter_number, source_lang, target_lang))
+            empty_result = cursor.fetchone()
+            empty_paragraphs = empty_result[0] if empty_result else 0
+            
+            # Chapter is fully translated if there are no empty paragraphs
+            return empty_paragraphs == 0 and total_paragraphs > 0
+        except Exception as e:
+            if self.verbose:
+                print(f"Database check for chapter translation status failed: {e}")
+            return False
     
     def _save_translation_to_db(self, text: str, translation: str, source_lang: str, target_lang: str, 
                                 chapter_number: int = None, paragraph_number: int = None, 
