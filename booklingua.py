@@ -850,15 +850,15 @@ class EPUBTranslator:
                 print(f"Database lookup for chapters failed: {e}")
             raise
 
-    def db_get_next_paragraph(self, edition_number: int, chapter_number: int, paragraph_number: int, source_lang: str, target_lang: str) -> tuple:
+    def db_get_next_paragraph(self, source_lang: str, target_lang: str, edition_number: int, chapter_number: int, paragraph_number: int) -> tuple:
         """Get the next paragraph in a chapter after the specified paragraph number.
         
         Args:
+            source_lang (str): Source language code
+            target_lang (str): Target language code
             edition_number (int): Edition number to search within
             chapter_number (int): Chapter number to search within
             paragraph_number (int): Current paragraph number
-            source_lang (str): Source language code
-            target_lang (str): Target language code
             
         Returns:
             tuple: (paragraph_number, source, target) of the next paragraph,
@@ -887,10 +887,11 @@ class EPUBTranslator:
                 print(f"Database lookup for next paragraph failed: {e}")
             raise
 
-    def db_count_paragraphs(self, chapter_number: int, source_lang: str, target_lang: str) -> int:
-        """Count total paragraphs in a chapter.
+    def db_count_paragraphs(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> int:
+        """Count total paragraphs in a chapter for a given edition.
         
         Args:
+            edition_number (int): Edition number to count paragraphs for
             chapter_number (int): Chapter number to count paragraphs for
             source_lang (str): Source language code
             target_lang (str): Target language code
@@ -909,8 +910,8 @@ class EPUBTranslator:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT COUNT(*) FROM translations 
-                WHERE chapter = ? AND source_lang = ? AND target_lang = ?
-            ''', (chapter_number, source_lang, target_lang))
+                WHERE edition = ? AND chapter = ? AND source_lang = ? AND target_lang = ?
+            ''', (edition_number, chapter_number, source_lang, target_lang))
             result = cursor.fetchone()
             return result[0] if result else 0
         except Exception as e:
@@ -918,10 +919,11 @@ class EPUBTranslator:
                 print(f"Database count for chapter paragraphs failed: {e}")
             raise
 
-    def db_chapter_stats(self, chapter_number: int, source_lang: str, target_lang: str) -> tuple:
-        """Get chapter translation statistics.
+    def db_chapter_stats(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> tuple:
+        """Get chapter translation statistics for a given edition.
         
         Args:
+            edition_number (int): Edition number to get statistics for
             chapter_number (int): Chapter number to get statistics for
             source_lang (str): Source language code
             target_lang (str): Target language code
@@ -945,9 +947,9 @@ class EPUBTranslator:
                     COUNT(*) as total_paragraphs,
                     COUNT(CASE WHEN target IS NOT NULL AND target != '' THEN 1 END) as translated_paragraphs
                 FROM translations 
-                WHERE chapter = ? AND source_lang = ? AND target_lang = ? 
+                WHERE edition = ? AND chapter = ? AND source_lang = ? AND target_lang = ? 
                 AND duration IS NOT NULL
-            ''', (chapter_number, source_lang, target_lang))
+            ''', (edition_number, chapter_number, source_lang, target_lang))
             result = cursor.fetchone()
             # Calculate
             if result:
@@ -968,10 +970,11 @@ class EPUBTranslator:
                 print(f"Database chapter stats query failed: {e}")
             raise
 
-    def db_chapter_is_translated(self, chapter_number: int, source_lang: str, target_lang: str) -> bool:
+    def db_chapter_is_translated(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> bool:
         """Check if a chapter is fully translated.
         
         Args:
+            edition_number (int): Edition number to check
             chapter_number (int): Chapter number to check
             source_lang (str): Source language code
             target_lang (str): Target language code
@@ -990,16 +993,16 @@ class EPUBTranslator:
             # Count total paragraphs in the chapter
             cursor.execute('''
                 SELECT COUNT(*) FROM translations 
-                WHERE chapter = ? AND source_lang = ? AND target_lang = ?
-            ''', (chapter_number, source_lang, target_lang))
+                WHERE edition = ? AND chapter = ? AND source_lang = ? AND target_lang = ?
+            ''', (edition_number, chapter_number, source_lang, target_lang))
             total_result = cursor.fetchone()
             total_paragraphs = total_result[0] if total_result else 0
             # Count paragraphs with empty translations
             cursor.execute('''
                 SELECT COUNT(*) FROM translations 
-                WHERE chapter = ? AND source_lang = ? AND target_lang = ? 
+                WHERE edition = ? AND chapter = ? AND source_lang = ? AND target_lang = ? 
                 AND (target IS NULL OR target = '')
-            ''', (chapter_number, source_lang, target_lang))
+            ''', (edition_number, chapter_number, source_lang, target_lang))
             empty_result = cursor.fetchone()
             empty_paragraphs = empty_result[0] if empty_result else 0
             # Chapter is fully translated if there are no empty paragraphs
@@ -1196,7 +1199,7 @@ class EPUBTranslator:
         # Get the next chapter's paragraph from database
         par = 0
         while True:
-            par, source, target = self.db_get_next_paragraph(chapter_number, par, source_lang, target_lang)
+            par, source, target = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
             if par:
                 print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}")
                 # Check if already translated
@@ -1240,7 +1243,7 @@ class EPUBTranslator:
         # Run quality checks at the end of chapter translation
         try:
             # Get all translated texts in the chapter for quality assessment
-            translated_texts = self.db_get_translations(chapter_number, source_lang, target_lang)
+            translated_texts = self.db_get_translations(edition_number, chapter_number=chapter_number, source_lang=source_lang, target_lang=target_lang)
             if translated_texts:
                 chapter_content = '\n\n'.join(translated_texts)
                 # Calculate fluency score for the chapter
@@ -1330,7 +1333,7 @@ class EPUBTranslator:
         # Save all content to database
         edition_number = self.db_save_chapters(chapters, source_lang, target_lang)
         # Get chapter list first
-        chapter_list = self.db_get_chapters(source_lang, target_lang)
+        chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number)
         # Pre-fill context
         self.prefill_context(source_lang, target_lang)
         # Process each chapter
