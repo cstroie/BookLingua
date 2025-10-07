@@ -1332,7 +1332,7 @@ class EPUBTranslator:
     
     def translate_epub(self, input_path: str, output_dir: str = "output", 
                       source_lang: str = "English", target_lang: str = "Romanian",
-                      chapter_number: int = None):
+                      chapter_numbers: str = None):
         """Translate EPUB books using direct translation method.
         
         This method provides a translation workflow for EPUB books,
@@ -1346,7 +1346,7 @@ class EPUBTranslator:
                 Defaults to "output". The directory will be created if it doesn't exist.
             source_lang (str, optional): Source language name. Defaults to "English".
             target_lang (str, optional): Target language name. Defaults to "Romanian".
-            chapter_number (int, optional): Specific chapter number to translate.
+            chapter_numbers (str, optional): Comma-separated list of chapter numbers to translate.
                 If None, translates all chapters. Defaults to None.
                 
         Returns:
@@ -1380,9 +1380,9 @@ class EPUBTranslator:
             ...     output_dir="translations",
             ...     source_lang="English",
             ...     target_lang="Romanian",
-            ...     chapter_number=3
+            ...     chapter_numbers="3,5,7"
             ... )
-            # Creates: translations/translated.epub with only chapter 3
+            # Creates: translations/translated.epub with only chapters 3, 5, and 7
         """
         # Update database path if not set during initialization
         if not self.db_path and input_path:
@@ -1403,13 +1403,25 @@ class EPUBTranslator:
         # Get chapter list first
         chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number)
         
-        # If specific chapter requested, filter the list
-        if chapter_number is not None:
-            if chapter_number in chapter_list:
-                chapter_list = [chapter_number]
-                print(f"Translating only chapter {chapter_number}")
-            else:
-                print(f"Warning: Chapter {chapter_number} not found in database")
+        # If specific chapters requested, filter the list
+        if chapter_numbers is not None:
+            try:
+                # Parse comma-separated list of chapter numbers
+                requested_chapters = [int(ch.strip()) for ch in chapter_numbers.split(',')]
+                # Filter to only include chapters that exist in the database
+                filtered_chapters = [ch for ch in requested_chapters if ch in chapter_list]
+                # Check for any chapters that don't exist
+                missing_chapters = [ch for ch in requested_chapters if ch not in chapter_list]
+                if missing_chapters:
+                    print(f"Warning: Chapters {missing_chapters} not found in database")
+                if filtered_chapters:
+                    chapter_list = filtered_chapters
+                    print(f"Translating only chapters: {', '.join(map(str, filtered_chapters))}")
+                else:
+                    print("Warning: None of the requested chapters were found in database")
+                    return
+            except ValueError:
+                print("Error: Chapter numbers must be comma-separated integers")
                 return
         
         # Pre-fill context
@@ -1802,7 +1814,7 @@ def main():
     parser.add_argument("-u", "--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
     parser.add_argument("-m", "--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
     parser.add_argument("-k", "--api-key", help="API key for the translation service")
-    parser.add_argument("-c", "--chapter", type=int, help="Specific chapter number to translate (default: all chapters)")
+    parser.add_argument("-c", "--chapter", type=str, help="Comma-separated list of chapter numbers to translate (default: all chapters)")
     
     # Preset configurations for common services
     parser.add_argument("--openai", action="store_true", help="Use OpenAI API")
@@ -1879,7 +1891,7 @@ def main():
         output_dir=output_dir,
         source_lang=source_lang,
         target_lang=target_lang,
-        chapter_number=args.chapter
+        chapter_numbers=args.chapter
     )
 
 # Run main function if executed as script
