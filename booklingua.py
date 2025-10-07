@@ -1456,7 +1456,7 @@ class EPUBTranslator:
         for chapter_num in chapter_list:
             self.translate_chapter(edition_number, chapter_num, source_lang, target_lang, len(chapter_list))
         # Prepare output book
-        translated_book = self.book_create_template(book)
+        translated_book = self.book_create_template(book, target_lang)
         translated_chapters = []
         for chapter_number in chapter_list:
             # Only include chapters that are fully translated
