@@ -757,6 +757,7 @@ class EPUBTranslator:
         from the database, ordered by paragraph number.
         
         Args:
+            edition_number (int): Edition number to retrieve translations for
             chapter_number (int): Chapter number to retrieve
             source_lang (str): Source language code
             target_lang (str): Target language code
@@ -1175,6 +1176,7 @@ class EPUBTranslator:
         database lookups, progress tracking, and timing statistics.
         
         Args:
+            edition_number (int): Edition number for this translation
             chapter_number (int): Chapter number (1-based index)
             source_lang (str): Source language code
             target_lang (str): Target language code
