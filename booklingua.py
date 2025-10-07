@@ -284,10 +284,13 @@ class EPUBTranslator:
         # Join all translated texts with double newlines
         translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
         # Create chapter for book
-        # Ensure we have a valid language code (default to 'en' if empty)
-        lang_code = target_lang.lower()[:2] if target_lang else 'en'
-        if not lang_code:
-            lang_code = 'en'
+        # Ensure we have a valid language code (default to 'en' if empty or None)
+        lang_code = 'en'  # default
+        if target_lang:
+            # Try to get the first 2 characters, but make sure it's not empty
+            lang_part = target_lang.lower()[:2]
+            if lang_part and lang_part.strip():
+                lang_code = lang_part
         translated_chapter = epub.EpubHtml(
             title=f'Chapter {chapter_number}',
             file_name=f'chapter_{chapter_number}.xhtml',
