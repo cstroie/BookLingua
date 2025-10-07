@@ -1281,7 +1281,7 @@ class EPUBTranslator:
         # Reset context for each chapter to avoid drift
         self.context_reset()
         # Pre-fill context with chapter-specific data
-        self.prefill_context(source_lang, target_lang, chapter_number)
+        self.context_prefill(source_lang, target_lang, chapter_number)
         # Get total paragraphs in chapter
         total_paragraphs = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
         # Get the next chapter's paragraph from database
@@ -1428,7 +1428,6 @@ class EPUBTranslator:
         edition_number = self.db_save_chapters(chapters, source_lang, target_lang)
         # Get chapter list first
         chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number)
-        
         # If specific chapters requested, filter the list
         if chapter_numbers is not None:
             try:
@@ -1449,9 +1448,6 @@ class EPUBTranslator:
             except ValueError:
                 print("Error: Chapter numbers must be comma-separated integers")
                 return
-        
-        # Pre-fill context
-        self.prefill_context(source_lang, target_lang, None)
         # Process each chapter
         for chapter_num in chapter_list:
             self.translate_chapter(edition_number, chapter_num, source_lang, target_lang, len(chapter_list))
@@ -1503,7 +1499,7 @@ class EPUBTranslator:
             finally:
                 print()
 
-    def prefill_context(self, source_lang: str, target_lang: str, chapter_number: int = None):
+    def context_prefill(self, source_lang: str, target_lang: str, chapter_number: int = None):
         """Pre-fill translation context with existing translations or random paragraphs.
         
         This method first tries to use existing translations from the database to
@@ -1562,7 +1558,8 @@ class EPUBTranslator:
                 if self.verbose:
                     print(f"Database context prefill failed: {e}")
             # Ensure we at least report what we have
-            print(f"Pre-filled context with {len(self.context)} paragraph pairs")
+            if self.context and self.verbose:
+                print(f"Pre-filled context with {len(self.context)} paragraph pairs")
 
     def context_reset(self):
         """Reset the translation context to avoid drift between chapters.
