@@ -1271,7 +1271,11 @@ class EPUBTranslator:
             if response.status_code != 200:
                 raise Exception(f"API request failed with status {response.status_code}: {response.text}")
             result = response.json()
-            translation = result["choices"][0]["message"]["content"].strip()
+            try:
+                translation = result["choices"][0]["message"]["content"].strip()
+            except (KeyError, IndexError) as e:
+                print(f"Warning: Failed to extract translation from API response:\n{response}")
+                raise Exception(f"Unexpected API response format: {e}")
             
             # Add back the markdown formatting
             translation = prefix + translation + suffix
