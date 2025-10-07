@@ -291,6 +291,8 @@ class EPUBTranslator:
         translated_texts = self.db_get_translations(edition_number, chapter_number, source_lang, target_lang)
         # Join all translated texts with double newlines
         translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
+        # Convert translated content to HTML
+        html_content = self.text_to_html(translated_content)
         
         # Save translated chapter as markdown if output directory exists
         if self.output_dir and os.path.exists(self.output_dir):
@@ -306,9 +308,6 @@ class EPUBTranslator:
                     f.write(translated_content)
             except Exception as e:
                 print(f"Warning: Failed to save translated chapter {chapter_number} as markdown: {e}")
-        
-        # Convert translated content to HTML
-        html_content = self.text_to_html(translated_content)
         
         # Save translated chapter as XHTML if output directory exists
         if self.output_dir and os.path.exists(self.output_dir):
