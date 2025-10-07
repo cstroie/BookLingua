@@ -1193,69 +1193,78 @@ class EPUBTranslator:
                 return cached_result[0]  # Return only the translated text
         # Strip markdown formatting for cleaner translation
         stripped_text, prefix, suffix = self.strip_markdown_formatting(text)
-        # No cached translation, call the API
-        try:
-            headers = {
-                "Content-Type": "application/json"
-            }
-            # Add API key if provided and not a local endpoint
-            if self.api_key and self.api_key != 'dummy-key':
-                headers["Authorization"] = f"Bearer {self.api_key}"
-            # Build messages with context
-            messages = [
-                {
-                    "role": "system",
-                    "content": SYSTEM_PROMPT.format(source_lang=source_lang, target_lang=target_lang)
-                }
-            ]
-            # Add context from previous translations for this language pair
-            for user_msg, assistant_msg in self.context:
-                messages.append({"role": "user", "content": user_msg})
-                messages.append({"role": "assistant", "content": assistant_msg})
-            # Add current text to translate
-            messages.append({"role": "user", "content": stripped_text})
-            # Handle model name with provider (provider@model format)
-            model_name = self.model
-            payload = {
-                "model": model_name,
-                "messages": messages,
-                "temperature": DEFAULT_TEMPERATURE,
-                "max_tokens": DEFAULT_MAX_TOKENS,
-                "keep_alive": DEFAULT_KEEP_ALIVE,
-                "stream": False
-            }
-            # If model name contains '@', split it and add provider info
-            if '@' in self.model:
-                model_parts = self.model.split('@', 1)
-                model_name = model_parts[1]
-                provider = model_parts[0]
-                payload["model"] = model_name
-                payload["provider"] = {
-                    "order": [provider]
-                }
-            # Call the API
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload
-            )
-            if response.status_code != 200:
-                raise Exception(f"API request failed with status {response.status_code}: {response.text}")
-            result = response.json()
+        # No cached translation, call the API with retry logic
+        max_retries = 5
+        for attempt in range(max_retries):
             try:
-                translation = result["choices"][0]["message"]["content"].strip()
-            except (KeyError, IndexError) as e:
-                print(f"Warning: Failed to extract translation from API response:\n{response}")
-                raise Exception(f"Unexpected API response format: {e}")
-            # Update translation context for this language pair, already stripped of markdown
-            self.context_add(stripped_text, translation, False)
-            # Add back the markdown formatting
-            translation = prefix + translation + suffix
-            # Return the translated text
-            return translation
-        except Exception as e:
-            print(f"Error during translation: {e}")
-            raise    
+                headers = {
+                    "Content-Type": "application/json"
+                }
+                # Add API key if provided and not a local endpoint
+                if self.api_key and self.api_key != 'dummy-key':
+                    headers["Authorization"] = f"Bearer {self.api_key}"
+                # Build messages with context
+                messages = [
+                    {
+                        "role": "system",
+                        "content": SYSTEM_PROMPT.format(source_lang=source_lang, target_lang=target_lang)
+                    }
+                ]
+                # Add context from previous translations for this language pair
+                for user_msg, assistant_msg in self.context:
+                    messages.append({"role": "user", "content": user_msg})
+                    messages.append({"role": "assistant", "content": assistant_msg})
+                # Add current text to translate
+                messages.append({"role": "user", "content": stripped_text})
+                # Handle model name with provider (provider@model format)
+                model_name = self.model
+                payload = {
+                    "model": model_name,
+                    "messages": messages,
+                    "temperature": DEFAULT_TEMPERATURE,
+                    "max_tokens": DEFAULT_MAX_TOKENS,
+                    "keep_alive": DEFAULT_KEEP_ALIVE,
+                    "stream": False
+                }
+                # If model name contains '@', split it and add provider info
+                if '@' in self.model:
+                    model_parts = self.model.split('@', 1)
+                    model_name = model_parts[1]
+                    provider = model_parts[0]
+                    payload["model"] = model_name
+                    payload["provider"] = {
+                        "order": [provider]
+                    }
+                # Call the API
+                response = requests.post(
+                    f"{self.base_url}/chat/completions",
+                    headers=headers,
+                    json=payload
+                )
+                if response.status_code != 200:
+                    raise Exception(f"API request failed with status {response.status_code}: {response.text}")
+                result = response.json()
+                try:
+                    translation = result["choices"][0]["message"]["content"].strip()
+                except (KeyError, IndexError) as e:
+                    print(f"Warning: Failed to extract translation from API response:\n{response}")
+                    raise Exception(f"Unexpected API response format: {e}")
+                # Update translation context for this language pair, already stripped of markdown
+                self.context_add(stripped_text, translation, False)
+                # Add back the markdown formatting
+                translation = prefix + translation + suffix
+                # Return the translated text
+                return translation
+            except Exception as e:
+                if attempt < max_retries - 1:  # Don't sleep on the last attempt
+                    wait_time = 2 ** (attempt + 1)  # 2, 4, 8, 16, 32 seconds
+                    print(f"API call failed (attempt {attempt + 1}/{max_retries}): {e}")
+                    print(f"Retrying in {wait_time} seconds...")
+                    import time
+                    time.sleep(wait_time)
+                else:
+                    print(f"Error during translation after {max_retries} attempts: {e}")
+                    raise
 
     def translate_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int):
         """Translate a single chapter and return an EPUB HTML item.
