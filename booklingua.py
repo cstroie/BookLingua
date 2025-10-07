@@ -1316,7 +1316,9 @@ class EPUBTranslator:
                     end_time = datetime.now()
                     if self.verbose:
                         #print(f"{target_lang}: {target}")
-                        self.display_side_by_side(source, target)
+                        print(f"{'~'*80}")
+                        self.display_side_by_side(source, target, 80)
+                        print(f"{'~'*80}")
                     # Calculate and store timing
                     elapsed = int((end_time - start_time).total_seconds() * 1000)  # Convert to milliseconds
                     # Calculate fluency score
