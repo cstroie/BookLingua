@@ -1327,10 +1327,8 @@ class EPUBTranslator:
                     # Calculate statistics for current chapter only
                     avg_time, elapsed_time, remaining_time = self.db_chapter_stats(edition_number, chapter_number, source_lang, target_lang)
                     if self.verbose:
-                        # Show fluency score
-                        print(f"Fluency: {fluency}%")
-                        # Show timing statistics
-                        print(f"Time: {elapsed/1000:.2f}s | Avg: {avg_time/1000:.2f}s | Remaining: {remaining_time/1000:.2f}s")
+                        # Show fluency score and timing stats
+                        print(f"Fluency: {fluency}% | Time: {elapsed/1000:.2f}s | Avg: {avg_time/1000:.2f}s | Remaining: {remaining_time/1000:.2f}s")
             else:
                 # No more paragraphs to translate
                 break
@@ -1742,10 +1740,10 @@ Return only a single integer number between 0 and 100."""
             # Hello world          Bonjour le monde
         """
         # Constants for layout
-        LEFT_WIDTH = 38
-        RIGHT_WIDTH = 38
-        MARGIN = 1
-        GAP = 2
+        LEFT_WIDTH = 36
+        RIGHT_WIDTH = 36
+        MARGIN = 2
+        GAP = 4
         TOTAL_WIDTH = 80
         
         # Helper function to split text at word boundaries
@@ -1767,21 +1765,16 @@ Return only a single integer number between 0 and 100."""
         # Split texts into lines that fit within the available width
         left_lines = split_at_word_boundaries(text1, LEFT_WIDTH)
         right_lines = split_at_word_boundaries(text2, RIGHT_WIDTH)
-        
         # Determine maximum number of lines needed
         max_lines = max(len(left_lines), len(right_lines))
-        
         # Display each line pair
         for i in range(max_lines):
             left_line = left_lines[i] if i < len(left_lines) else ""
             right_line = right_lines[i] if i < len(right_lines) else ""
-            
             # Format left line with right padding
             formatted_left = left_line.ljust(LEFT_WIDTH)
-            
             # Format right line with left padding
             formatted_right = right_line.ljust(RIGHT_WIDTH)
-            
             # Combine with margins and gap
             display_line = ' ' * MARGIN + formatted_left + ' ' * GAP + formatted_right + ' ' * MARGIN
             print(display_line)
