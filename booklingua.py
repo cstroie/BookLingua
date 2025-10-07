@@ -287,6 +287,22 @@ class EPUBTranslator:
         translated_texts = self.db_get_translations(edition_number, chapter_number, source_lang, target_lang)
         # Join all translated texts with double newlines
         translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
+        
+        # Save translated chapter as markdown if output directory exists
+        if self.output_dir and os.path.exists(self.output_dir):
+            try:
+                # Create target language subdirectory for translated files
+                target_lang_dir = os.path.join(self.output_dir, target_lang)
+                os.makedirs(target_lang_dir, exist_ok=True)
+                # Create markdown filename
+                filename = f"chapter_{chapter_number}.md"
+                filepath = os.path.join(target_lang_dir, filename)
+                # Write translated markdown content to file
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(translated_content)
+            except Exception as e:
+                print(f"Warning: Failed to save translated chapter {chapter_number} as markdown: {e}")
+        
         # Create chapter for book
         # Ensure we have a valid language code (default to 'en' if empty or None)
         lang_code = 'en'  # default
