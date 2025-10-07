@@ -1087,7 +1087,7 @@ class EPUBTranslator:
                 print(f"Failed to save chapters to database: {e}")
             raise
 
-    def translate_text(self, text: str, source_lang: str, target_lang: str, prefill: bool = False) -> str:
+    def translate_text(self, text: str, source_lang: str, target_lang: str, use_cache: bool = True) -> str:
         """Translate a text chunk using OpenAI-compatible API with database caching.
         
         Args:
@@ -1108,18 +1108,17 @@ class EPUBTranslator:
             Exception: If translation fails
         """
         
-        if not prefill:
+        # Check cache first
+        if use_cache and self.conn:
             # Check database first
             cached_result = self.db_get_translation(text, source_lang, target_lang)
             if cached_result[0]:
                 # Push to context list for continuity
-                self.context.append((text, result[0]))
-                # Keep only the last N exchanges for better context
-                if len(self.context) > DEFAULT_CONTEXT_SIZE:
-                    self.context.pop(0)
+                self.context_add(text, cached_result[0])
                 if self.verbose:
                     print("✓ Using cached translation")
                 return cached_result[0]  # Return only the translated text
+        # No cached translation, call the API
         try:
             headers = {
                 "Content-Type": "application/json"
@@ -1158,10 +1157,7 @@ class EPUBTranslator:
             result = response.json()
             translation = result["choices"][0]["message"]["content"].strip()
             # Update translation context for this language pair
-            self.context.append((text, translation))
-            # Keep only the last N exchanges for better context
-            if len(self.context) > DEFAULT_CONTEXT_SIZE:
-                self.context.pop(0)
+            self.context_add(text, translation)
             return translation
         except Exception as e:
             print(f"Error during translation: {e}")
@@ -1371,14 +1367,11 @@ class EPUBTranslator:
                 print(f"{source_lang}: {text}")
             try:
                 # Translation without storing in database
-                translation = self.translate_text(text, source_lang, target_lang, True)
+                translation = self.translate_text(text, source_lang, target_lang, False)
                 if self.verbose:
                     print(f"{target_lang}: {translation}")
                 # Add to context immediately
-                self.context.append((text, translation))
-                # Keep only the last N exchanges for better context
-                if len(self.context) > DEFAULT_PREFILL_CONTEXT_SIZE:
-                    self.context.pop(0)
+                self.context_add(text, translation)
             except Exception as e:
                 print(f"Warning: Failed to pre-translate context paragraph: {e}")
                 continue
@@ -1523,7 +1516,8 @@ Return only a single integer number between 0 and 100."""
         
         # Use the existing translation system to evaluate
         try:
-            result = self.translate_text(prompt, "English", "English", prefill=True)  # Evaluate in English
+            # Evaluate in English
+            result = self.translate_text(prompt, "English", "English", use_cache=False)
             # Extract numerical score from response
             import re
             score_match = re.search(r'(\d+)', result)
