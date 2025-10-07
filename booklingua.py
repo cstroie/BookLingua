@@ -1584,8 +1584,11 @@ class EPUBTranslator:
             text (str): The original text
             translation (str): The translated text
         """
+        # Strip markdown formatting from both source and target before adding to context
+        clean_text, _, _ = self.strip_markdown_formatting(text)
+        clean_translation, _, _ = self.strip_markdown_formatting(translation)
         # Update translation context for this language pair
-        self.context.append((text, translation))
+        self.context.append((clean_text, clean_translation))
         # Keep only the last N exchanges for better context
         if len(self.context) > DEFAULT_CONTEXT_SIZE:
             self.context.pop(0)
