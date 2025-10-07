@@ -1161,7 +1161,7 @@ class EPUBTranslator:
             print(f"Error during translation: {e}")
             raise    
 
-    def translate_chapter(self, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int):
+    def translate_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int):
         """Translate a single chapter and return an EPUB HTML item.
         
         This method handles the translation of a single chapter, including
@@ -1219,7 +1219,7 @@ class EPUBTranslator:
                     fluency = self.calculate_fluency_score(target)
                     # Save to database with timing and fluency info
                     self.db_save_translation(source, target, source_lang, target_lang,
-                                             chapter_number, par, elapsed, fluency)
+                                             edition_number, chapter_number, par, elapsed, fluency)
                     # Calculate statistics for current chapter only
                     avg_time, elapsed_time, remaining_time = self.db_chapter_stats(chapter_number, source_lang, target_lang)                 
                     # Show fluency score
@@ -1324,7 +1324,7 @@ class EPUBTranslator:
         book = epub.read_epub(input_path, options={'ignore_ncx': False})
         chapters = self.book_extract_content(book)
         # Save all content to database
-        self.db_save_chapters(chapters, source_lang, target_lang)
+        edition_number = self.db_save_chapters(chapters, source_lang, target_lang)
         # Get chapter list first
         chapter_list = self.db_get_chapters(source_lang, target_lang)
         # Pre-fill context
@@ -1332,7 +1332,7 @@ class EPUBTranslator:
         self.prefill_context(source_lang, target_lang, first_chapter)
         # Process each chapter
         for chapter_number in chapter_list:
-            self.translate_chapter(chapter_number, source_lang, target_lang, len(chapter_list))
+            self.translate_chapter(edition_number,chapter_number, source_lang, target_lang, len(chapter_list))
         # Prepare output book
         translated_book = self.book_create_template(book)
         translated_chapters = []
