@@ -1247,8 +1247,8 @@ class EPUBTranslator:
             except (KeyError, IndexError) as e:
                 print(f"Warning: Failed to extract translation from API response:\n{response}")
                 raise Exception(f"Unexpected API response format: {e}")
-            # Update translation context for this language pair
-            self.context_add(stripped_text, translation)
+            # Update translation context for this language pair, already stripped of markdown
+            self.context_add(stripped_text, translation, False)
             # Add back the markdown formatting
             translation = prefix + translation + suffix
             # Return the translated text
@@ -1574,7 +1574,7 @@ class EPUBTranslator:
         """
         self.context = []
 
-    def context_add(self, text: str, translation: str):
+    def context_add(self, text: str, translation: str, clean: bool = True):
         """Add a text and its translation to the context.
         
         This method updates the translation context for the current language pair
@@ -1584,11 +1584,15 @@ class EPUBTranslator:
             text (str): The original text
             translation (str): The translated text
         """
-        # Strip markdown formatting from both source and target before adding to context
-        clean_text, _, _ = self.strip_markdown_formatting(text)
-        clean_translation, _, _ = self.strip_markdown_formatting(translation)
-        # Update translation context for this language pair
-        self.context.append((clean_text, clean_translation))
+        if clean:
+            # Strip markdown formatting from both source and target before adding to context
+            clean_text, _, _ = self.strip_markdown_formatting(text)
+            clean_translation, _, _ = self.strip_markdown_formatting(translation)
+            # Update translation context for this language pair
+            self.context.append((clean_text, clean_translation))
+        else:
+            # Update translation context without cleaning
+            self.context.append((text, translation))
         # Keep only the last N exchanges for better context
         if len(self.context) > DEFAULT_CONTEXT_SIZE:
             self.context.pop(0)
