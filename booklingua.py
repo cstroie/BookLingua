@@ -1129,6 +1129,38 @@ class EPUBTranslator:
                 if self.verbose:
                     print("✓ Using cached translation")
                 return cached_result[0]  # Return only the translated text
+        
+        # Strip markdown formatting for cleaner translation
+        prefix = ""
+        stripped_text = text.strip()
+        
+        # Handle headers (# Header)
+        header_match = re.match(r'^(#+)\s+(.*)', stripped_text)
+        if header_match:
+            prefix = header_match.group(1) + " "
+            stripped_text = header_match.group(2)
+        
+        # Handle list items (- Item or * Item)
+        elif stripped_text.startswith("- ") or stripped_text.startswith("* "):
+            prefix = stripped_text[:2]
+            stripped_text = stripped_text[2:]
+        
+        # Handle bold (**text**)
+        bold_match = re.match(r'^(\*{2})(.*?)(\*{2})$', stripped_text)
+        if bold_match:
+            prefix = bold_match.group(1)
+            stripped_text = bold_match.group(2)
+            suffix = bold_match.group(3)
+        else:
+            suffix = ""
+        
+        # Handle italic (*text*)
+        italic_match = re.match(r'^(\*)(.*?)(\*)$', stripped_text)
+        if italic_match and not bold_match:  # Only if not already handled as bold
+            prefix = italic_match.group(1)
+            stripped_text = italic_match.group(2)
+            suffix = italic_match.group(3)
+        
         # No cached translation, call the API
         try:
             headers = {
@@ -1149,7 +1181,7 @@ class EPUBTranslator:
                 messages.append({"role": "user", "content": user_msg})
                 messages.append({"role": "assistant", "content": assistant_msg})
             # Add current text to translate
-            messages.append({"role": "user", "content": text})
+            messages.append({"role": "user", "content": stripped_text})
             payload = {
                 "model": self.model,
                 "messages": messages,
@@ -1167,6 +1199,10 @@ class EPUBTranslator:
                 raise Exception(f"API request failed with status {response.status_code}: {response.text}")
             result = response.json()
             translation = result["choices"][0]["message"]["content"].strip()
+            
+            # Add back the markdown formatting
+            translation = prefix + translation + suffix
+            
             # Update translation context for this language pair
             self.context_add(text, translation)
             return translation
