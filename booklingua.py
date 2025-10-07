@@ -1034,7 +1034,7 @@ class EPUBTranslator:
                 INSERT OR REPLACE INTO translations 
                 (source_lang, target_lang, source, target, model, edition, chapter, paragraph, duration, fluency)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (source_lang, target_lang, text, translation, self.model, edition_number, chapter_number, paragraph_number, duration, fluency, edition))
+            ''', (source_lang, target_lang, text, translation, self.model, edition_number, chapter_number, paragraph_number, duration, fluency))
             self.conn.commit()
         except Exception as e:
             if self.verbose:
