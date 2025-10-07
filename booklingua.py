@@ -1377,7 +1377,7 @@ class EPUBTranslator:
         # Get chapter list first
         chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number)
         # Pre-fill context
-        self.prefill_context(source_lang, target_lang)
+        self.prefill_context(source_lang, target_lang, None)
         # Process each chapter
         for chapter_number in chapter_list:
             self.translate_chapter(edition_number, chapter_number, source_lang, target_lang, len(chapter_list))
@@ -1425,7 +1425,7 @@ class EPUBTranslator:
             finally:
                 print()
 
-    def prefill_context(self, source_lang: str, target_lang: str):
+    def prefill_context(self, source_lang: str, target_lang: str, chapter_number: int = None):
         """Pre-fill translation context with existing translations or random paragraphs.
         
         This method first tries to use existing translations from the database to
