@@ -1421,7 +1421,11 @@ class EPUBTranslator:
         translated_book = self.book_create_template(book)
         translated_chapters = []
         for chapter_number in chapter_list:
-            translated_chapters.append(self.book_create_chapter(edition_number, chapter_number, source_lang, target_lang))
+            # Only include chapters that are fully translated
+            if self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
+                translated_chapters.append(self.book_create_chapter(edition_number, chapter_number, source_lang, target_lang))
+            else:
+                print(f"Warning: Chapter {chapter_number} is not fully translated and will be skipped")
         # Use the database-retrieved chapters if available
         if translated_chapters:
             self.book_finalize(translated_book, translated_chapters)
