@@ -293,7 +293,18 @@ class EPUBTranslator:
         translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
         # Convert translated content to HTML and extract title
         title, html_content = self.markdown_to_html(translated_content)
-        
+        html = """<?xml version="1.0" encoding="utf-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{lang}">
+	<head>
+		<title>{title}</title>
+	</head>
+	<body>
+    <article id="{id}">
+		{content}
+    </article>
+	</body>
+</html>
+""".format(title=title, content=html_content, id=f'chapter_{chapter_number}', lang=target_lang.lower()[:2] if target_lang else 'en')
         # Save translated chapter as markdown if output directory exists
         if self.output_dir and os.path.exists(self.output_dir):
             try:
@@ -581,24 +592,23 @@ class EPUBTranslator:
             >>> print(html)
             '<h1>Title</h1>\\n\\n<p>This is <strong>bold</strong> text</p>'
         """
+        # Return empty title and content if input is empty
         if not markdown_text:
             return (None, "")
-            
+        # Split text into lines for processing
         try:
             lines = markdown_text.split('\n')
         except Exception as e:
             print(f"Warning: Failed to split markdown text: {e}")
             return (None, "")
-            
         html_lines = []
         title = None
-        
+        # Process each line
         for line in lines:
             try:
                 line = line.strip()
                 if not line:
                     continue
-                    
                 # Handle headers
                 if line.startswith('###### '):
                     try:
@@ -617,23 +627,38 @@ class EPUBTranslator:
                 elif line.startswith('#### '):
                     try:
                         content = self.process_inline_markdown(line[5:])
+                        # Set title only if it hasn't been set yet
+                        if title is None:
+                            title = content
                         html_lines.append(f'<h4>{content}</h4>')
                     except Exception as e:
                         print(f"Warning: Error processing h4 header: {e}")
+                        if title is None:
+                            title = line[2:]
                         html_lines.append(f'<h4>{line[5:]}</h4>')
                 elif line.startswith('### '):
                     try:
                         content = self.process_inline_markdown(line[4:])
+                        # Set title only if it hasn't been set yet
+                        if title is None:
+                            title = content
                         html_lines.append(f'<h3>{content}</h3>')
                     except Exception as e:
                         print(f"Warning: Error processing h3 header: {e}")
+                        if title is None:
+                            title = line[2:]
                         html_lines.append(f'<h3>{line[4:]}</h3>')
                 elif line.startswith('## '):
                     try:
                         content = self.process_inline_markdown(line[3:])
+                        # Set title only if it hasn't been set yet
+                        if title is None:
+                            title = content
                         html_lines.append(f'<h2>{content}</h2>')
                     except Exception as e:
                         print(f"Warning: Error processing h2 header: {e}")
+                        if title is None:
+                            title = line[2:]
                         html_lines.append(f'<h2>{line[3:]}</h2>')
                 elif line.startswith('# '):
                     try:
@@ -666,7 +691,7 @@ class EPUBTranslator:
             except Exception as e:
                 print(f"Warning: Error processing line: {e}")
                 continue
-        
+        # Return empty title and content if input is empty
         try:
             return (title, '\n'.join(html_lines))
         except Exception as e:
@@ -704,9 +729,10 @@ class EPUBTranslator:
             >>> print(html_text)
             'This is <strong>bold</strong> and <em>italic</em> text with <code>code</code>'
         """
+        # Return empty string if input is empty
         if not text:
             return ""
-            
+        # Process inline formatting with regex substitutions
         try:
             # Process formatting in order of precedence
             # Code (highest precedence)
@@ -722,31 +748,9 @@ class EPUBTranslator:
         except Exception as e:
             print(f"Warning: Error processing markdown inline formatting: {e}")
             return text
-        
+        # Return processed text
         return text
 
-    def text_to_html(self, text: str) -> str:
-        """Convert text to HTML paragraphs with intelligent format detection.
-        
-        This method converts text content to HTML format, automatically detecting
-        whether the input is Markdown-formatted or plain text.
-        
-        Args:
-            text (str): Text content to convert to HTML
-            
-        Returns:
-            str: HTML formatted text with appropriate tags and structure
-        """
-        # First try to convert from Markdown, fallback to plain text
-        if '#' in text or '- ' in text or '*' in text or '_' in text or '~' in text or '`' in text:
-            _, html = self.markdown_to_html(text)
-            return html
-        else:
-            # Plain text conversion
-            paragraphs = text.split('\n\n')
-            html_paragraphs = [f'<p>{p.replace(chr(10), "<br/>")}</p>' for p in paragraphs if p.strip()]
-            return '\n'.join(html_paragraphs)
-    
     def db_init(self):
         """Initialize the SQLite database for storing translations."""
         if not self.db_path:
