@@ -376,8 +376,9 @@ class EPUBTranslator:
         markdown_lines = []
         
         try:
-            # Process each element
-            for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'br']):
+            # Process only direct children of the root element to avoid duplicate text extraction
+            # This prevents block elements inside other block elements from being processed twice
+            for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'br'], recursive=False):
                 try:
                     # Process inline tags within the element
                     processed_element = self.process_inline_tags(element)
@@ -399,6 +400,32 @@ class EPUBTranslator:
                 except Exception as e:
                     print(f"Warning: Error processing element: {e}")
                     continue
+                    
+            # Also process direct children of body if present
+            body = soup.find('body')
+            if body:
+                for element in body.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'br'], recursive=False):
+                    try:
+                        # Process inline tags within the element
+                        processed_element = self.process_inline_tags(element)
+                        text = processed_element.get_text(separator=' ', strip=True)
+                        if not text:
+                            continue
+                            
+                        # Add appropriate Markdown formatting
+                        if element.name and element.name.startswith('h'):
+                            try:
+                                level = int(element.name[1])
+                                markdown_lines.append('#' * level + ' ' + text)
+                            except (ValueError, IndexError):
+                                markdown_lines.append(text)  # Fallback to plain text
+                        elif element.name == 'li':
+                            markdown_lines.append('- ' + text)
+                        else:
+                            markdown_lines.append(text)
+                    except Exception as e:
+                        print(f"Warning: Error processing element: {e}")
+                        continue
         except Exception as e:
             print(f"Warning: Failed to find elements in soup: {e}")
         
