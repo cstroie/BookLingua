@@ -775,6 +775,95 @@ class EPUBTranslator:
             print(f"Warning: Could not initialize database: {e}")
             self.conn = None
     
+    def db_export_csv(self, csv_path: str):
+        """Export the database to CSV format.
+        
+        Args:
+            csv_path (str): Path to the output CSV file
+            
+        Raises:
+            Exception: If database connection is not available
+        """
+        if not self.conn:
+            raise Exception("Database connection not available")
+        
+        try:
+            import csv
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT id, source_lang, target_lang, source, target, model, 
+                       edition, chapter, paragraph, duration, fluency, created 
+                FROM translations
+                ORDER BY source_lang, target_lang, edition, chapter, paragraph
+            ''')
+            
+            with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.writer(csvfile)
+                # Write header
+                writer.writerow([
+                    'id', 'source_lang', 'target_lang', 'source', 'target', 'model',
+                    'edition', 'chapter', 'paragraph', 'duration', 'fluency', 'created'
+                ])
+                # Write data
+                writer.writerows(cursor.fetchall())
+            
+            print(f"Database exported to {csv_path}")
+        except Exception as e:
+            print(f"Failed to export database to CSV: {e}")
+            raise
+
+    def db_import_csv(self, csv_path: str):
+        """Import translations from CSV format into the database.
+        
+        Args:
+            csv_path (str): Path to the input CSV file
+            
+        Raises:
+            Exception: If database connection is not available
+        """
+        if not self.conn:
+            raise Exception("Database connection not available")
+        
+        try:
+            import csv
+            cursor = self.conn.cursor()
+            
+            with open(csv_path, 'r', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                imported_count = 0
+                
+                for row in reader:
+                    try:
+                        cursor.execute('''
+                            INSERT OR REPLACE INTO translations 
+                            (id, source_lang, target_lang, source, target, model,
+                             edition, chapter, paragraph, duration, fluency, created)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (
+                            int(row['id']) if row['id'] else None,
+                            row['source_lang'],
+                            row['target_lang'],
+                            row['source'],
+                            row['target'],
+                            row['model'],
+                            int(row['edition']) if row['edition'] else -1,
+                            int(row['chapter']) if row['chapter'] else -1,
+                            int(row['paragraph']) if row['paragraph'] else -1,
+                            int(row['duration']) if row['duration'] else -1,
+                            int(row['fluency']) if row['fluency'] else 1,
+                            row['created'] if row['created'] else None
+                        ))
+                        imported_count += 1
+                    except Exception as e:
+                        print(f"Warning: Failed to import row: {e}")
+                        continue
+            
+            self.conn.commit()
+            print(f"Imported {imported_count} translations from {csv_path}")
+        except Exception as e:
+            print(f"Failed to import database from CSV: {e}")
+            raise
+    
     def db_get_translation(self, text: str, source_lang: str, target_lang: str) -> tuple:
         """Retrieve the best translation from the database if it exists.
         
