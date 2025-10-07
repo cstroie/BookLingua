@@ -1132,8 +1132,9 @@ class EPUBTranslator:
         
         # Strip markdown formatting for cleaner translation
         prefix = ""
+        suffix = ""
         stripped_text = text.strip()
-        
+
         # Handle headers (# Header)
         header_match = re.match(r'^(#+)\s+(.*)', stripped_text)
         if header_match:
@@ -1151,9 +1152,7 @@ class EPUBTranslator:
             prefix = bold_match.group(1)
             stripped_text = bold_match.group(2)
             suffix = bold_match.group(3)
-        else:
-            suffix = ""
-        
+         
         # Handle italic (*text*)
         italic_match = re.match(r'^(\*)(.*?)(\*)$', stripped_text)
         if italic_match and not bold_match:  # Only if not already handled as bold
