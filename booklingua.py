@@ -145,8 +145,8 @@ class EPUBTranslator:
         """Clean up database connection when object is destroyed."""
         if self.conn:
             self.conn.close()
-    
-    def book_extract_content(self, book) -> List[dict]:
+
+    def book_extract_content(self, book, source_lang) -> List[dict]:
         """Extract text content from an already opened EPUB book object.
         
         This method processes an already opened EPUB book object, extracts all 
@@ -155,6 +155,7 @@ class EPUBTranslator:
         
         Args:
             book: An opened EPUB book object
+            source_lang (str): Source language code for saving chapters
             
         Returns:
             List[dict]: A list of chapter dictionaries, each containing:
@@ -1407,7 +1408,7 @@ class EPUBTranslator:
         print(f"Translating from {source_lang} to {target_lang}")
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path, options={'ignore_ncx': False})
-        chapters = self.book_extract_content(book)
+        chapters = self.book_extract_content(book, source_lang)
         # Save all content to database
         edition_number = self.db_save_chapters(chapters, source_lang, target_lang)
         # Get chapter list first
