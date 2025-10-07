@@ -1191,10 +1191,8 @@ class EPUBTranslator:
                 if self.verbose:
                     print("✓ Using cached translation")
                 return cached_result[0]  # Return only the translated text
-        
         # Strip markdown formatting for cleaner translation
         stripped_text, prefix, suffix = self.strip_markdown_formatting(text)
-        
         # No cached translation, call the API
         try:
             headers = {
@@ -1249,12 +1247,11 @@ class EPUBTranslator:
             except (KeyError, IndexError) as e:
                 print(f"Warning: Failed to extract translation from API response:\n{response}")
                 raise Exception(f"Unexpected API response format: {e}")
-            
+            # Update translation context for this language pair
+            self.context_add(stripped_text, translation)
             # Add back the markdown formatting
             translation = prefix + translation + suffix
-            
-            # Update translation context for this language pair
-            self.context_add(text, translation)
+            # Return the translated text
             return translation
         except Exception as e:
             print(f"Error during translation: {e}")
@@ -1576,7 +1573,6 @@ class EPUBTranslator:
         context drift that could affect translation consistency across chapters.
         """
         self.context = []
-
 
     def context_add(self, text: str, translation: str):
         """Add a text and its translation to the context.
