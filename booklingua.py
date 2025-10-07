@@ -1013,8 +1013,8 @@ class EPUBTranslator:
             raise
     
     def db_save_translation(self, text: str, translation: str, source_lang: str, target_lang: str, 
-                            chapter_number: int = None, paragraph_number: int = None, 
-                            duration: int = None, fluency: int = None, edition: int = None):
+                            edition_number: int = None, chapter_number: int = None, paragraph_number: int = None, 
+                            duration: int = None, fluency: int = None):
         """Save a translation to the database.
         
         Args:
@@ -1022,11 +1022,11 @@ class EPUBTranslator:
             translation (str): Translated text
             source_lang (str): Source language code
             target_lang (str): Target language code
+            edition_number (int, optional): Edition number for this translation
             chapter_number (int, optional): Chapter number for this translation
             paragraph_number (int, optional): Paragraph number within the chapter
             duration (int, optional): Time taken to process translation in milliseconds
             fluency (int, optional): Fluency score of the translation as percentage
-            edition (int, optional): Edition number for this translation
             
         Raises:
             Exception: If database connection is not available
@@ -1037,9 +1037,9 @@ class EPUBTranslator:
             cursor = self.conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO translations 
-                (source_lang, target_lang, source, target, model, chapter, paragraph, duration, fluency, edition)
+                (source_lang, target_lang, source, target, model, edition, chapter, paragraph, duration, fluency)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (source_lang, target_lang, text, translation, self.model, chapter_number, paragraph_number, duration, fluency, edition))
+            ''', (source_lang, target_lang, text, translation, self.model, edition_number, chapter_number, paragraph_number, duration, fluency, edition))
             self.conn.commit()
         except Exception as e:
             if self.verbose:
