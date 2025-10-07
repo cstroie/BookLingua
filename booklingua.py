@@ -280,7 +280,7 @@ class EPUBTranslator:
             epub.EpubHtml: EPUB HTML item for the chapter
         """
         # Get all translated texts in the chapter
-        translated_texts = self.db_get_translated(chapter_number, source_lang, target_lang)
+        translated_texts = self.db_get_translations(chapter_number, source_lang, target_lang)
         # Join all translated texts with double newlines
         translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
         # Create chapter for book
@@ -755,7 +755,7 @@ class EPUBTranslator:
                 print(f"Database lookup failed: {e}")
             raise
 
-    def db_get_translated(self, chapter_number: int, source_lang: str, target_lang: str) -> List[str]:
+    def db_get_translations(self, chapter_number: int, source_lang: str, target_lang: str) -> List[str]:
         """Get all translated texts in a chapter from the database.
         
         This helper function retrieves all translated paragraphs for a specific chapter
@@ -1235,7 +1235,7 @@ class EPUBTranslator:
         # Run quality checks at the end of chapter translation
         try:
             # Get all translated texts in the chapter for quality assessment
-            translated_texts = self.db_get_translated(chapter_number, source_lang, target_lang)
+            translated_texts = self.db_get_translations(chapter_number, source_lang, target_lang)
             if translated_texts:
                 chapter_content = '\n\n'.join(translated_texts)
                 # Calculate fluency score for the chapter
