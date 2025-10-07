@@ -1041,11 +1041,21 @@ class EPUBTranslator:
             raise Exception("Database connection not available")
         try:
             cursor = self.conn.cursor()
+            # First try to update existing record
             cursor.execute('''
-                INSERT OR REPLACE INTO translations 
-                (source_lang, target_lang, source, target, model, edition, chapter, paragraph, duration, fluency)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (source_lang, target_lang, text, translation, self.model, edition_number, chapter_number, paragraph_number, duration, fluency))
+                UPDATE translations 
+                SET target = ?, model = ?, duration = ?, fluency = ?
+                WHERE source_lang = ? AND target_lang = ? AND edition = ? AND chapter = ? AND paragraph = ?
+            ''', (translation, self.model, duration, fluency, source_lang, target_lang, edition_number, chapter_number, paragraph_number))
+            
+            # If no rows were updated, insert a new record
+            if cursor.rowcount == 0:
+                cursor.execute('''
+                    INSERT INTO translations 
+                    (source_lang, target_lang, source, target, model, edition, chapter, paragraph, duration, fluency)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (source_lang, target_lang, text, translation, self.model, edition_number, chapter_number, paragraph_number, duration, fluency))
+            
             self.conn.commit()
         except Exception as e:
             if self.verbose:
