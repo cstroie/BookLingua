@@ -719,7 +719,10 @@ class EPUBTranslator:
             self.conn = None
     
     def db_get_translation(self, text: str, source_lang: str, target_lang: str) -> tuple:
-        """Retrieve a translation from the database if it exists.
+        """Retrieve the best translation from the database if it exists.
+        
+        This method retrieves translations ordered by fluency score in descending order
+        and returns the highest quality translation available.
         
         Args:
             text (str): Source text to look up
@@ -727,7 +730,8 @@ class EPUBTranslator:
             target_lang (str): Target language code
             
         Returns:
-            tuple: (target, duration, fluency) if found, (None, None, None) otherwise
+            tuple: (target, duration, fluency) of the best translation if found, 
+                   (None, None, None) otherwise
             
         Raises:
             Exception: If database connection is not available
@@ -740,6 +744,7 @@ class EPUBTranslator:
             cursor.execute('''
                 SELECT target, duration, fluency FROM translations 
                 WHERE source_lang = ? AND target_lang = ? AND source = ? AND target != ''
+                ORDER BY fluency DESC
             ''', (source_lang, target_lang, text))
             result = cursor.fetchone()
             if result:
