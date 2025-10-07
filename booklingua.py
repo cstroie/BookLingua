@@ -850,10 +850,11 @@ class EPUBTranslator:
                 print(f"Database lookup for chapters failed: {e}")
             raise
 
-    def db_get_next_paragraph(self, chapter_number: int, paragraph_number: int, source_lang: str, target_lang: str) -> tuple:
+    def db_get_next_paragraph(self, edition_number: int, chapter_number: int, paragraph_number: int, source_lang: str, target_lang: str) -> tuple:
         """Get the next paragraph in a chapter after the specified paragraph number.
         
         Args:
+            edition_number (int): Edition number to search within
             chapter_number (int): Chapter number to search within
             paragraph_number (int): Current paragraph number
             source_lang (str): Source language code
@@ -874,10 +875,10 @@ class EPUBTranslator:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT paragraph, source, target FROM translations 
-                WHERE chapter = ? AND paragraph > ? 
+                WHERE edition = ? AND chapter = ? AND paragraph > ? 
                 AND source_lang = ? AND target_lang = ? 
                 ORDER BY paragraph ASC LIMIT 1
-            ''', (chapter_number, paragraph_number, source_lang, target_lang))
+            ''', (edition_number, chapter_number, paragraph_number, source_lang, target_lang))
             result = cursor.fetchone()
             # Return the result or None if not found
             return result if result else (None, None, None)
