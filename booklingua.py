@@ -1480,7 +1480,10 @@ class EPUBTranslator:
         # Save outputs
         print(f"\n{'='*80}")
         print("Saving output files...")
-        translated_path = os.path.join(self.output_dir, "translated.epub")
+        # Create filename with original name + language edition
+        original_filename = os.path.splitext(os.path.basename(input_path))[0]
+        language_edition = f"{original_filename} {target_lang.lower()} edition.epub"
+        translated_path = os.path.join(self.output_dir, language_edition)
         epub.write_epub(translated_path, translated_book)
         print(f"✓ Translation saved: {translated_path}")
         print(f"{'='*80}")
