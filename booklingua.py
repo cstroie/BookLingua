@@ -1820,10 +1820,10 @@ def main():
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("-s", "--source-lang", default="English", help="Source language (default: English)")
     parser.add_argument("-t", "--target-lang", default="Romanian", help="Target language (default: Romanian)")
+    parser.add_argument("-c", "--chapters", type=str, help="Comma-separated list of chapter numbers to translate (default: all chapters)")
     parser.add_argument("-u", "--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
     parser.add_argument("-m", "--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
     parser.add_argument("-k", "--api-key", help="API key for the translation service")
-    parser.add_argument("-c", "--chapter", type=str, help="Comma-separated list of chapter numbers to translate (default: all chapters)")
     
     # Preset configurations for common services
     parser.add_argument("--openai", action="store_true", help="Use OpenAI API")
@@ -1900,7 +1900,7 @@ def main():
         output_dir=output_dir,
         source_lang=source_lang,
         target_lang=target_lang,
-        chapter_numbers=args.chapter
+        chapter_numbers=args.chapters
     )
 
 # Run main function if executed as script
