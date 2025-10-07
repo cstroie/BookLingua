@@ -1117,6 +1117,19 @@ class EPUBTranslator:
         edition_number = self.db_get_latest_edition(source_lang, target_lang) + 1
         if self.verbose:
             print(f"Saving chapters as edition {edition_number}...")
+        # Delete all entries with empty translations for this language pair
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                DELETE FROM translations 
+                WHERE source_lang = ? AND target_lang = ? AND (target IS NULL OR target = '')
+            ''', (source_lang, target_lang))
+            self.conn.commit()
+            if self.verbose:
+                print("Deleted existing entries with empty translations")
+        except Exception as e:
+            if self.verbose:
+                print(f"Warning: Failed to delete empty translations: {e}")
         # Save all texts with empty translations
         try:
             for ch, chapter in enumerate(chapters):
