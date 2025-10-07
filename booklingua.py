@@ -1046,7 +1046,7 @@ class EPUBTranslator:
                 print(f"Database save failed: {e}")
             raise
     
-    def db_save_chapters(self, chapters: List[dict], source_lang: str, target_lang: str):
+    def db_save_chapters(self, chapters: List[dict], source_lang: str, target_lang: str) -> int:
         """Save all paragraphs from all chapters to database with empty translations.
         
         This method saves all paragraphs from all chapters to the database with empty
@@ -1057,12 +1057,17 @@ class EPUBTranslator:
             source_lang (str): Source language code
             target_lang (str): Target language code
             
+        Returns:
+            int: Edition number used for these chapters
+            
         Raises:
             Exception: If database connection is not available
         """
         # We need the database connection
         if not self.conn:
             raise Exception("Database connection not available")
+        # Get the latest edition number and increment it
+        edition_number = self.db_get_latest_edition(source_lang, target_lang) + 1
         # Save all paragraphs with empty translations
         try:
             for ch, chapter in enumerate(chapters):
@@ -1075,12 +1080,13 @@ class EPUBTranslator:
                         cursor = self.conn.cursor()
                         cursor.execute('''
                             INSERT OR IGNORE INTO translations 
-                            (source_lang, target_lang, source, target, model, chapter, paragraph)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ''', (source_lang, target_lang, paragraph, '', self.model, ch+1, par+1))
+                            (source_lang, target_lang, source, target, model, edition, chapter, paragraph)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (source_lang, target_lang, paragraph, '', self.model, edition_number, ch+1, par+1))
             self.conn.commit()
             if self.verbose:
                 print(f"... with {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs from all chapters.")
+            return edition_number
         except Exception as e:
             if self.verbose:
                 print(f"Failed to save chapters to database: {e}")
