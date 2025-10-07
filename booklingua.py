@@ -24,7 +24,7 @@ import os
 import argparse
 import re
 import sqlite3
-import random
+import time
 from typing import List, Dict, Optional
 from datetime import datetime
 
@@ -1115,8 +1115,7 @@ class EPUBTranslator:
             raise Exception("Database connection not available")
         # Get the latest edition number and increment it
         edition_number = self.db_get_latest_edition(source_lang, target_lang) + 1
-        if self.verbose:
-            print(f"Saving chapters as edition {edition_number}...")
+        print(f"Starting edition {edition_number}.")
         # Delete all entries with empty translations for this language pair
         try:
             cursor = self.conn.cursor()
@@ -1152,8 +1151,7 @@ class EPUBTranslator:
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (source_lang, target_lang, text, target, self.model, edition_number, ch+1, par+1, duration, fluency))
             self.conn.commit()
-            if self.verbose:
-                print(f"... with {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs from all chapters.")
+            print(f"... with {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs from all chapters.")
             return edition_number
         except Exception as e:
             if self.verbose:
@@ -1247,7 +1245,9 @@ class EPUBTranslator:
                 try:
                     translation = result["choices"][0]["message"]["content"].strip()
                 except (KeyError, IndexError) as e:
-                    print(f"Warning: Failed to extract translation from API response:\n{response}")
+                    if 'error' in result:
+                        error_info = result['error']
+                        raise Exception(f"API error: {error_info.get('message', 'Unknown error')}")
                     raise Exception(f"Unexpected API response format: {e}")
                 # Update translation context for this language pair, already stripped of markdown
                 self.context_add(stripped_text, translation, False)
@@ -1260,11 +1260,10 @@ class EPUBTranslator:
                     wait_time = 2 ** (attempt + 1)  # 2, 4, 8, 16, 32 seconds
                     print(f"API call failed (attempt {attempt + 1}/{max_retries}): {e}")
                     print(f"Retrying in {wait_time} seconds...")
-                    import time
                     time.sleep(wait_time)
                 else:
                     print(f"Error during translation after {max_retries} attempts: {e}")
-                    raise
+                    return ""
 
     def translate_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int):
         """Translate a single chapter and return an EPUB HTML item.
@@ -1303,7 +1302,8 @@ class EPUBTranslator:
                 # Check if already translated
                 if target:
                     if self.verbose:
-                        print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}    ✓ Using cached paragraph translation")
+                        print()
+                        self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}", "✓ Using cached paragraph translation", 80, 0, 4)
                         print(f"{'~'*80}")
                         self.display_side_by_side(source, target, 80)
                         print(f"{'~'*80}")
@@ -1311,16 +1311,17 @@ class EPUBTranslator:
                     continue
                 # Translate paragraph
                 if source.strip() and len(source.split()) < 1000:
-                    if self.verbose:
-                        print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}")
+                    print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}")
                     # Time the translation
                     start_time = datetime.now()
                     target = self.translate_text(source, source_lang, target_lang)
+                    if not target:
+                        print("Error: Translation failed, skipping paragraph.")
+                        continue
                     end_time = datetime.now()
-                    if self.verbose:
-                        print(f"{'~'*80}")
-                        self.display_side_by_side(source, target, 80)
-                        print(f"{'~'*80}")
+                    print(f"{'~'*80}")
+                    self.display_side_by_side(source, target, 80)
+                    print(f"{'~'*80}")
                     # Calculate and store timing
                     elapsed = int((end_time - start_time).total_seconds() * 1000)  # Convert to milliseconds
                     # Calculate fluency score
@@ -1497,13 +1498,13 @@ class EPUBTranslator:
         print("Pre-filling translation context with random paragraphs...")
         for i, text in enumerate(texts):
             print(f"Context {i+1}/{len(texts)}")
-            if self.verbose:
-                print(f"{source_lang}: {text}")
             try:
                 # Translation without storing in database
                 translation = self.translate_text(text, source_lang, target_lang, False)
                 if self.verbose:
-                    print(f"{target_lang}: {translation}")
+                    print(f"{'~'*80}")
+                    self.display_side_by_side(f"{text}:", f"{translation}:", 80)
+                    print(f"{'~'*80}")
                 # Add to context immediately
                 self.context_add(text, translation)
             except Exception as e:
