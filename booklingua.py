@@ -261,7 +261,14 @@ class EPUBTranslator:
         new_book.set_identifier(original_book.get_metadata('DC', 'identifier')[0][0])
         original_title = original_book.get_metadata('DC', 'title')[0][0]
         new_book.set_title(f"{original_title}")
-        new_book.set_language(target_lang.lower()[:2] if target_lang else 'en')
+        # Ensure we have a valid language code (default to 'en' if empty or None)
+        lang_code = 'en'  # default
+        if target_lang:
+            # Try to get the first 2 characters, but make sure it's not empty
+            lang_part = target_lang.lower()[:2]
+            if lang_part and lang_part.strip():
+                lang_code = lang_part
+        new_book.set_language(lang_code)
         for author in original_book.get_metadata('DC', 'creator'):
             new_book.add_author(author[0])
         return new_book
