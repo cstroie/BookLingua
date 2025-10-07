@@ -1720,31 +1720,35 @@ Return only a single integer number between 0 and 100."""
         
         return errors
 
-    def display_side_by_side(self, text1: str, text2: str) -> None:
-        """Display two texts side by side on an 80-character console.
+    def display_side_by_side(self, text1: str, text2: str, width: int = 80, margin: int = 2, gap: int = 4) -> None:
+        """Display two texts side by side on a console with specified layout.
         
-        The first text is displayed on the left side (first 38 characters) and
-        the second text is displayed on the right side (last 38 characters).
-        Both texts can be longer than 38 characters and will continue on
-        subsequent lines, splitting at word boundaries. There's a 1-character 
-        margin on both sides and a 2-character gap in between.
+        The first text is displayed on the left side and the second text on the right side.
+        Both texts can be longer than the column width and will continue on subsequent lines,
+        splitting at word boundaries. The layout is determined by the width, margin, and gap parameters.
         
         Args:
             text1 (str): First text to display on the left side
             text2 (str): Second text to display on the right side
+            width (int, optional): Total console width in characters. Defaults to 80.
+            margin (int, optional): Number of spaces on each side. Defaults to 2.
+            gap (int, optional): Number of spaces between columns. Defaults to 4.
             
         Example:
             >>> translator = EPUBTranslator()
             >>> translator.display_side_by_side("Hello world", "Bonjour le monde")
             # Displays:
-            # Hello world          Bonjour le monde
+            #   Hello world          Bonjour le monde   
         """
-        # Constants for layout
-        LEFT_WIDTH = 36
-        RIGHT_WIDTH = 36
-        MARGIN = 2
-        GAP = 4
-        TOTAL_WIDTH = 80
+        # Calculate column width (equal for both columns)
+        total_used_space = 2 * margin + gap
+        if width <= total_used_space:
+            # Not enough space for margins and gap, use minimal layout
+            column_width = max(1, (width - gap) // 2)
+        else:
+            # Calculate equal column width
+            available_space = width - total_used_space
+            column_width = available_space // 2
         
         # Helper function to split text at word boundaries
         def split_at_word_boundaries(text, width):
@@ -1763,8 +1767,8 @@ Return only a single integer number between 0 and 100."""
             return lines
         
         # Split texts into lines that fit within the available width
-        left_lines = split_at_word_boundaries(text1, LEFT_WIDTH)
-        right_lines = split_at_word_boundaries(text2, RIGHT_WIDTH)
+        left_lines = split_at_word_boundaries(text1, column_width)
+        right_lines = split_at_word_boundaries(text2, column_width)
         # Determine maximum number of lines needed
         max_lines = max(len(left_lines), len(right_lines))
         # Display each line pair
@@ -1772,11 +1776,11 @@ Return only a single integer number between 0 and 100."""
             left_line = left_lines[i] if i < len(left_lines) else ""
             right_line = right_lines[i] if i < len(right_lines) else ""
             # Format left line with right padding
-            formatted_left = left_line.ljust(LEFT_WIDTH)
+            formatted_left = left_line.ljust(column_width)
             # Format right line with left padding
-            formatted_right = right_line.ljust(RIGHT_WIDTH)
+            formatted_right = right_line.ljust(column_width)
             # Combine with margins and gap
-            display_line = ' ' * MARGIN + formatted_left + ' ' * GAP + formatted_right + ' ' * MARGIN
+            display_line = ' ' * margin + formatted_left + ' ' * gap + formatted_right + ' ' * margin
             print(display_line)
 
     def generate_quality_report(self, chapters: List[dict], source_lang: str, target_lang: str) -> Dict:
