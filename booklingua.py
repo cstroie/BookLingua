@@ -2104,6 +2104,10 @@ def main():
     parser.add_argument("-m", "--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
     parser.add_argument("-k", "--api-key", help="API key for the translation service")
     
+    # CSV export/import options
+    parser.add_argument("--export-csv", help="Export database to CSV file")
+    parser.add_argument("--import-csv", help="Import translations from CSV file")
+    
     # Preset configurations for common services
     parser.add_argument("--openai", action="store_true", help="Use OpenAI API")
     parser.add_argument("--ollama", action="store_true", help="Use Ollama local server")
@@ -2168,6 +2172,25 @@ def main():
         verbose=args.verbose,
         epub_path=args.input
     )
+    
+    # Handle CSV export/import operations
+    if args.export_csv:
+        try:
+            translator.db_export_csv(args.export_csv)
+            print(f"Database exported to {args.export_csv}")
+            return
+        except Exception as e:
+            print(f"Error exporting database: {e}")
+            return
+    
+    if args.import_csv:
+        try:
+            translator.db_import_csv(args.import_csv)
+            print(f"Database imported from {args.import_csv}")
+            return
+        except Exception as e:
+            print(f"Error importing database: {e}")
+            return
     
     # Use language names with first letter uppercase
     source_lang = args.source_lang.capitalize()
