@@ -1469,10 +1469,6 @@ class EPUBTranslator:
                 print(f"Warning: Chapter {chapter_number} is not fully translated and will be skipped")
         # Use the database-retrieved chapters if available
         if translated_chapters:
-            # Ensure all chapters have proper IDs
-            for i, chapter in enumerate(translated_chapters):
-                if not chapter.get_id():
-                    chapter.set_id(f'chapter_{i+1}')
             self.book_finalize(translated_book, translated_chapters)
         # Save outputs
         print(f"\n{'='*60}")
