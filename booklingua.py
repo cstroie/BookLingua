@@ -1403,12 +1403,10 @@ class EPUBTranslator:
             return
         # Get total paragraphs in chapter to determine chapter size
         total_paragraphs = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
-        # Set chapter size and texts for context reset decision
-        self._current_chapter_size = total_paragraphs
         # Initialize timing statistics for this chapter
         chapter_start_time = datetime.now()
         # Reset context for each chapter to avoid drift (with smart preservation)
-        self.context_reset()
+        self.context_reset(total_paragraphs)
         # Pre-fill context with chapter-specific data
         self.context_prefill(source_lang, target_lang, chapter_number)
         # Get total paragraphs in chapter
@@ -1694,25 +1692,28 @@ class EPUBTranslator:
             if self.context and self.verbose:
                 print(f"Pre-filled context with {len(self.context)} paragraph pairs")
 
-    def context_reset(self):
+    def context_reset(self, current_chapter_size: int = None):
         """Reset the translation context to avoid drift between chapters.
         
         This method clears the context cache that maintains translation history
         to ensure each chapter starts with a clean context. This prevents
         context drift that could affect translation consistency across chapters.
         
-        However, if the current chapter is small (less than twice the number of context items)
-        and the source texts in context have more than 50 characters, do not reset the context.
-        """
+        However, if the current chapter is small (less than twice the number of
+        context items) and the source texts in context have more than 50 characters,
+        do not reset the context.
+
+        Args:
+            current_chapter_size (int, optional): The size of the current chapter.        """
         # Check if we should preserve context for small chapters
-        if hasattr(self, '_current_chapter_size') and hasattr(self, '_current_chapter_texts'):
+        if current_chapter_size is not None:
             # If chapter is small and context texts are substantial, preserve context
-            if (self._current_chapter_size < 2 * DEFAULT_CONTEXT_SIZE and 
+            if (current_chapter_size < 2 * DEFAULT_CONTEXT_SIZE and
                 all(len(text) > 50 for text, _ in self.context)):
                 if self.verbose:
                     print("Preserving context for small chapter with substantial context texts")
                 return
-        
+        # Reset context
         self.context = []
 
     def context_add(self, text: str, translation: str, clean: bool = True):
