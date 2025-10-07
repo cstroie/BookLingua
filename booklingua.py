@@ -1454,6 +1454,23 @@ class EPUBTranslator:
         self.context = []
 
 
+    def context_add(self, text: str, translation: str):
+        """Add a text and its translation to the context.
+        
+        This method updates the translation context for the current language pair
+        and maintains a rolling window of the last N exchanges for better context.
+        
+        Args:
+            text (str): The original text
+            translation (str): The translated text
+        """
+        # Update translation context for this language pair
+        self.context.append((text, translation))
+        # Keep only the last N exchanges for better context
+        if len(self.context) > DEFAULT_CONTEXT_SIZE:
+            self.context.pop(0)
+
+
     def calculate_fluency_score(self, text: str) -> int:
         """Calculate fluency score based on linguistic patterns.
         
