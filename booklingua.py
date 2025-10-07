@@ -1191,8 +1191,7 @@ class EPUBTranslator:
                 messages.append({"role": "assistant", "content": assistant_msg})
             # Add current text to translate
             messages.append({"role": "user", "content": stripped_text})
-            
-            # Handle model name with provider (model@provider format)
+            # Handle model name with provider (provider@model format)
             model_name = self.model
             payload = {
                 "model": model_name,
@@ -1202,17 +1201,16 @@ class EPUBTranslator:
                 "keep_alive": DEFAULT_KEEP_ALIVE,
                 "stream": False
             }
-            
             # If model name contains '@', split it and add provider info
             if '@' in self.model:
                 model_parts = self.model.split('@', 1)
-                model_name = model_parts[0]
-                provider = model_parts[1]
+                model_name = model_parts[1]
+                provider = model_parts[0]
                 payload["model"] = model_name
                 payload["provider"] = {
                     "order": [provider]
                 }
-            
+            # Call the API
             response = requests.post(
                 f"{self.base_url}/chat/completions",
                 headers=headers,
