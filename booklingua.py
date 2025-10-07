@@ -243,7 +243,7 @@ class EPUBTranslator:
         # Return the list of chapter data
         return chapters
     
-    def book_create_template(self, original_book):
+    def book_create_template(self, original_book, target_lang: str) -> epub.EpubBook:
         """Create a new EPUB book template with metadata copied from original book.
         
         This method creates a new EPUB book object and copies essential metadata
@@ -252,21 +252,18 @@ class EPUBTranslator:
         
         Args:
             original_book: The original EPUB book object (ebooklib.epub.EpubBook)
+            target_lang (str): Target language code for setting the book language
                 
         Returns:
             epub.EpubBook: A new EPUB book object with copied metadata
         """
         new_book = epub.EpubBook()
         new_book.set_identifier(original_book.get_metadata('DC', 'identifier')[0][0])
-        
         original_title = original_book.get_metadata('DC', 'title')[0][0]
         new_book.set_title(f"{original_title}")
-        # Default to English, will be overridden later
-        new_book.set_language('en')
-        
+        new_book.set_language(target_lang.lower()[:2] if target_lang else 'en')
         for author in original_book.get_metadata('DC', 'creator'):
             new_book.add_author(author[0])
-        
         return new_book
 
     def book_create_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
@@ -1276,9 +1273,9 @@ class EPUBTranslator:
         print(f"{'='*60}")
         # Check if chapter is fully translated
         if self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
-            print("✓ Chapter is fully translated")
+            if self.verbose:
+                print("✓ Chapter is fully translated")
             return
-        print("✗ Chapter is not fully translated")
         # Initialize timing statistics for this chapter
         chapter_start_time = datetime.now()
         # Reset context for each chapter to avoid drift
@@ -1292,7 +1289,8 @@ class EPUBTranslator:
         while True:
             par, source, target = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
             if par:
-                print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}")
+                if self.verbose:
+                    print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}")
                 # Check if already translated
                 if target:
                     if self.verbose:
@@ -1320,10 +1318,11 @@ class EPUBTranslator:
                                              edition_number, chapter_number, par, elapsed, fluency)
                     # Calculate statistics for current chapter only
                     avg_time, elapsed_time, remaining_time = self.db_chapter_stats(edition_number, chapter_number, source_lang, target_lang)
-                    # Show fluency score
-                    print(f"Fluency: {fluency}%")
-                    # Show timing statistics
-                    print(f"Time: {elapsed/1000:.2f}s | Avg: {avg_time/1000:.2f}s | Remaining: {remaining_time/1000:.2f}s")
+                    if self.verbose:
+                        # Show fluency score
+                        print(f"Fluency: {fluency}%")
+                        # Show timing statistics
+                        print(f"Time: {elapsed/1000:.2f}s | Avg: {avg_time/1000:.2f}s | Remaining: {remaining_time/1000:.2f}s")
             else:
                 # No more paragraphs to translate
                 break
