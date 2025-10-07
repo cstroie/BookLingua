@@ -817,14 +817,13 @@ class EPUBTranslator:
                 print(f"Database lookup for latest edition failed: {e}")
             raise
 
-    def db_get_chapters(self, source_lang: str, target_lang: str, edition_number: int = None) -> List[int]:
+    def db_get_chapters(self, source_lang: str, target_lang: str, edition_number: int) -> List[int]:
         """Retrieve all chapter numbers from the database, ordered ascending.
         
         Args:
             source_lang (str): Source language code
             target_lang (str): Target language code
-            edition_number (int, optional): Edition number to filter chapters.
-                If None, retrieves chapters from all editions.
+            edition_number (int): Edition number to filter chapters.
             
         Returns:
             List[int]: List of chapter numbers in ascending order
@@ -838,18 +837,11 @@ class EPUBTranslator:
         # Query distinct chapter numbers
         try:
             cursor = self.conn.cursor()
-            if edition_number is not None:
-                cursor.execute('''
-                    SELECT DISTINCT chapter FROM translations 
-                    WHERE source_lang = ? AND target_lang = ? AND edition = ?
-                    ORDER BY chapter ASC
-                ''', (source_lang, target_lang, edition_number))
-            else:
-                cursor.execute('''
-                    SELECT DISTINCT chapter FROM translations 
-                    WHERE source_lang = ? AND target_lang = ? 
-                    ORDER BY chapter ASC
-                ''', (source_lang, target_lang))
+            cursor.execute('''
+                SELECT DISTINCT chapter FROM translations 
+                WHERE source_lang = ? AND target_lang = ? AND edition = ?
+                ORDER BY chapter ASC
+            ''', (source_lang, target_lang, edition_number))
             results = cursor.fetchall()
             # Return list of chapter numbers
             return [result[0] for result in results if result[0] is not None] if results else []
