@@ -29,8 +29,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 
 # Constants for configurable values
-DEFAULT_CHUNK_SIZE = 3000
-DEFAULT_TEMPERATURE = 0.5
+DEFAULT_TEMPERATURE = 0.3
 DEFAULT_MAX_TOKENS = 4096
 DEFAULT_CONTEXT_SIZE = 5
 DEFAULT_PREFILL_CONTEXT_SIZE = 5
@@ -1406,7 +1405,7 @@ class EPUBTranslator:
             - Maintains translation context across chapters for consistency
             - Preserves Markdown formatting and document structure
             - Supports paragraph-level translation for better quality
-            - Uses temperature=0.5 for balanced creativity and accuracy
+            - Uses temperature=0.3 for balanced creativity and accuracy
             - Verbose progress reporting when enabled
             - Database caching for reliability and resume capability
             
@@ -1966,7 +1965,7 @@ def main():
         - Direct and pivot translation modes
         - Comparison mode for analyzing translation quality
         - Preserves EPUB structure and formatting
-        - Uses temperature=0.5 for balanced creativity and accuracy
+        - Uses temperature=0.3 for balanced creativity and accuracy
         - Verbose progress reporting
         - Environment variable support for API keys
         - Preset configurations for common services
