@@ -791,6 +791,37 @@ class EPUBTranslator:
                 print(f"Database lookup for chapter texts failed: {e}")
             raise
 
+    def db_get_latest_edition(self, source_lang: str, target_lang: str) -> int:
+        """Get the latest edition number from the database.
+        
+        Args:
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            int: Latest edition number, or -1 if no editions found
+            
+        Raises:
+            Exception: If database connection is not available
+        """
+        # Raise exception if no database connection
+        if not self.conn:
+            raise Exception("Database connection not available")
+        # Query for the maximum edition number
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT MAX(edition) FROM translations 
+                WHERE source_lang = ? AND target_lang = ?
+            ''', (source_lang, target_lang))
+            result = cursor.fetchone()
+            # Return the latest edition number or -1 if none found
+            return result[0] if result and result[0] is not None else -1
+        except Exception as e:
+            if self.verbose:
+                print(f"Database lookup for latest edition failed: {e}")
+            raise
+
     def db_get_chapters(self, source_lang: str, target_lang: str) -> List[int]:
         """Retrieve all chapter numbers from the database, ordered ascending.
         
