@@ -1728,8 +1728,8 @@ Return only a single integer number between 0 and 100."""
         The first text is displayed on the left side (first 38 characters) and
         the second text is displayed on the right side (last 38 characters).
         Both texts can be longer than 38 characters and will continue on
-        subsequent lines. There's a 1-character margin on both sides and a
-        2-character gap in between.
+        subsequent lines, splitting at word boundaries. There's a 1-character 
+        margin on both sides and a 2-character gap in between.
         
         Args:
             text1 (str): First text to display on the left side
@@ -1748,23 +1748,25 @@ Return only a single integer number between 0 and 100."""
         GAP = 2
         TOTAL_WIDTH = 80
         
+        # Helper function to split text at word boundaries
+        def split_at_word_boundaries(text, width):
+            lines = []
+            # Handle existing line breaks first
+            for line in text.split('\n'):
+                while len(line) > width:
+                    # Try to split at word boundary
+                    split_pos = line.rfind(' ', 0, width)
+                    if split_pos == -1:
+                        # No word boundary found, split at character boundary
+                        split_pos = width
+                    lines.append(line[:split_pos])
+                    line = line[split_pos:].lstrip()
+                lines.append(line)
+            return lines
+        
         # Split texts into lines that fit within the available width
-        left_lines = []
-        right_lines = []
-        
-        # Process left text
-        for line in text1.split('\n'):
-            while len(line) > LEFT_WIDTH:
-                left_lines.append(line[:LEFT_WIDTH])
-                line = line[LEFT_WIDTH:]
-            left_lines.append(line)
-        
-        # Process right text
-        for line in text2.split('\n'):
-            while len(line) > RIGHT_WIDTH:
-                right_lines.append(line[:RIGHT_WIDTH])
-                line = line[RIGHT_WIDTH:]
-            right_lines.append(line)
+        left_lines = split_at_word_boundaries(text1, LEFT_WIDTH)
+        right_lines = split_at_word_boundaries(text2, RIGHT_WIDTH)
         
         # Determine maximum number of lines needed
         max_lines = max(len(left_lines), len(right_lines))
