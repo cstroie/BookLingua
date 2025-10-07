@@ -1184,18 +1184,18 @@ class EPUBTranslator:
         print(f"Chapter {chapter_number}/{total_chapters}")
         print(f"{'='*60}")
         # Check if chapter is fully translated
-        if self.db_chapter_is_translated(chapter_number, source_lang, target_lang):
+        if self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
             print("✓ Chapter is fully translated")
             return
         print("✗ Chapter is not fully translated")
         # Initialize timing statistics for this chapter
         chapter_start_time = datetime.now()
         # Reset context for each chapter to avoid drift
-        self.reset_context()
+        self.context_reset()
         # Pre-fill context with chapter-specific data
         self.prefill_context(source_lang, target_lang, chapter_number)
         # Get total paragraphs in chapter
-        total_paragraphs = self.db_count_paragraphs(chapter_number, source_lang, target_lang)
+        total_paragraphs = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
         # Get the next chapter's paragraph from database
         par = 0
         while True:
@@ -1228,7 +1228,7 @@ class EPUBTranslator:
                     self.db_save_translation(source, target, source_lang, target_lang,
                                              edition_number, chapter_number, par, elapsed, fluency)
                     # Calculate statistics for current chapter only
-                    avg_time, elapsed_time, remaining_time = self.db_chapter_stats(chapter_number, source_lang, target_lang)                 
+                    avg_time, elapsed_time, remaining_time = self.db_chapter_stats(edition_number, chapter_number, source_lang, target_lang)
                     # Show fluency score
                     print(f"Fluency: {fluency}%")
                     # Show timing statistics
@@ -1442,7 +1442,7 @@ class EPUBTranslator:
             # Ensure we at least report what we have
             print(f"Pre-filled context with {len(self.context)} paragraph pairs")
 
-    def reset_context(self):
+    def context_reset(self):
         """Reset the translation context to avoid drift between chapters.
         
         This method clears the context cache that maintains translation history
