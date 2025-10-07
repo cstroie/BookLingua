@@ -1193,34 +1193,7 @@ class EPUBTranslator:
                 return cached_result[0]  # Return only the translated text
         
         # Strip markdown formatting for cleaner translation
-        prefix = ""
-        suffix = ""
-        stripped_text = text.strip()
-
-        # Handle headers (# Header)
-        header_match = re.match(r'^(#+)\s+(.*)', stripped_text)
-        if header_match:
-            prefix = header_match.group(1) + " "
-            stripped_text = header_match.group(2)
-        
-        # Handle list items (- Item or * Item)
-        elif stripped_text.startswith("- ") or stripped_text.startswith("* "):
-            prefix = stripped_text[:2]
-            stripped_text = stripped_text[2:]
-        
-        # Handle bold (**text**)
-        bold_match = re.match(r'^(\*{2})(.*?)(\*{2})$', stripped_text)
-        if bold_match:
-            prefix = bold_match.group(1)
-            stripped_text = bold_match.group(2)
-            suffix = bold_match.group(3)
-         
-        # Handle italic (*text*)
-        italic_match = re.match(r'^(\*)(.*?)(\*)$', stripped_text)
-        if italic_match and not bold_match:  # Only if not already handled as bold
-            prefix = italic_match.group(1)
-            stripped_text = italic_match.group(2)
-            suffix = italic_match.group(3)
+        stripped_text, prefix, suffix = self.strip_markdown_formatting(text)
         
         # No cached translation, call the API
         try:
@@ -1873,6 +1846,50 @@ Return only a single integer number between 0 and 100."""
         lang_code = language_name.lower()[:2]
         # Ensure we have a valid language code (default to 'en' if empty)
         return lang_code if lang_code.strip() else "en"
+
+    def strip_markdown_formatting(self, text: str) -> tuple:
+        """Strip markdown formatting and return clean text with prefix/suffix.
+        
+        This helper function removes common markdown formatting from text and
+        returns the clean text along with the formatting prefix and suffix.
+        
+        Args:
+            text (str): Text with potential markdown formatting
+            
+        Returns:
+            tuple: (clean_text, prefix, suffix) where clean_text is the text without
+                   formatting, and prefix/suffix contain the markdown formatting
+        """
+        stripped_text = text.strip()
+        prefix = ""
+        suffix = ""
+        
+        # Handle headers (# Header)
+        header_match = re.match(r'^(#+)\s+(.*)', stripped_text)
+        if header_match:
+            prefix = header_match.group(1) + " "
+            stripped_text = header_match.group(2)
+        
+        # Handle list items (- Item or * Item)
+        elif stripped_text.startswith("- ") or stripped_text.startswith("* "):
+            prefix = stripped_text[:2]
+            stripped_text = stripped_text[2:]
+        
+        # Handle bold (**text**)
+        bold_match = re.match(r'^(\*{2})(.*?)(\*{2})$', stripped_text)
+        if bold_match:
+            prefix = bold_match.group(1)
+            stripped_text = bold_match.group(2)
+            suffix = bold_match.group(3)
+         
+        # Handle italic (*text*)
+        italic_match = re.match(r'^(\*)(.*?)(\*)$', stripped_text)
+        if italic_match and not bold_match:  # Only if not already handled as bold
+            prefix = italic_match.group(1)
+            stripped_text = italic_match.group(2)
+            suffix = italic_match.group(3)
+            
+        return (stripped_text, prefix, suffix)
 
 def main():
     """Command-line interface for BookLingua EPUB translation tool.
