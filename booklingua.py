@@ -291,8 +291,8 @@ class EPUBTranslator:
         translated_texts = self.db_get_translations(edition_number, chapter_number, source_lang, target_lang)
         # Join all translated texts with double newlines
         translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
-        # Convert translated content to HTML
-        html_content = self.text_to_html(translated_content)
+        # Convert translated content to HTML and extract title
+        title, html_content = self.markdown_to_html(translated_content)
         
         # Save translated chapter as markdown if output directory exists
         if self.output_dir and os.path.exists(self.output_dir):
@@ -546,7 +546,7 @@ class EPUBTranslator:
         
         return element_copy
     
-    def markdown_to_html(self, markdown_text: str) -> str:
+    def markdown_to_html(self, markdown_text: str) -> tuple:
         """Convert Markdown text back to HTML format.
         
         This method converts Markdown-formatted text back to HTML tags, preserving
@@ -557,7 +557,8 @@ class EPUBTranslator:
             markdown_text (str): Markdown-formatted text to convert
             
         Returns:
-            str: HTML formatted text with appropriate tags
+            tuple: (title, content) where title is the first h1 header content (or None)
+                   and content is the HTML formatted text with appropriate tags
             
         Supported conversions:
             - Headers (# ## ### etc.) → <h1>, <h2>, <h3> etc.
@@ -574,20 +575,23 @@ class EPUBTranslator:
             
         Example:
             >>> markdown = "# Title\\n\\nThis is **bold** text"
-            >>> html = translator.markdown_to_html(markdown)
+            >>> title, html = translator.markdown_to_html(markdown)
+            >>> print(title)
+            'Title'
             >>> print(html)
             '<h1>Title</h1>\\n\\n<p>This is <strong>bold</strong> text</p>'
         """
         if not markdown_text:
-            return ""
+            return (None, "")
             
         try:
             lines = markdown_text.split('\n')
         except Exception as e:
             print(f"Warning: Failed to split markdown text: {e}")
-            return ""
+            return (None, "")
             
         html_lines = []
+        title = None
         
         for line in lines:
             try:
@@ -634,9 +638,14 @@ class EPUBTranslator:
                 elif line.startswith('# '):
                     try:
                         content = self.process_inline_markdown(line[2:])
+                        # Set title only if it hasn't been set yet
+                        if title is None:
+                            title = content
                         html_lines.append(f'<h1>{content}</h1>')
                     except Exception as e:
                         print(f"Warning: Error processing h1 header: {e}")
+                        if title is None:
+                            title = line[2:]
                         html_lines.append(f'<h1>{line[2:]}</h1>')
                 # Handle lists
                 elif line.startswith('- '):
@@ -659,10 +668,10 @@ class EPUBTranslator:
                 continue
         
         try:
-            return '\n'.join(html_lines)
+            return (title, '\n'.join(html_lines))
         except Exception as e:
             print(f"Warning: Failed to join HTML lines: {e}")
-            return ""
+            return (title, "")
     
     def process_inline_markdown(self, text: str) -> str:
         """Convert Markdown inline formatting back to HTML tags.
@@ -730,7 +739,8 @@ class EPUBTranslator:
         """
         # First try to convert from Markdown, fallback to plain text
         if '#' in text or '- ' in text or '*' in text or '_' in text or '~' in text or '`' in text:
-            return self.markdown_to_html(text)
+            _, html = self.markdown_to_html(text)
+            return html
         else:
             # Plain text conversion
             paragraphs = text.split('\n\n')
