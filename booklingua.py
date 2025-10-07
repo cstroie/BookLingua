@@ -1721,6 +1721,68 @@ Return only a single integer number between 0 and 100."""
         
         return errors
 
+    def display_side_by_side(self, text1: str, text2: str) -> None:
+        """Display two texts side by side on an 80-character console.
+        
+        The first text is displayed on the left side (first 38 characters) and
+        the second text is displayed on the right side (last 38 characters).
+        Both texts can be longer than 38 characters and will continue on
+        subsequent lines. There's a 1-character margin on both sides and a
+        2-character gap in between.
+        
+        Args:
+            text1 (str): First text to display on the left side
+            text2 (str): Second text to display on the right side
+            
+        Example:
+            >>> translator = EPUBTranslator()
+            >>> translator.display_side_by_side("Hello world", "Bonjour le monde")
+            # Displays:
+            # Hello world          Bonjour le monde
+        """
+        # Constants for layout
+        LEFT_WIDTH = 38
+        RIGHT_WIDTH = 38
+        MARGIN = 1
+        GAP = 2
+        TOTAL_WIDTH = 80
+        
+        # Split texts into lines that fit within the available width
+        left_lines = []
+        right_lines = []
+        
+        # Process left text
+        for line in text1.split('\n'):
+            while len(line) > LEFT_WIDTH:
+                left_lines.append(line[:LEFT_WIDTH])
+                line = line[LEFT_WIDTH:]
+            left_lines.append(line)
+        
+        # Process right text
+        for line in text2.split('\n'):
+            while len(line) > RIGHT_WIDTH:
+                right_lines.append(line[:RIGHT_WIDTH])
+                line = line[RIGHT_WIDTH:]
+            right_lines.append(line)
+        
+        # Determine maximum number of lines needed
+        max_lines = max(len(left_lines), len(right_lines))
+        
+        # Display each line pair
+        for i in range(max_lines):
+            left_line = left_lines[i] if i < len(left_lines) else ""
+            right_line = right_lines[i] if i < len(right_lines) else ""
+            
+            # Format left line with right padding
+            formatted_left = left_line.ljust(LEFT_WIDTH)
+            
+            # Format right line with left padding
+            formatted_right = right_line.rjust(RIGHT_WIDTH)
+            
+            # Combine with margins and gap
+            display_line = ' ' * MARGIN + formatted_left + ' ' * GAP + formatted_right + ' ' * MARGIN
+            print(display_line)
+
     def generate_quality_report(self, chapters: List[dict], source_lang: str, target_lang: str) -> Dict:
         """Generate comprehensive quality assessment report.
         
