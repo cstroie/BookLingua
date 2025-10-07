@@ -267,27 +267,6 @@ class EPUBTranslator:
             new_book.add_author(author[0])
         return new_book
 
-    def get_language_code(self, language_name: str) -> str:
-        """Get the first two letters of a language name in lowercase.
-        
-        This helper function extracts the first two characters from a language name
-        and converts them to lowercase. This is used for setting language codes in
-        EPUB files and other contexts where a short language code is needed.
-        
-        Args:
-            language_name (str): The language name (e.g., "English", "French")
-            
-        Returns:
-            str: The first two letters of the language name in lowercase (e.g., "en", "fr")
-                 Returns "en" as default if the input is empty or None
-        """
-        if not language_name:
-            return "en"  # default to English
-        # Get first 2 characters and convert to lowercase
-        lang_code = language_name.lower()[:2]
-        # Ensure we have a valid language code (default to 'en' if empty)
-        return lang_code if lang_code.strip() else "en"
-
     def book_create_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
         """Create an EPUB chapter from translated texts in the database.
         
@@ -308,16 +287,14 @@ class EPUBTranslator:
         translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
         # Convert translated content to HTML and extract title
         title, html_content = self.markdown_to_html(translated_content)
-        html = """<?xml version="1.0" encoding="utf-8"?>
+        xhtml = """<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{lang}">
-	<head>
-		<title>{title}</title>
-	</head>
-	<body>
-    <article id="{id}">
-		{content}
-    </article>
-	</body>
+<head><title>{title}</title></head>
+<body>
+<article id="{id}">
+{content}
+</article>
+</body>
 </html>
 """.format(title=title, content=html_content, id=f'chapter_{chapter_number}', lang=self.get_language_code(target_lang))
         # Save translated chapter as markdown if output directory exists
@@ -332,31 +309,22 @@ class EPUBTranslator:
                 # Write translated markdown content to file
                 with open(filepath, 'w', encoding='utf-8') as f:
                     f.write(translated_content)
-            except Exception as e:
-                print(f"Warning: Failed to save translated chapter {chapter_number} as markdown: {e}")
-        
-        # Save translated chapter as XHTML if output directory exists
-        if self.output_dir and os.path.exists(self.output_dir):
-            try:
-                # Create target language subdirectory for translated files
-                target_lang_dir = os.path.join(self.output_dir, target_lang)
-                os.makedirs(target_lang_dir, exist_ok=True)
                 # Create XHTML filename
                 filename = f"chapter_{chapter_number}.xhtml"
                 filepath = os.path.join(target_lang_dir, filename)
                 # Write translated XHTML content to file
                 with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(f'<html><body>{html_content}</body></html>')
+                    f.write(xhtml)
             except Exception as e:
-                print(f"Warning: Failed to save translated chapter {chapter_number} as XHTML: {e}")
-        
+                print(f"Warning: Failed to save translated chapter {chapter_number} as markdown: {e}")        
         # Create chapter for book
         translated_chapter = epub.EpubHtml(
-            title=f'Chapter {chapter_number}',
+            title=title or f'Chapter {chapter_number}',
             file_name=f'chapter_{chapter_number}.xhtml',
-            lang=self.get_language_code(target_lang)
+            lang=self.get_language_code(target_lang),
+            uid=f'chapter_{chapter_number}'
         )
-        translated_chapter.content = f'<html><body>{html_content}</body></html>'
+        translated_chapter.content = xhtml
         # Return the reconstructed chapter
         return translated_chapter
     
@@ -371,6 +339,8 @@ class EPUBTranslator:
             book (epub.EpubBook): The EPUB book object to finalize
             chapters (List[epub.EpubHtml]): List of chapter objects to include in navigation
         """
+        for chapter in chapters:
+            book.add_item(chapter)
         book.toc = tuple(chapters)
         book.add_item(epub.EpubNcx())
         book.add_item(epub.EpubNav())
@@ -1511,15 +1481,15 @@ class EPUBTranslator:
         if translated_chapters:
             self.book_finalize(translated_book, translated_chapters)
         # Save outputs
-        print(f"\n{'='*60}")
+        print(f"\n{'='*80}")
         print("Saving output files...")
         translated_path = os.path.join(self.output_dir, "translated.epub")
         epub.write_epub(translated_path, translated_book)
         print(f"✓ Translation saved: {translated_path}")
-        print(f"\n{'='*60}")
+        print(f"\n{'='*80}")
         print("Translation complete! 🎉")
-        print(f"{'='*60}")
-    
+        print(f"{'='*80}")
+
     def translate_context(self, texts: List[str], source_lang: str, target_lang: str):
         """Translate texts and add them to context without storing in database.
         
@@ -1865,6 +1835,27 @@ Return only a single integer number between 0 and 100."""
         report['overall_score'] = int(avg_fluency * 0.4 + avg_adequacy * 0.4 + report['consistency_score'] * 0.2)
         
         return report
+
+    def get_language_code(self, language_name: str) -> str:
+        """Get the first two letters of a language name in lowercase.
+        
+        This helper function extracts the first two characters from a language name
+        and converts them to lowercase. This is used for setting language codes in
+        EPUB files and other contexts where a short language code is needed.
+        
+        Args:
+            language_name (str): The language name (e.g., "English", "French")
+            
+        Returns:
+            str: The first two letters of the language name in lowercase (e.g., "en", "fr")
+                 Returns "en" as default if the input is empty or None
+        """
+        if not language_name:
+            return "en"  # default to English
+        # Get first 2 characters and convert to lowercase
+        lang_code = language_name.lower()[:2]
+        # Ensure we have a valid language code (default to 'en' if empty)
+        return lang_code if lang_code.strip() else "en"
 
 def main():
     """Command-line interface for BookLingua EPUB translation tool.
