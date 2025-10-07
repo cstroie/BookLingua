@@ -307,6 +307,24 @@ class EPUBTranslator:
             except Exception as e:
                 print(f"Warning: Failed to save translated chapter {chapter_number} as markdown: {e}")
         
+        # Convert translated content to HTML
+        html_content = self.text_to_html(translated_content)
+        
+        # Save translated chapter as XHTML if output directory exists
+        if self.output_dir and os.path.exists(self.output_dir):
+            try:
+                # Create target language subdirectory for translated files
+                target_lang_dir = os.path.join(self.output_dir, target_lang)
+                os.makedirs(target_lang_dir, exist_ok=True)
+                # Create XHTML filename
+                filename = f"chapter_{chapter_number}.xhtml"
+                filepath = os.path.join(target_lang_dir, filename)
+                # Write translated XHTML content to file
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(f'<html><body>{html_content}</body></html>')
+            except Exception as e:
+                print(f"Warning: Failed to save translated chapter {chapter_number} as XHTML: {e}")
+        
         # Create chapter for book
         # Ensure we have a valid language code (default to 'en' if empty or None)
         lang_code = 'en'  # default
@@ -320,7 +338,7 @@ class EPUBTranslator:
             file_name=f'chapter_{chapter_number}.xhtml',
             lang=lang_code
         )
-        translated_chapter.content = f'<html><body>{self.text_to_html(translated_content)}</body></html>'
+        translated_chapter.content = f'<html><body>{html_content}</body></html>'
         # Return the reconstructed chapter
         return translated_chapter
     
