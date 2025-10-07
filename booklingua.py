@@ -265,7 +265,7 @@ class EPUBTranslator:
         
         return new_book
 
-    def book_create_chapter(self, chapter_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
+    def book_create_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
         """Create an EPUB chapter from translated texts in the database.
         
         This function retrieves all translated paragraphs for a chapter from the database,
@@ -280,7 +280,7 @@ class EPUBTranslator:
             epub.EpubHtml: EPUB HTML item for the chapter
         """
         # Get all translated texts in the chapter
-        translated_texts = self.db_get_translations(chapter_number, source_lang, target_lang)
+        translated_texts = self.db_get_translations(edition_number, chapter_number, source_lang, target_lang)
         # Join all translated texts with double newlines
         translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
         # Create chapter for book
@@ -743,11 +743,6 @@ class EPUBTranslator:
             ''', (source_lang, target_lang, text))
             result = cursor.fetchone()
             if result:
-                # Push to context list for continuity
-                self.context.append((text, result[0]))
-                # Keep only the last N exchanges for better context
-                if len(self.context) > DEFAULT_CONTEXT_SIZE:
-                    self.context.pop(0)
                 return (result[0], result[1], result[2])  # (target, duration, fluency)
             return (None, None, None)
         except Exception as e:
@@ -755,7 +750,7 @@ class EPUBTranslator:
                 print(f"Database lookup failed: {e}")
             raise
 
-    def db_get_translations(self, chapter_number: int, source_lang: str, target_lang: str) -> List[str]:
+    def db_get_translations(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> List[str]:
         """Get all translated texts in a chapter from the database.
         
         This helper function retrieves all translated paragraphs for a specific chapter
@@ -780,9 +775,9 @@ class EPUBTranslator:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT target FROM translations 
-                WHERE chapter = ? AND source_lang = ? AND target_lang = ? 
+                WHERE edition = ? AND chapter = ? AND source_lang = ? AND target_lang = ? 
                 ORDER BY paragraph ASC
-            ''', (chapter_number, source_lang, target_lang))
+            ''', (edition_number, chapter_number, source_lang, target_lang))
             results = cursor.fetchall()
             # Return list of translated texts
             return [result[0] for result in results if result[0] is not None] if results else []
@@ -815,8 +810,8 @@ class EPUBTranslator:
                 WHERE source_lang = ? AND target_lang = ?
             ''', (source_lang, target_lang))
             result = cursor.fetchone()
-            # Return the latest edition number or -1 if none found
-            return result[0] if result and result[0] is not None else -1
+            # Return the latest edition number or 0 if none found
+            return result[0] if result and result[0] is not None else 0
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup for latest edition failed: {e}")
@@ -1068,21 +1063,21 @@ class EPUBTranslator:
             raise Exception("Database connection not available")
         # Get the latest edition number and increment it
         edition_number = self.db_get_latest_edition(source_lang, target_lang) + 1
-        # Save all paragraphs with empty translations
+        # Save all texts with empty translations
         try:
             for ch, chapter in enumerate(chapters):
-                paragraphs = chapter.get('paragraphs', [])
-                print(f"{(ch+1):>4}: {(len(paragraphs)):>6}  {chapter.get('name', 'Untitled Chapter')}")
-                for par, paragraph in enumerate(paragraphs):
-                    # Only save non-empty paragraphs
-                    if paragraph.strip():
+                texts = chapter.get('paragraphs', [])
+                print(f"{(ch+1):>4}: {(len(texts)):>6}  {chapter.get('name', 'Untitled Chapter')}")
+                for par, text in enumerate(texts):
+                    # Only save non-empty texts
+                    if text.strip():
                         # Insert with empty translation if not already there
                         cursor = self.conn.cursor()
                         cursor.execute('''
                             INSERT OR IGNORE INTO translations 
                             (source_lang, target_lang, source, target, model, edition, chapter, paragraph)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (source_lang, target_lang, paragraph, '', self.model, edition_number, ch+1, par+1))
+                        ''', (source_lang, target_lang, text, '', self.model, edition_number, ch+1, par+1))
             self.conn.commit()
             if self.verbose:
                 print(f"... with {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs from all chapters.")
@@ -1117,6 +1112,11 @@ class EPUBTranslator:
             # Check database first
             cached_result = self.db_get_translation(text, source_lang, target_lang)
             if cached_result[0]:
+                # Push to context list for continuity
+                self.context.append((text, result[0]))
+                # Keep only the last N exchanges for better context
+                if len(self.context) > DEFAULT_CONTEXT_SIZE:
+                    self.context.pop(0)
                 if self.verbose:
                     print("✓ Using cached translation")
                 return cached_result[0]  # Return only the translated text
@@ -1334,16 +1334,15 @@ class EPUBTranslator:
         # Get chapter list first
         chapter_list = self.db_get_chapters(source_lang, target_lang)
         # Pre-fill context
-        first_chapter = chapter_list[0] if chapter_list else None
-        self.prefill_context(source_lang, target_lang, first_chapter)
+        self.prefill_context(source_lang, target_lang)
         # Process each chapter
         for chapter_number in chapter_list:
-            self.translate_chapter(edition_number,chapter_number, source_lang, target_lang, len(chapter_list))
+            self.translate_chapter(edition_number, chapter_number, source_lang, target_lang, len(chapter_list))
         # Prepare output book
         translated_book = self.book_create_template(book)
         translated_chapters = []
         for chapter_number in chapter_list:
-            translated_chapters.append(self.book_create_chapter(chapter_number, source_lang, target_lang))
+            translated_chapters.append(self.book_create_chapter(edition_number, chapter_number, source_lang, target_lang))
         # Use the database-retrieved chapters if available
         if translated_chapters:
             self.book_finalize(translated_book, translated_chapters)
@@ -1386,7 +1385,7 @@ class EPUBTranslator:
             finally:
                 print()
 
-    def prefill_context(self, source_lang: str, target_lang: str, chapter_number: int = None):
+    def prefill_context(self, source_lang: str, target_lang: str):
         """Pre-fill translation context with existing translations or random paragraphs.
         
         This method first tries to use existing translations from the database to
