@@ -701,16 +701,16 @@ class EPUBTranslator:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     source_lang TEXT NOT NULL,
                     target_lang TEXT NOT NULL,
-                    source_text TEXT NOT NULL,
-                    translated_text TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    target TEXT NOT NULL,
                     model TEXT NOT NULL,
-                    chapter_number INTEGER,
-                    paragraph_number INTEGER,
-                    processing_time INTEGER,
-                    fluency_score INTEGER,
                     edition INTEGER DEFAULT -1,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(source_lang, target_lang, chapter_number, paragraph_number)
+                    chapter INTEGER DEFAULT -1,
+                    paragraph INTEGER DEFAULT -1,
+                    duration INTEGER DEFAULT -1,
+                    fluency INTEGER DEFAULT 1,
+                    created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(source_lang, target_lang, edition, chapter, paragraph)
                 )
             ''')
             self.conn.commit()
@@ -727,7 +727,7 @@ class EPUBTranslator:
             target_lang (str): Target language code
             
         Returns:
-            tuple: (translated_text, processing_time, fluency_score) if found, (None, None, None) otherwise
+            tuple: (target, duration, fluency) if found, (None, None, None) otherwise
             
         Raises:
             Exception: If database connection is not available
@@ -738,8 +738,8 @@ class EPUBTranslator:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT translated_text, processing_time, fluency_score FROM translations 
-                WHERE source_lang = ? AND target_lang = ? AND source_text = ? AND translated_text != ''
+                SELECT target, duration, fluency FROM translations 
+                WHERE source_lang = ? AND target_lang = ? AND source = ? AND target != ''
             ''', (source_lang, target_lang, text))
             result = cursor.fetchone()
             if result:
@@ -748,7 +748,7 @@ class EPUBTranslator:
                 # Keep only the last N exchanges for better context
                 if len(self.context) > DEFAULT_CONTEXT_SIZE:
                     self.context.pop(0)
-                return (result[0], result[1], result[2])  # (translated_text, processing_time, fluency_score)
+                return (result[0], result[1], result[2])  # (target, duration, fluency)
             return (None, None, None)
         except Exception as e:
             if self.verbose:
@@ -779,9 +779,9 @@ class EPUBTranslator:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT translated_text FROM translations 
-                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
-                ORDER BY paragraph_number ASC
+                SELECT target FROM translations 
+                WHERE chapter = ? AND source_lang = ? AND target_lang = ? 
+                ORDER BY paragraph ASC
             ''', (chapter_number, source_lang, target_lang))
             results = cursor.fetchall()
             # Return list of translated texts
@@ -811,9 +811,9 @@ class EPUBTranslator:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT DISTINCT chapter_number FROM translations 
+                SELECT DISTINCT chapter FROM translations 
                 WHERE source_lang = ? AND target_lang = ? 
-                ORDER BY chapter_number ASC
+                ORDER BY chapter ASC
             ''', (source_lang, target_lang))
             results = cursor.fetchall()
             # Return list of chapter numbers
@@ -833,7 +833,7 @@ class EPUBTranslator:
             target_lang (str): Target language code
             
         Returns:
-            tuple: (paragraph_number, source_text, translated_text) of the next paragraph,
+            tuple: (paragraph_number, source, target) of the next paragraph,
                    or (None, None, None) if there is no next paragraph
                    
         Raises:
@@ -846,10 +846,10 @@ class EPUBTranslator:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT paragraph_number, source_text, translated_text FROM translations 
-                WHERE chapter_number = ? AND paragraph_number > ? 
+                SELECT paragraph, source, target FROM translations 
+                WHERE chapter = ? AND paragraph > ? 
                 AND source_lang = ? AND target_lang = ? 
-                ORDER BY paragraph_number ASC LIMIT 1
+                ORDER BY paragraph ASC LIMIT 1
             ''', (chapter_number, paragraph_number, source_lang, target_lang))
             result = cursor.fetchone()
             # Return the result or None if not found
@@ -881,7 +881,7 @@ class EPUBTranslator:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT COUNT(*) FROM translations 
-                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ?
+                WHERE chapter = ? AND source_lang = ? AND target_lang = ?
             ''', (chapter_number, source_lang, target_lang))
             result = cursor.fetchone()
             return result[0] if result else 0
@@ -912,13 +912,13 @@ class EPUBTranslator:
             # Single query to get all statistics
             cursor.execute('''
                 SELECT 
-                    AVG(processing_time) as avg_time,
-                    SUM(processing_time) as elapsed_time,
+                    AVG(duration) as avg_time,
+                    SUM(duration) as elapsed_time,
                     COUNT(*) as total_paragraphs,
-                    COUNT(CASE WHEN translated_text IS NOT NULL AND translated_text != '' THEN 1 END) as translated_paragraphs
+                    COUNT(CASE WHEN target IS NOT NULL AND target != '' THEN 1 END) as translated_paragraphs
                 FROM translations 
-                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
-                AND processing_time IS NOT NULL
+                WHERE chapter = ? AND source_lang = ? AND target_lang = ? 
+                AND duration IS NOT NULL
             ''', (chapter_number, source_lang, target_lang))
             result = cursor.fetchone()
             # Calculate
@@ -962,15 +962,15 @@ class EPUBTranslator:
             # Count total paragraphs in the chapter
             cursor.execute('''
                 SELECT COUNT(*) FROM translations 
-                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ?
+                WHERE chapter = ? AND source_lang = ? AND target_lang = ?
             ''', (chapter_number, source_lang, target_lang))
             total_result = cursor.fetchone()
             total_paragraphs = total_result[0] if total_result else 0
             # Count paragraphs with empty translations
             cursor.execute('''
                 SELECT COUNT(*) FROM translations 
-                WHERE chapter_number = ? AND source_lang = ? AND target_lang = ? 
-                AND (translated_text IS NULL OR translated_text = '')
+                WHERE chapter = ? AND source_lang = ? AND target_lang = ? 
+                AND (target IS NULL OR target = '')
             ''', (chapter_number, source_lang, target_lang))
             empty_result = cursor.fetchone()
             empty_paragraphs = empty_result[0] if empty_result else 0
@@ -983,7 +983,7 @@ class EPUBTranslator:
     
     def db_save_translation(self, text: str, translation: str, source_lang: str, target_lang: str, 
                             chapter_number: int = None, paragraph_number: int = None, 
-                            processing_time: int = None, fluency_score: int = None):
+                            duration: int = None, fluency: int = None):
         """Save a translation to the database.
         
         Args:
@@ -993,8 +993,8 @@ class EPUBTranslator:
             target_lang (str): Target language code
             chapter_number (int, optional): Chapter number for this translation
             paragraph_number (int, optional): Paragraph number within the chapter
-            processing_time (int, optional): Time taken to process translation in milliseconds
-            fluency_score (int, optional): Fluency score of the translation as percentage
+            duration (int, optional): Time taken to process translation in milliseconds
+            fluency (int, optional): Fluency score of the translation as percentage
             
         Raises:
             Exception: If database connection is not available
@@ -1005,9 +1005,9 @@ class EPUBTranslator:
             cursor = self.conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO translations 
-                (source_lang, target_lang, source_text, translated_text, model, chapter_number, paragraph_number, processing_time, fluency_score)
+                (source_lang, target_lang, source, target, model, chapter, paragraph, duration, fluency)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (source_lang, target_lang, text, translation, self.model, chapter_number, paragraph_number, processing_time, fluency_score))
+            ''', (source_lang, target_lang, text, translation, self.model, chapter_number, paragraph_number, duration, fluency))
             self.conn.commit()
         except Exception as e:
             if self.verbose:
@@ -1043,7 +1043,7 @@ class EPUBTranslator:
                         cursor = self.conn.cursor()
                         cursor.execute('''
                             INSERT OR IGNORE INTO translations 
-                            (source_lang, target_lang, source_text, translated_text, model, chapter_number, paragraph_number)
+                            (source_lang, target_lang, source, target, model, chapter, paragraph)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
                         ''', (source_lang, target_lang, paragraph, '', self.model, ch+1, par+1))
             self.conn.commit()
@@ -1160,33 +1160,33 @@ class EPUBTranslator:
         # Get the next chapter's paragraph from database
         par = 0
         while True:
-            par, source_text, translated_text = self.db_get_next_paragraph(chapter_number, par, source_lang, target_lang)
+            par, source, target = self.db_get_next_paragraph(chapter_number, par, source_lang, target_lang)
             if par:
                 print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}")
                 # Check if already translated
-                if translated_text:
+                if target:
                     if self.verbose:
                         print("✓ Using cached paragraph translation")
-                        print(f"{source_lang}: {source_text}")
-                        print(f"{target_lang}: {translated_text}")
+                        print(f"{source_lang}: {source}")
+                        print(f"{target_lang}: {target}")
                     # Already translated, skip
                     continue
                 # Translate paragraph
-                if source_text.strip() and len(source_text.split()) < 1000:
+                if source.strip() and len(source.split()) < 1000:
                     if self.verbose:
-                        print(f"{source_lang}: {source_text}")
+                        print(f"{source_lang}: {source}")
                     # Time the translation
                     start_time = datetime.now()
-                    translated_text = self.translate_text(source_text, source_lang, target_lang)
+                    target = self.translate_text(source, source_lang, target_lang)
                     end_time = datetime.now()
                     if self.verbose:
-                        print(f"{target_lang}: {translated_text}")
+                        print(f"{target_lang}: {target}")
                     # Calculate and store timing
                     elapsed = int((end_time - start_time).total_seconds() * 1000)  # Convert to milliseconds
                     # Calculate fluency score
-                    fluency = self.calculate_fluency_score(translated_text)
+                    fluency = self.calculate_fluency_score(target)
                     # Save to database with timing and fluency info
-                    self.db_save_translation(source_text, translated_text, source_lang, target_lang,
+                    self.db_save_translation(source, target, source_lang, target_lang,
                                              chapter_number, par, elapsed, fluency)
                     # Calculate statistics for current chapter only
                     avg_time, elapsed_time, remaining_time = self.db_chapter_stats(chapter_number, source_lang, target_lang)                 
@@ -1208,8 +1208,8 @@ class EPUBTranslator:
             if translated_texts:
                 chapter_content = '\n\n'.join(translated_texts)
                 # Calculate fluency score for the chapter
-                fluency_score = self.calculate_fluency_score(chapter_content)
-                print(f"Chapter {chapter_number} fluency score: {fluency_score}%")
+                fluency = self.calculate_fluency_score(chapter_content)
+                print(f"Chapter {chapter_number} fluency score: {fluency}%")
                 # Detect translation errors
                 error_counts = self.detect_translation_errors("", chapter_content, source_lang)
                 total_errors = sum(error_counts.values())
@@ -1377,23 +1377,23 @@ class EPUBTranslator:
                 cursor = self.conn.cursor()
                 # Priority 1: Try to get existing translations
                 cursor.execute('''
-                    SELECT source_text, translated_text FROM translations 
-                    WHERE source_lang = ? AND target_lang = ? AND translated_text != ''
-                    AND length(source_text) > 50
+                    SELECT source, target FROM translations 
+                    WHERE source_lang = ? AND target_lang = ? AND target != ''
+                    AND length(source) > 50
                     ORDER BY id DESC LIMIT ?
                 ''', (source_lang, target_lang, DEFAULT_PREFILL_CONTEXT_SIZE))
                 translated_results = cursor.fetchall()
                 # Add to context in chronological order (oldest first)
-                for source_text, translated_text in reversed(translated_results):
-                    self.context.append((source_text, translated_text))
+                for source, target in reversed(translated_results):
+                    self.context.append((source, target))
                 # If we still need more context, continue with other priorities
                 if len(self.context) < DEFAULT_PREFILL_CONTEXT_SIZE:
                     needed_count = DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context)
                 # Priority 2: Get untranslated paragraphs
                 cursor.execute('''
-                    SELECT source_text FROM translations 
-                    WHERE source_lang = ? AND target_lang = ? AND translated_text = ''
-                    AND length(source_text) > 50
+                    SELECT source FROM translations 
+                    WHERE source_lang = ? AND target_lang = ? AND target = ''
+                    AND length(source) > 50
                     ORDER BY RANDOM() LIMIT ?
                 ''', (source_lang, target_lang, needed_count))
                 untranslated_results = cursor.fetchall()
