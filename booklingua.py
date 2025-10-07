@@ -1308,14 +1308,15 @@ class EPUBTranslator:
                     continue
                 # Translate paragraph
                 if source.strip() and len(source.split()) < 1000:
-                    if self.verbose:
-                        print(f"{source_lang}: {source}")
+                    #if self.verbose:
+                        #print(f"{source_lang}: {source}")
                     # Time the translation
                     start_time = datetime.now()
                     target = self.translate_text(source, source_lang, target_lang)
                     end_time = datetime.now()
                     if self.verbose:
-                        print(f"{target_lang}: {target}")
+                        #print(f"{target_lang}: {target}")
+                        self.display_side_by_side(source, target)
                     # Calculate and store timing
                     elapsed = int((end_time - start_time).total_seconds() * 1000)  # Convert to milliseconds
                     # Calculate fluency score
@@ -1777,7 +1778,7 @@ Return only a single integer number between 0 and 100."""
             formatted_left = left_line.ljust(LEFT_WIDTH)
             
             # Format right line with left padding
-            formatted_right = right_line.rjust(RIGHT_WIDTH)
+            formatted_right = right_line.ljust(RIGHT_WIDTH)
             
             # Combine with margins and gap
             display_line = ' ' * MARGIN + formatted_left + ' ' * GAP + formatted_right + ' ' * MARGIN
