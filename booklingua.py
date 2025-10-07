@@ -1523,20 +1523,22 @@ class EPUBTranslator:
                 for source, target in reversed(translated_results):
                     self.context.append((source, target))
                 # If we still need more context, continue with other priorities
+                needed_count = 0  # Initialize needed_count
                 if len(self.context) < DEFAULT_PREFILL_CONTEXT_SIZE:
                     needed_count = DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context)
-                # Priority 2: Get untranslated paragraphs
-                cursor.execute('''
-                    SELECT source FROM translations 
-                    WHERE source_lang = ? AND target_lang = ? AND target = ''
-                    AND length(source) > 50
-                    ORDER BY RANDOM() LIMIT ?
-                ''', (source_lang, target_lang, needed_count))
-                untranslated_results = cursor.fetchall()
-                # Get the texts and translate them
-                selected_texts = [row[0] for row in untranslated_results]
-                if selected_texts:
-                    self.translate_context(selected_texts, source_lang, target_lang)
+                # Priority 2: Get untranslated paragraphs (only if we need more)
+                if needed_count > 0:
+                    cursor.execute('''
+                        SELECT source FROM translations 
+                        WHERE source_lang = ? AND target_lang = ? AND target = ''
+                        AND length(source) > 50
+                        ORDER BY RANDOM() LIMIT ?
+                    ''', (source_lang, target_lang, needed_count))
+                    untranslated_results = cursor.fetchall()
+                    # Get the texts and translate them
+                    selected_texts = [row[0] for row in untranslated_results]
+                    if selected_texts:
+                        self.translate_context(selected_texts, source_lang, target_lang)
             except Exception as e:
                 if self.verbose:
                     print(f"Database context prefill failed: {e}")
