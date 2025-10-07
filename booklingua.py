@@ -708,6 +708,7 @@ class EPUBTranslator:
                     paragraph_number INTEGER,
                     processing_time INTEGER,
                     fluency_score INTEGER,
+                    edition INTEGER DEFAULT -1,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(source_lang, target_lang, chapter_number, paragraph_number)
                 )
