@@ -287,16 +287,7 @@ class EPUBTranslator:
         translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
         # Convert translated content to HTML and extract title
         title, html_content = self.markdown_to_html(translated_content)
-        xhtml = """<?xml version="1.0" encoding="utf-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="{lang}">
-<head><title>{title}</title></head>
-<body>
-<article id="{id}">
-{content}
-</article>
-</body>
-</html>
-""".format(title=title, content=html_content, id=f'chapter_{chapter_number}', lang=self.get_language_code(target_lang))
+        xhtml = '<article id="{id}">{content}</article>'.format(content=html_content, id=f'chapter_{chapter_number}')
         # Save translated chapter as markdown if output directory exists
         if self.output_dir and os.path.exists(self.output_dir):
             try:
@@ -1124,6 +1115,8 @@ class EPUBTranslator:
             raise Exception("Database connection not available")
         # Get the latest edition number and increment it
         edition_number = self.db_get_latest_edition(source_lang, target_lang) + 1
+        if self.verbose:
+            print(f"Saving chapters as edition {edition_number}...")
         # Save all texts with empty translations
         try:
             for ch, chapter in enumerate(chapters):
@@ -1134,11 +1127,17 @@ class EPUBTranslator:
                     if text.strip():
                         # Insert with empty translation if not already there
                         cursor = self.conn.cursor()
+                        # Get an existing translation for this text if it exists
+                        (target, duration, fluency) = self.db_get_translation(text, source_lang, target_lang)
+                        if target is None:
+                            target = ""
+                            duration = -1
+                            fluency = -1
                         cursor.execute('''
                             INSERT OR IGNORE INTO translations 
-                            (source_lang, target_lang, source, target, model, edition, chapter, paragraph)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (source_lang, target_lang, text, '', self.model, edition_number, ch+1, par+1))
+                            (source_lang, target_lang, source, target, model, edition, chapter, paragraph, duration, fluency)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (source_lang, target_lang, text, target, self.model, edition_number, ch+1, par+1, duration, fluency))
             self.conn.commit()
             if self.verbose:
                 print(f"... with {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs from all chapters.")
@@ -1284,9 +1283,9 @@ class EPUBTranslator:
             target_lang (str): Target language code
             total_chapters (int): Total number of chapters in the book
         """
-        print(f"\n{'='*60}")
+        print(f"\n{'='*80}")
         print(f"Chapter {chapter_number}/{total_chapters}")
-        print(f"{'='*60}")
+        print(f"{'-'*80}")
         # Check if chapter is fully translated
         if self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
             if self.verbose:
@@ -1305,26 +1304,24 @@ class EPUBTranslator:
         while True:
             par, source, target = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
             if par:
-                if self.verbose:
-                    print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}")
                 # Check if already translated
                 if target:
                     if self.verbose:
-                        print("✓ Using cached paragraph translation")
-                        print(f"{source_lang}: {source}")
-                        print(f"{target_lang}: {target}")
+                        print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}    ✓ Using cached paragraph translation")
+                        print(f"{'~'*80}")
+                        self.display_side_by_side(source, target, 80)
+                        print(f"{'~'*80}")
                     # Already translated, skip
                     continue
                 # Translate paragraph
                 if source.strip() and len(source.split()) < 1000:
-                    #if self.verbose:
-                        #print(f"{source_lang}: {source}")
+                    if self.verbose:
+                        print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}")
                     # Time the translation
                     start_time = datetime.now()
                     target = self.translate_text(source, source_lang, target_lang)
                     end_time = datetime.now()
                     if self.verbose:
-                        #print(f"{target_lang}: {target}")
                         print(f"{'~'*80}")
                         self.display_side_by_side(source, target, 80)
                         print(f"{'~'*80}")
@@ -1346,7 +1343,7 @@ class EPUBTranslator:
         # Show chapter completion time
         chapter_end_time = datetime.now()
         chapter_duration_ms = int((chapter_end_time - chapter_start_time).total_seconds() * 1000)
-        print(f"Chapter {chapter_number} translation completed in {chapter_duration_ms/1000:.2f}s")
+        print(f"Translation completed in {chapter_duration_ms/1000:.2f}s")
         # Run quality checks at the end of chapter translation
         try:
             # Get all translated texts in the chapter for quality assessment
@@ -1355,20 +1352,20 @@ class EPUBTranslator:
                 chapter_content = '\n\n'.join(translated_texts)
                 # Calculate fluency score for the chapter
                 fluency = self.calculate_fluency_score(chapter_content)
-                print(f"Chapter {chapter_number} fluency score: {fluency}%")
+                print(f"Fluency score: {fluency}%")
                 # Detect translation errors
                 error_counts = self.detect_translation_errors("", chapter_content, source_lang)
                 total_errors = sum(error_counts.values())
                 if total_errors > 0:
-                    print(f"Chapter {chapter_number} translation errors detected: {total_errors}")
+                    print(f"Translation errors detected: {total_errors}")
                     for error_type, count in error_counts.items():
                         if count > 0:
                             print(f"  - {error_type.replace('_', ' ').title()}: {count}")
                 else:
-                    print(f"Chapter {chapter_number} passed error checks")
+                    print(f"Error checks: passed.")
                 # Check terminology consistency within the chapter
                 consistency_score = self.calculate_consistency_score([{'content': chapter_content}])
-                print(f"Chapter {chapter_number} consistency score: {consistency_score}%")
+                print(f"Consistency score: {consistency_score}%")
         except Exception as e:
             if self.verbose:
                 print(f"Warning: Quality checks failed for chapter {chapter_number}: {e}")
@@ -1436,7 +1433,7 @@ class EPUBTranslator:
             self.output_dir = output_dir
             os.makedirs(self.output_dir, exist_ok=True)
         # Load book and extract text
-        print(f"{'='*60}")
+        print(f"{'='*80}")
         print(f"Translating from {source_lang} to {target_lang}")
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path, options={'ignore_ncx': False})
@@ -1486,8 +1483,8 @@ class EPUBTranslator:
         translated_path = os.path.join(self.output_dir, "translated.epub")
         epub.write_epub(translated_path, translated_book)
         print(f"✓ Translation saved: {translated_path}")
-        print(f"\n{'='*80}")
-        print("Translation complete! 🎉")
+        print(f"{'='*80}")
+        print("Translation complete!")
         print(f"{'='*80}")
 
     def translate_context(self, texts: List[str], source_lang: str, target_lang: str):
