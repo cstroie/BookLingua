@@ -1331,7 +1331,8 @@ class EPUBTranslator:
                 print(f"Warning: Quality checks failed for chapter {chapter_number}: {e}")
     
     def translate_epub(self, input_path: str, output_dir: str = "output", 
-                      source_lang: str = "English", target_lang: str = "Romanian"):
+                      source_lang: str = "English", target_lang: str = "Romanian",
+                      chapter_number: int = None):
         """Translate EPUB books using direct translation method.
         
         This method provides a translation workflow for EPUB books,
@@ -1345,6 +1346,8 @@ class EPUBTranslator:
                 Defaults to "output". The directory will be created if it doesn't exist.
             source_lang (str, optional): Source language name. Defaults to "English".
             target_lang (str, optional): Target language name. Defaults to "Romanian".
+            chapter_number (int, optional): Specific chapter number to translate.
+                If None, translates all chapters. Defaults to None.
                 
         Returns:
             None: Results are saved to files in the specified output directory.
@@ -1376,9 +1379,10 @@ class EPUBTranslator:
             ...     input_path="book.epub",
             ...     output_dir="translations",
             ...     source_lang="English",
-            ...     target_lang="Romanian"
+            ...     target_lang="Romanian",
+            ...     chapter_number=3
             ... )
-            # Creates: translations/translated.epub
+            # Creates: translations/translated.epub with only chapter 3
         """
         # Update database path if not set during initialization
         if not self.db_path and input_path:
@@ -1398,11 +1402,21 @@ class EPUBTranslator:
         edition_number = self.db_save_chapters(chapters, source_lang, target_lang)
         # Get chapter list first
         chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number)
+        
+        # If specific chapter requested, filter the list
+        if chapter_number is not None:
+            if chapter_number in chapter_list:
+                chapter_list = [chapter_number]
+                print(f"Translating only chapter {chapter_number}")
+            else:
+                print(f"Warning: Chapter {chapter_number} not found in database")
+                return
+        
         # Pre-fill context
         self.prefill_context(source_lang, target_lang, None)
         # Process each chapter
-        for chapter_number in chapter_list:
-            self.translate_chapter(edition_number, chapter_number, source_lang, target_lang, len(chapter_list))
+        for chapter_num in chapter_list:
+            self.translate_chapter(edition_number, chapter_num, source_lang, target_lang, len(chapter_list))
         # Prepare output book
         translated_book = self.book_create_template(book)
         translated_chapters = []
@@ -1784,6 +1798,7 @@ def main():
     parser.add_argument("-u", "--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
     parser.add_argument("-m", "--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
     parser.add_argument("-k", "--api-key", help="API key for the translation service")
+    parser.add_argument("-c", "--chapter", type=int, help="Specific chapter number to translate (default: all chapters)")
     
     # Preset configurations for common services
     parser.add_argument("--openai", action="store_true", help="Use OpenAI API")
@@ -1859,7 +1874,8 @@ def main():
         input_path=args.input,
         output_dir=output_dir,
         source_lang=source_lang,
-        target_lang=target_lang
+        target_lang=target_lang,
+        chapter_number=args.chapter
     )
 
 # Run main function if executed as script
