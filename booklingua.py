@@ -1869,6 +1869,10 @@ class EPUBTranslator:
         if width < 20:
             width = 20  # Minimum reasonable width
         self.console_width = width
+        # Create separator strings with repeating characters for the new width
+        self.equal_separator = '=' * self.console_width
+        self.dash_separator = '-' * self.console_width
+        self.tilde_separator = '~' * self.console_width
         if self.verbose:
             print(f"Console width set to {width} characters")
 
