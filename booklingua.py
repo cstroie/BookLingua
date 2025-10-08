@@ -1613,6 +1613,185 @@ class EPUBTranslator:
             if self.verbose:
                 print(f"Warning: Quality checks failed for chapter {chapter_number}: {e}")
     
+    def import_phase(self, input_path: str, output_dir: str = "output", source_lang: str = "English"):
+        """Import phase: Extract content from EPUB and save to database.
+        
+        This method handles the import phase of the translation workflow, which includes:
+        1. Reading the EPUB file
+        2. Extracting text content from all chapters
+        3. Saving the content to the database for later translation
+        
+        Args:
+            input_path (str): Path to the input EPUB file
+            output_dir (str, optional): Directory for output files. Defaults to "output".
+            source_lang (str, optional): Source language name. Defaults to "English".
+        """
+        # Update database path if not set during initialization
+        if not self.db_path and input_path:
+            self.db_path = os.path.splitext(input_path)[0] + '.db'
+            self.db_init()
+        # Create output directory if it doesn't exist
+        if output_dir:
+            self.output_dir = output_dir
+            os.makedirs(self.output_dir, exist_ok=True)
+        # Load book and extract text
+        print(f"{self.sep1}")
+        print(f"Importing content from {input_path}...")
+        book = epub.read_epub(input_path, options={'ignore_ncx': False})
+        chapters = self.book_extract_content(book, source_lang)
+        # Save all content to database
+        edition_number = self.db_save_chapters(chapters, source_lang, "temp")
+        print(f"Import completed. Saved {len(chapters)} chapters to database.")
+        print(f"{self.sep1}")
+
+    def translate_phase(self, source_lang: str = "English", target_lang: str = "Romanian", 
+                       chapter_numbers: str = None):
+        """Translate phase: Translate content from database using AI.
+        
+        This method handles the translation phase of the workflow, which includes:
+        1. Loading content from the database
+        2. Translating chapters using the AI model
+        3. Saving translations back to the database
+        
+        Args:
+            source_lang (str, optional): Source language name. Defaults to "English".
+            target_lang (str, optional): Target language name. Defaults to "Romanian".
+            chapter_numbers (str, optional): Comma-separated list of chapter numbers to translate.
+        """
+        if not self.conn:
+            raise Exception("Database connection not available")
+        
+        # Get the latest edition number
+        edition_number = self.db_get_latest_edition(source_lang, "temp")
+        if edition_number == 0:
+            print("No content found in database. Please run import phase first.")
+            return
+            
+        # Update edition to proper target language
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            UPDATE translations 
+            SET target_lang = ?
+            WHERE source_lang = ? AND target_lang = 'temp'
+        ''', (target_lang, source_lang))
+        self.conn.commit()
+        
+        print(f"{self.sep1}")
+        print(f"Translating from {source_lang} to {target_lang}")
+        # Get chapter list first, ordered by number of paragraphs
+        chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, True)
+        # If specific chapters requested, filter the list
+        if chapter_numbers is not None:
+            try:
+                # Parse comma-separated list of chapter numbers
+                requested_chapters = [int(ch.strip()) for ch in chapter_numbers.split(',')]
+                # Filter to only include chapters that exist in the database
+                filtered_chapters = [ch for ch in chapter_list if ch in requested_chapters]
+                # Check for any chapters that don't exist
+                missing_chapters = [ch for ch in requested_chapters if ch not in chapter_list]
+                if missing_chapters:
+                    print(f"Warning: Chapters {missing_chapters} not found in database")
+                if filtered_chapters:
+                    chapter_list = filtered_chapters
+                    print(f"Translating chapters: {', '.join(map(str, filtered_chapters))}")
+                else:
+                    print("Warning: None of the requested chapters were found in database")
+                    return
+            except ValueError:
+                print("Error: Chapter numbers must be comma-separated integers")
+                return
+        # Process each chapter
+        for chapter_num in chapter_list:
+            self.translate_chapter(edition_number, chapter_num, source_lang, target_lang, len(chapter_list))
+        print(f"Translation phase completed.")
+        print(f"{self.sep1}")
+
+    def build_phase(self, input_path: str, output_dir: str = "output", 
+                   source_lang: str = "English", target_lang: str = "Romanian",
+                   chapter_numbers: str = None):
+        """Build phase: Create translated EPUB from database translations.
+        
+        This method handles the build phase of the workflow, which includes:
+        1. Loading translated content from the database
+        2. Creating a new EPUB with the translated content
+        3. Saving the final EPUB file
+        
+        Args:
+            input_path (str): Path to the original input EPUB file
+            output_dir (str, optional): Directory for output files. Defaults to "output".
+            source_lang (str, optional): Source language name. Defaults to "English".
+            target_lang (str, optional): Target language name. Defaults to "Romanian".
+            chapter_numbers (str, optional): Comma-separated list of chapter numbers to include.
+        """
+        # Update database path if not set during initialization
+        if not self.db_path and input_path:
+            self.db_path = os.path.splitext(input_path)[0] + '.db'
+            self.db_init()
+        # Create output directory if it doesn't exist
+        if output_dir:
+            self.output_dir = output_dir
+            os.makedirs(self.output_dir, exist_ok=True)
+            
+        if not self.conn:
+            raise Exception("Database connection not available")
+        
+        # Get the latest edition number
+        edition_number = self.db_get_latest_edition(source_lang, target_lang)
+        if edition_number == 0:
+            print("No translations found in database. Please run translation phase first.")
+            return
+            
+        print(f"{self.sep1}")
+        print(f"Building translated EPUB from {source_lang} to {target_lang}")
+        # Load original book for template
+        book = epub.read_epub(input_path, options={'ignore_ncx': False})
+        # Get chapter list
+        chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, False)
+        # If specific chapters requested, filter the list
+        if chapter_numbers is not None:
+            try:
+                # Parse comma-separated list of chapter numbers
+                requested_chapters = [int(ch.strip()) for ch in chapter_numbers.split(',')]
+                # Filter to only include chapters that exist in the database
+                filtered_chapters = [ch for ch in chapter_list if ch in requested_chapters]
+                # Check for any chapters that don't exist
+                missing_chapters = [ch for ch in requested_chapters if ch not in chapter_list]
+                if missing_chapters:
+                    print(f"Warning: Chapters {missing_chapters} not found in database")
+                if filtered_chapters:
+                    chapter_list = filtered_chapters
+                    print(f"Building with chapters: {', '.join(map(str, filtered_chapters))}")
+                else:
+                    print("Warning: None of the requested chapters were found in database")
+                    return
+            except ValueError:
+                print("Error: Chapter numbers must be comma-separated integers")
+                return
+        # Prepare output book
+        translated_book = self.book_create_template(book, target_lang)
+        translated_chapters = []
+        for chapter_number in chapter_list:
+            # Only include chapters that are fully translated
+            if self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
+                translated_chapters.append(self.book_create_chapter(edition_number, chapter_number, source_lang, target_lang))
+            else:
+                print(f"Warning: Chapter {chapter_number} is not fully translated and will be skipped")
+        # Use the database-retrieved chapters if available
+        if translated_chapters:
+            self.book_finalize(translated_book, translated_chapters)
+        # Save outputs
+        print(f"\n{self.sep1}")
+        print("Saving output files...")
+        # Create filename with original name + language edition
+        original_filename = os.path.splitext(os.path.basename(input_path))[0]
+        translation_filename = f"{original_filename} {target_lang.lower()}.epub"
+        translated_path = os.path.join(self.output_dir, translation_filename)
+        epub.write_epub(translated_path, translated_book)
+        print(f"✓ Translation saved: {translated_path}")
+        print(f"{self.sep1}")
+        print("Build phase completed!")
+        print(f"{self.sep1}")
+
     def translate_epub(self, input_path: str, output_dir: str = "output", 
                       source_lang: str = "English", target_lang: str = "Romanian",
                       chapter_numbers: str = None):
@@ -1677,71 +1856,10 @@ class EPUBTranslator:
             # Creates: translations/book Romanian.epub with only chapters 3, 5, and 7
             # Also creates: translations/English/ and translations/Romanian/ directories
         """
-        # Update database path if not set during initialization
-        if not self.db_path and input_path:
-            self.db_path = os.path.splitext(input_path)[0] + '.db'
-            self.db_init()
-        # Create output directory if it doesn't exist
-        if output_dir:
-            self.output_dir = output_dir
-            os.makedirs(self.output_dir, exist_ok=True)
-        # Load book and extract text
-        print(f"{self.sep1}")
-        print(f"Translating from {source_lang} to {target_lang}")
-        print(f"Reading EPUB from {input_path}...")
-        book = epub.read_epub(input_path, options={'ignore_ncx': False})
-        chapters = self.book_extract_content(book, source_lang)
-        # Save all content to database
-        edition_number = self.db_save_chapters(chapters, source_lang, target_lang)
-        # Get chapter list first, ordered by number of paragraphs
-        chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, True)
-        # If specific chapters requested, filter the list
-        if chapter_numbers is not None:
-            try:
-                # Parse comma-separated list of chapter numbers
-                requested_chapters = [int(ch.strip()) for ch in chapter_numbers.split(',')]
-                # Filter to only include chapters that exist in the database
-                filtered_chapters = [ch for ch in chapter_list if ch in requested_chapters]
-                # Check for any chapters that don't exist
-                missing_chapters = [ch for ch in requested_chapters if ch not in chapter_list]
-                if missing_chapters:
-                    print(f"Warning: Chapters {missing_chapters} not found in database")
-                if filtered_chapters:
-                    chapter_list = filtered_chapters
-                    print(f"Translating chapters: {', '.join(map(str, filtered_chapters))}")
-                else:
-                    print("Warning: None of the requested chapters were found in database")
-                    return
-            except ValueError:
-                print("Error: Chapter numbers must be comma-separated integers")
-                return
-        # Process each chapter
-        for chapter_num in chapter_list:
-            self.translate_chapter(edition_number, chapter_num, source_lang, target_lang, len(chapter_list))
-        # Prepare output book
-        translated_book = self.book_create_template(book, target_lang)
-        translated_chapters = []
-        for chapter_number in chapter_list:
-            # Only include chapters that are fully translated
-            if self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
-                translated_chapters.append(self.book_create_chapter(edition_number, chapter_number, source_lang, target_lang))
-            else:
-                print(f"Warning: Chapter {chapter_number} is not fully translated and will be skipped")
-        # Use the database-retrieved chapters if available
-        if translated_chapters:
-            self.book_finalize(translated_book, translated_chapters)
-        # Save outputs
-        print(f"\n{self.sep1}")
-        print("Saving output files...")
-        # Create filename with original name + language edition
-        original_filename = os.path.splitext(os.path.basename(input_path))[0]
-        translation_filename = f"{original_filename} {target_lang.lower()}.epub"
-        translated_path = os.path.join(self.output_dir, translation_filename)
-        epub.write_epub(translated_path, translated_book)
-        print(f"✓ Translation saved: {translated_path}")
-        print(f"{self.sep1}")
-        print("Translation complete!")
-        print(f"{self.sep1}")
+        # Run all three phases in sequence
+        self.import_phase(input_path, output_dir, source_lang)
+        self.translate_phase(source_lang, target_lang, chapter_numbers)
+        self.build_phase(input_path, output_dir, source_lang, target_lang, chapter_numbers)
 
     def translate_context(self, texts: List[str], source_lang: str, target_lang: str):
         """Translate texts and add them to context without storing in database.
