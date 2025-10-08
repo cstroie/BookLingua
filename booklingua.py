@@ -1663,7 +1663,7 @@ class EPUBTranslator:
         if not self.conn:
             raise Exception("Database connection not available")
         # Get the latest edition number, always translate the latest imported edition
-        edition_number = self.db_get_latest_edition(source_lang, "temp")
+        edition_number = self.db_get_latest_edition(source_lang, target_lang)
         if edition_number == 0:
             print("No content found in database. Please run import phase first.")
             return
