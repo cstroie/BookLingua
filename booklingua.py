@@ -1530,7 +1530,7 @@ class EPUBTranslator:
                         print()
                         self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}", "✓ Using cached paragraph translation", 80, 0, 4)
                         print(f"{'~'*80}")
-                        self.display_side_by_side(source, target, 80)
+                        self.display_side_by_side(source, target, self.console_width)
                         print(f"{'~'*80}")
                     # Already translated, skip
                     continue
