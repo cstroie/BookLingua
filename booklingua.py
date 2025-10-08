@@ -413,29 +413,33 @@ class EPUBTranslator:
             >>> print(markdown)
             '# Title\n\nParagraph text'
         """
+        # Return empty string if soup is None
         if not soup:
             return ""
-            
+        # Remove script and style elements
         try:
-            # Remove script and style elements
             for script in soup(["script", "style"]):
                 script.decompose()
         except Exception as e:
             print(f"Warning: Failed to remove script/style elements: {e}")
-        
+        # Block elements to process
+        block_elements = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'br']
+        # Initialize list to hold markdown lines
         markdown_lines = []
-        
         try:
-            # Process only direct children of the root element to avoid duplicate text extraction
-            # This prevents block elements inside other block elements from being processed twice
-            for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'br'], recursive=False):
+            # Process block elements
+            for element in soup.find_all(block_elements, recursive=True):
                 try:
+                    # Skip if parent is also a block element to avoid duplication
+                    parent = element.parent
+                    if parent and parent.name in block_elements \
+                        and parent.get_text(" ", strip=True) == element.get_text(" ", strip=True):
+                        continue
                     # Process inline tags within the element
                     processed_element = self.process_inline_tags(element)
                     text = processed_element.get_text(separator=' ', strip=True)
                     if not text:
                         continue
-                        
                     # Add appropriate Markdown formatting
                     if element.name and element.name.startswith('h'):
                         try:
@@ -450,32 +454,6 @@ class EPUBTranslator:
                 except Exception as e:
                     print(f"Warning: Error processing element: {e}")
                     continue
-                    
-            # Also process direct children of body if present
-            body = soup.find('body')
-            if body:
-                for element in body.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'br'], recursive=False):
-                    try:
-                        # Process inline tags within the element
-                        processed_element = self.process_inline_tags(element)
-                        text = processed_element.get_text(separator=' ', strip=True)
-                        if not text:
-                            continue
-                            
-                        # Add appropriate Markdown formatting
-                        if element.name and element.name.startswith('h'):
-                            try:
-                                level = int(element.name[1])
-                                markdown_lines.append('#' * level + ' ' + text)
-                            except (ValueError, IndexError):
-                                markdown_lines.append(text)  # Fallback to plain text
-                        elif element.name == 'li':
-                            markdown_lines.append('- ' + text)
-                        else:
-                            markdown_lines.append(text)
-                    except Exception as e:
-                        print(f"Warning: Error processing element: {e}")
-                        continue
         except Exception as e:
             print(f"Warning: Failed to find elements in soup: {e}")
         
@@ -524,22 +502,21 @@ class EPUBTranslator:
         """
         if not element:
             return BeautifulSoup("", 'html.parser')
-            
         try:
             # Create a copy to avoid modifying the original
             element_copy = BeautifulSoup(str(element), 'html.parser')
         except Exception as e:
             print(f"Warning: Failed to create element copy: {e}")
             return BeautifulSoup("", 'html.parser')
-        
+        # Inline tags to process
+        inline_tags = ['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span']
         try:
             # Process each inline tag
-            for tag in element_copy.find_all(['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span']):
+            for tag in element_copy.find_all(inline_tags):
                 try:
                     text = tag.get_text()
                     if not text:
                         continue
-                        
                     # Replace with appropriate Markdown formatting
                     if not tag.name:
                         replacement = text
@@ -562,7 +539,6 @@ class EPUBTranslator:
                                 css_class = ' '.join(css_class).lower() if css_class else ''
                             else:
                                 css_class = str(css_class).lower() if css_class else ''
-                            
                             # Check for bold styling
                             if ('font-weight' in style and 'bold' in style) \
                                 or any(cls in css_class for cls in ['bold', 'strong']):
@@ -591,7 +567,6 @@ class EPUBTranslator:
                             replacement = text
                     else:  # other tags
                         replacement = text
-                    
                     # Replace the tag with formatted text
                     tag.replace_with(replacement)
                 except Exception as e:
@@ -1613,7 +1588,8 @@ class EPUBTranslator:
             if self.verbose:
                 print(f"Warning: Quality checks failed for chapter {chapter_number}: {e}")
     
-    def import_phase(self, input_path: str, output_dir: str = "output", source_lang: str = "English"):
+    def phase_import(self, input_path: str, output_dir: str = "output",
+                     source_lang: str = "English", target_lang: str = "Romanian") -> int:
         """Import phase: Extract content from EPUB and save to database.
         
         This method handles the import phase of the translation workflow, which includes:
@@ -1625,6 +1601,7 @@ class EPUBTranslator:
             input_path (str): Path to the input EPUB file
             output_dir (str, optional): Directory for output files. Defaults to "output".
             source_lang (str, optional): Source language name. Defaults to "English".
+            target_lang (str, optional): Target language name. Defaults to "Romanian".
         """
         # Update database path if not set during initialization
         if not self.db_path and input_path:
@@ -1640,11 +1617,13 @@ class EPUBTranslator:
         book = epub.read_epub(input_path, options={'ignore_ncx': False})
         chapters = self.book_extract_content(book, source_lang)
         # Save all content to database
-        edition_number = self.db_save_chapters(chapters, source_lang, "temp")
+        edition_number = self.db_save_chapters(chapters, source_lang, target_lang)
         print(f"Import completed. Saved {len(chapters)} chapters to database.")
         print(f"{self.sep1}")
+        # Return the edition number for reference
+        return edition_number
 
-    def translate_phase(self, source_lang: str = "English", target_lang: str = "Romanian", 
+    def phase_translate(self, source_lang: str = "English", target_lang: str = "Romanian", 
                        chapter_numbers: str = None):
         """Translate phase: Translate content from database using AI.
         
@@ -1658,26 +1637,16 @@ class EPUBTranslator:
             target_lang (str, optional): Target language name. Defaults to "Romanian".
             chapter_numbers (str, optional): Comma-separated list of chapter numbers to translate.
         """
+        # We need the database connection
         if not self.conn:
             raise Exception("Database connection not available")
-        
-        # Get the latest edition number
+        # Get the latest edition number, always translate the latest imported edition
         edition_number = self.db_get_latest_edition(source_lang, "temp")
         if edition_number == 0:
             print("No content found in database. Please run import phase first.")
             return
-            
-        # Update edition to proper target language
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            UPDATE translations 
-            SET target_lang = ?
-            WHERE source_lang = ? AND target_lang = 'temp'
-        ''', (target_lang, source_lang))
-        self.conn.commit()
-        
         print(f"{self.sep1}")
-        print(f"Translating from {source_lang} to {target_lang}")
+        print(f"Translating edition {edition_number} from {source_lang} to {target_lang}")
         # Get chapter list first, ordered by number of paragraphs
         chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, True)
         # If specific chapters requested, filter the list
@@ -1706,7 +1675,7 @@ class EPUBTranslator:
         print(f"Translation phase completed.")
         print(f"{self.sep1}")
 
-    def build_phase(self, input_path: str, output_dir: str = "output", 
+    def phase_build(self, input_path: str, output_dir: str = "output", 
                    source_lang: str = "English", target_lang: str = "Romanian",
                    chapter_numbers: str = None):
         """Build phase: Create translated EPUB from database translations.
@@ -1731,16 +1700,15 @@ class EPUBTranslator:
         if output_dir:
             self.output_dir = output_dir
             os.makedirs(self.output_dir, exist_ok=True)
-            
+        # We need the database connection           
         if not self.conn:
             raise Exception("Database connection not available")
-        
-        # Get the latest edition number
+        # Get the latest edition number. We always build the latest edition
         edition_number = self.db_get_latest_edition(source_lang, target_lang)
         if edition_number == 0:
             print("No translations found in database. Please run translation phase first.")
             return
-            
+        # Load book and extract text
         print(f"{self.sep1}")
         print(f"Building translated EPUB from {source_lang} to {target_lang}")
         # Load original book for template
@@ -1857,9 +1825,9 @@ class EPUBTranslator:
             # Also creates: translations/English/ and translations/Romanian/ directories
         """
         # Run all three phases in sequence
-        self.import_phase(input_path, output_dir, source_lang)
-        self.translate_phase(source_lang, target_lang, chapter_numbers)
-        self.build_phase(input_path, output_dir, source_lang, target_lang, chapter_numbers)
+        self.phase_import(input_path, output_dir, source_lang)
+        self.phase_translate(source_lang, target_lang, chapter_numbers)
+        self.phase_build(input_path, output_dir, source_lang, target_lang, chapter_numbers)
 
     def translate_context(self, texts: List[str], source_lang: str, target_lang: str):
         """Translate texts and add them to context without storing in database.
@@ -2391,6 +2359,10 @@ def main():
     parser = argparse.ArgumentParser(description="BookLingua - Translate EPUB books using various AI models")
     # Required input EPUB file
     parser.add_argument("input", help="Input EPUB file path")
+    # Phase control arguments
+    parser.add_argument("--import", action="store_true", dest="phase_import", help="Run the import phase")
+    parser.add_argument("--translate", action="store_true", dest="phase_translate", help="Run the translate phase")
+    parser.add_argument("--build", action="store_true", dest="phase_build", help="Run the build phase")
     # Optional arguments
     parser.add_argument("-o", "--output", default=None, help="Output directory (default: filename without extension)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
@@ -2413,10 +2385,6 @@ def main():
     parser.add_argument("--lmstudio", action="store_true", help="Use LM Studio local server")
     parser.add_argument("--together", action="store_true", help="Use Together AI API")
     parser.add_argument("--openrouter", action="store_true", help="Use OpenRouter AI API")
-    # Phase control arguments
-    parser.add_argument("--import", action="store_true", dest="import_phase", help="Run only the import phase")
-    parser.add_argument("--translate", action="store_true", dest="translate_phase", help="Run only the translate phase")
-    parser.add_argument("--build", action="store_true", dest="build_phase", help="Run only the build phase")
     # Parse arguments
     args = parser.parse_args()
     # Determine API configuration
@@ -2488,38 +2456,33 @@ def main():
     source_lang = args.source_lang.capitalize()
     target_lang = args.target_lang.capitalize()
     
-    # Check if any phase is explicitly requested
-    if args.import_phase or args.translate_phase or args.build_phase:
-        # Run specific phases
-        if args.import_phase:
-            translator.import_phase(
-                input_path=args.input,
-                output_dir=output_dir,
-                source_lang=source_lang
-            )
-        if args.translate_phase:
-            translator.translate_phase(
-                source_lang=source_lang,
-                target_lang=target_lang,
-                chapter_numbers=args.chapters
-            )
-        if args.build_phase:
-            translator.build_phase(
-                input_path=args.input,
-                output_dir=output_dir,
-                source_lang=source_lang,
-                target_lang=target_lang,
-                chapter_numbers=args.chapters
-            )
-    else:
-        # Run all phases in sequence (default behavior)
-        translator.translate_epub(
+    # Check if any phase is specified; if none, run all phases
+    all_phases = False if (args.phase_import or args.phase_translate or args.phase_build) else True
+    print(f"Running phases: {'import ' if args.phase_import or all_phases else ''}"
+          f"{'translate ' if args.phase_translate or all_phases else ''}"
+          f"{'build' if args.phase_build or all_phases else ''}")
+    # Run specific phases
+    if args.phase_import or all_phases:
+        translator.phase_import(
+            input_path=args.input,
+            output_dir=output_dir,
+            source_lang=source_lang
+        )
+    if args.phase_translate or all_phases:
+        translator.phase_translate(
+            source_lang=source_lang,
+            target_lang=target_lang,
+            chapter_numbers=args.chapters
+        )
+    if args.phase_build or all_phases:
+        translator.phase_build(
             input_path=args.input,
             output_dir=output_dir,
             source_lang=source_lang,
             target_lang=target_lang,
             chapter_numbers=args.chapters
         )
+
 
 # Run main function if executed as script
 if __name__ == "__main__":
