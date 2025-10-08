@@ -171,6 +171,7 @@ class EPUBTranslator:
         self.model = model
         self.verbose = verbose
         self.context = []
+        self.console_width = 80  # Default console width
         
         # Initialize database
         self.epub_path = epub_path
@@ -1544,7 +1545,7 @@ class EPUBTranslator:
                         continue
                     end_time = datetime.now()
                     print(f"{'~'*80}")
-                    self.display_side_by_side(source, target, 80)
+                    self.display_side_by_side(source, target, self.console_width)
                     print(f"{'~'*80}")
                     # Calculate and store timing
                     elapsed = int((end_time - start_time).total_seconds() * 1000)  # Convert to milliseconds
@@ -1983,7 +1984,7 @@ Return only a single integer number between 0 and 100."""
         
         return errors
 
-    def display_side_by_side(self, text1: str, text2: str, width: int = 80, margin: int = 2, gap: int = 4) -> None:
+    def display_side_by_side(self, text1: str, text2: str, width: int = None, margin: int = 2, gap: int = 4) -> None:
         """Display two texts side by side on a console with specified layout.
         
         The first text is displayed on the left side and the second text on the right side.
@@ -2003,6 +2004,10 @@ Return only a single integer number between 0 and 100."""
             # Displays:
             #   Hello world          Bonjour le monde   
         """
+        # Use default width of 80 if not specified
+        if width is None:
+            width = 80
+            
         # Calculate column width (equal for both columns)
         total_used_space = 2 * margin + gap
         if width <= total_used_space:
@@ -2248,6 +2253,7 @@ def main():
     parser.add_argument("--lmstudio", action="store_true", help="Use LM Studio local server")
     parser.add_argument("--together", action="store_true", help="Use Together AI API")
     parser.add_argument("--openrouter", action="store_true", help="Use OpenRouter AI API")
+    parser.add_argument("--width", type=int, default=80, help="Console width for side-by-side display (default: 80)")
     
     args = parser.parse_args()
     
@@ -2304,6 +2310,8 @@ def main():
         verbose=args.verbose,
         epub_path=args.input
     )
+    # Set console width
+    translator.console_width = args.width
     
     # Handle CSV export/import operations
     if args.export_csv:
