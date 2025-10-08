@@ -336,7 +336,7 @@ class EPUBTranslator:
         translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
         # Convert translated content to HTML and extract title
         title, html_content = self.markdown_to_html(translated_content)
-        xhtml = '<article id="{id}">{content}</article>'.format(content=html_content, id=f'chapter_{chapter_number}')
+        xhtml = '<article id="{id}">\n{content}\n</article>'.format(content=html_content, id=f'chapter_{chapter_number}')
         # Save translated chapter as markdown if output directory exists
         if self.output_dir and os.path.exists(self.output_dir):
             try:
@@ -403,6 +403,8 @@ class EPUBTranslator:
             - Removes script and style elements
             - Converts headers (h1-h6) to Markdown headers
             - Converts list items to Markdown bullet points
+            - Handles break lines and horizontal rules
+            - Handles blockquotes
             - Handles paragraph breaks with double newlines
             - Preserves text content while removing HTML tags
             
@@ -423,7 +425,7 @@ class EPUBTranslator:
         except Exception as e:
             print(f"Warning: Failed to remove script/style elements: {e}")
         # Block elements to process
-        block_elements = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'br']
+        block_elements = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'blockquote', 'br', 'hr']
         # Initialize list to hold markdown lines
         markdown_lines = []
         try:
@@ -435,6 +437,9 @@ class EPUBTranslator:
                     if parent and parent.name in block_elements \
                         and parent.get_text(" ", strip=True) == element.get_text(" ", strip=True):
                         continue
+                    # Handle line breaks and horizontal rules
+                    if element.name in ['br', 'hr']:
+                        markdown_lines.append('---')
                     # Process inline tags within the element
                     processed_element = self.process_inline_tags(element)
                     text = processed_element.get_text(separator=' ', strip=True)
@@ -449,6 +454,8 @@ class EPUBTranslator:
                             markdown_lines.append(text)  # Fallback to plain text
                     elif element.name == 'li':
                         markdown_lines.append('- ' + text)
+                    elif element.name == 'blockquote':
+                        markdown_lines.append('> ' + text)
                     else:
                         markdown_lines.append(text)
                 except Exception as e:
@@ -456,7 +463,6 @@ class EPUBTranslator:
                     continue
         except Exception as e:
             print(f"Warning: Failed to find elements in soup: {e}")
-        
         # Join with double newlines for paragraph separation
         try:
             return '\n\n'.join(markdown_lines)
@@ -574,7 +580,7 @@ class EPUBTranslator:
                     continue
         except Exception as e:
             print(f"Warning: Failed to find inline tags: {e}")
-        
+        # Return the modified element
         return element_copy
     
     def markdown_to_html(self, markdown_text: str) -> tuple:
@@ -595,6 +601,8 @@ class EPUBTranslator:
             - Headers (# ## ### etc.) → <h1>, <h2>, <h3> etc.
             - Bullet lists (- item) → <li> items
             - Paragraphs → <p> tags
+            - Blockquotes (> quote) → <blockquote> tags
+            - Break lines (---) → <hr> tags
             - Inline formatting (**bold**, *italic*, __underline__, 
                 ~~strikethrough~, `code`) → HTML tags
             
@@ -692,6 +700,9 @@ class EPUBTranslator:
                         if title is None:
                             title = line[2:]
                         html_lines.append(f'<h1>{line[2:]}</h1>')
+                # Handle horizontal rules
+                elif line.startswith('---'):
+                    html_lines.append('<hr/>')
                 # Handle lists
                 elif line.startswith('- '):
                     try:
@@ -700,6 +711,14 @@ class EPUBTranslator:
                     except Exception as e:
                         print(f"Warning: Error processing list item: {e}")
                         html_lines.append(f'<li>{line[2:]}</li>')
+                # Handle blockquotes
+                elif line.startswith('> '):
+                    try:
+                        content = self.process_inline_markdown(line[2:])
+                        html_lines.append(f'<blockquote>{content}</blockquote>')
+                    except Exception as e:
+                        print(f"Warning: Error processing blockquote: {e}")
+                        html_lines.append(f'<blockquote>{line[2:]}</blockquote>')
                 # Handle regular paragraphs
                 else:
                     try:
@@ -1339,14 +1358,17 @@ class EPUBTranslator:
                 for par, text in enumerate(texts):
                     # Only save non-empty texts
                     if text.strip():
-                        # Insert with empty translation if not already there
+                        # Check if text is purely non-alphabetic
+                        if all(not c.isalpha() for c in text):
+                            # Copy as-is with perfect fluency and zero duration
+                            target, duration, fluency = text, 0, 100
+                        else:
+                            # Get an existing translation for this text if it exists
+                            (target, duration, fluency) = self.db_get_translation(text, source_lang, target_lang)
+                        # Insert with translation if not already there
                         cursor = self.conn.cursor()
-                        # Get an existing translation for this text if it exists
-                        (target, duration, fluency) = self.db_get_translation(text, source_lang, target_lang)
                         if target is None:
-                            target = ""
-                            duration = -1
-                            fluency = -1
+                            target, duration, fluency = text, -1, -1
                         cursor.execute('''
                             INSERT OR IGNORE INTO translations 
                             (source_lang, target_lang, source, target, model, edition, chapter, paragraph, duration, fluency)
