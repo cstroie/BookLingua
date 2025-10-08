@@ -1857,6 +1857,21 @@ class EPUBTranslator:
         if len(self.context) > DEFAULT_CONTEXT_SIZE:
             self.context.pop(0)
 
+    def set_console_width(self, width: int):
+        """Set the console width for side-by-side display.
+        
+        This method allows dynamically changing the console width used for
+        displaying side-by-side translations during verbose output.
+        
+        Args:
+            width (int): Console width in characters (minimum 20)
+        """
+        if width < 20:
+            width = 20  # Minimum reasonable width
+        self.console_width = width
+        if self.verbose:
+            print(f"Console width set to {width} characters")
+
 
     def calculate_fluency_score(self, text: str) -> int:
         """Calculate fluency score based on linguistic patterns.
