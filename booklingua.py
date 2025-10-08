@@ -968,8 +968,8 @@ class EPUBTranslator:
         if not self.conn:
             raise Exception("Database connection not available")
         # Split search string into words and limit to 10 words
-        words = search_string.split()[:10]
-        if not words:
+        words = search_string.split()
+        if not words or len(words) > 10:
             return []
         # Build the SQL query with LIKE clauses for each word
         query = "SELECT source, target, fluency FROM translations WHERE target IS NOT NULL and target != ''"
@@ -1418,7 +1418,7 @@ class EPUBTranslator:
                         "content": SYSTEM_PROMPT.format(source_lang=source_lang, target_lang=target_lang)
                     }
                 ]
-                # Use db_search to find similar texts and add them to context
+                # Find similar texts and add them to context
                 try:
                     similar_texts = self.db_search(stripped_text, source_lang, target_lang)
                     for source, target, _ in similar_texts:
@@ -1426,7 +1426,7 @@ class EPUBTranslator:
                         messages.append({"role": "assistant", "content": target})
                 except Exception as e:
                     if self.verbose:
-                        print(f"Warning: db_search failed: {e}")
+                        print(f"Warning: Search failed: {e}")
                 # Add context from previous translations for this language pair
                 for user_msg, assistant_msg in self.context:
                     messages.append({"role": "user", "content": user_msg})
