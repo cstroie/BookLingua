@@ -1418,6 +1418,15 @@ class EPUBTranslator:
                         "content": SYSTEM_PROMPT.format(source_lang=source_lang, target_lang=target_lang)
                     }
                 ]
+                # Use db_search to find similar texts and add them to context
+                try:
+                    similar_texts = self.db_search(stripped_text, source_lang, target_lang)
+                    for source, target, _ in similar_texts:
+                        messages.append({"role": "user", "content": source})
+                        messages.append({"role": "assistant", "content": target})
+                except Exception as e:
+                    if self.verbose:
+                        print(f"Warning: db_search failed: {e}")
                 # Add context from previous translations for this language pair
                 for user_msg, assistant_msg in self.context:
                     messages.append({"role": "user", "content": user_msg})
