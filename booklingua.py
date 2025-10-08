@@ -172,7 +172,6 @@ class EPUBTranslator:
         self.model = model
         self.verbose = verbose
         self.context = []
-        self.console_width = shutil.get_terminal_size().columns
         
         # Initialize database
         self.epub_path = epub_path
@@ -188,6 +187,8 @@ class EPUBTranslator:
             print(f"Using API endpoint: {base_url}")
         if self.db_path:
             print(f"Using database: {self.db_path}")
+        # Console width
+        self.set_console_width(shutil.get_terminal_size().columns)
     
     def __del__(self):
         """Clean up database connection when object is destroyed."""
