@@ -1067,16 +1067,18 @@ class EPUBTranslator:
                 print(f"Database lookup for latest edition failed: {e}")
             raise
 
-    def db_get_chapters(self, source_lang: str, target_lang: str, edition_number: int) -> List[int]:
+    def db_get_chapters(self, source_lang: str, target_lang: str, edition_number: int, by_length: bool = False) -> List[int]:
         """Retrieve all chapter numbers from the database, ordered ascending.
         
         Args:
             source_lang (str): Source language code
             target_lang (str): Target language code
             edition_number (int): Edition number to filter chapters.
+            by_length (bool): If True, sort chapters by number of paragraphs descending.
+                             If False, sort chapters by chapter number ascending.
             
         Returns:
-            List[int]: List of chapter numbers in ascending order
+            List[int]: List of chapter numbers in specified order
             
         Raises:
             Exception: If database connection is not available
@@ -1087,14 +1089,29 @@ class EPUBTranslator:
         # Query distinct chapter numbers
         try:
             cursor = self.conn.cursor()
-            cursor.execute('''
-                SELECT DISTINCT chapter FROM translations 
-                WHERE source_lang = ? AND target_lang = ? AND edition = ?
-                ORDER BY chapter ASC
-            ''', (source_lang, target_lang, edition_number))
+            if by_length:
+                # Sort by number of paragraphs in descending order
+                cursor.execute('''
+                    SELECT chapter, COUNT(*) as paragraph_count FROM translations 
+                    WHERE source_lang = ? AND target_lang = ? AND edition = ?
+                    GROUP BY chapter
+                    ORDER BY paragraph_count DESC, chapter ASC
+                ''', (source_lang, target_lang, edition_number))
+            else:
+                # Sort by chapter number in ascending order (default)
+                cursor.execute('''
+                    SELECT DISTINCT chapter FROM translations 
+                    WHERE source_lang = ? AND target_lang = ? AND edition = ?
+                    ORDER BY chapter ASC
+                ''', (source_lang, target_lang, edition_number))
             results = cursor.fetchall()
             # Return list of chapter numbers
-            return [result[0] for result in results if result[0] is not None] if results else []
+            if by_length:
+                # Return chapter numbers from the sorted results
+                return [result[0] for result in results if result[0] is not None] if results else []
+            else:
+                # Return chapter numbers from the default results
+                return [result[0] for result in results if result[0] is not None] if results else []
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup for chapters failed: {e}")
