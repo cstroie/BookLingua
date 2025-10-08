@@ -15,6 +15,40 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+BookLingua - Advanced EPUB Book Translation Tool
+
+A comprehensive command-line tool for translating EPUB books using various AI models
+and translation services. BookLingua preserves document structure, formatting, and
+provides both direct and pivot translation methods with quality assessment features.
+
+Features:
+- Multi-provider AI support (OpenAI, Ollama, Mistral, DeepSeek, LM Studio, Together AI, OpenRouter)
+- Direct translation and pivot translation modes
+- EPUB structure preservation and formatting maintenance
+- Database caching for reliability and resume capability
+- Quality assessment with fluency, adequacy, and consistency scoring
+- Progress tracking and verbose output options
+- CSV export/import for translation data
+- Chapter-level translation control
+
+Usage:
+    python booklingua.py input.epub [options]
+
+Examples:
+    # Basic translation
+    python booklingua.py book.epub
+    
+    # Translation with custom languages
+    python booklingua.py book.epub -s English -t Spanish -v
+    
+    # Using Ollama local server
+    python booklingua.py book.epub --ollama -m qwen2.5:72b
+    
+    # Export translations to CSV
+    python booklingua.py book.epub --export-csv translations.csv
+"""
+
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
@@ -78,9 +112,10 @@ class EPUBTranslator:
         """
         Initialize the EPUBTranslator with an OpenAI-compatible API.
         
-        This class provides functionality to translate EPUB books using various AI models
-        through OpenAI-compatible APIs. It supports both direct translation and pivot
-        translation through an intermediate language, with database caching for reliability.
+        This class provides comprehensive functionality for translating EPUB books using
+        various AI models through OpenAI-compatible APIs. It supports both direct and pivot
+        translation methods with advanced features like database caching, quality assessment,
+        and context management for consistent translations.
         
         Args:
             api_key (str, optional): API key for the translation service. 
@@ -91,24 +126,31 @@ class EPUBTranslator:
                 - "https://api.openai.com/v1" for OpenAI
                 - "http://localhost:11434/v1" for Ollama
                 - "https://api.mistral.ai/v1" for Mistral AI
+                - "https://api.deepseek.com/v1" for DeepSeek
+                - "http://localhost:1234/v1" for LM Studio
+                - "https://api.together.xyz/v1" for Together AI
+                - "https://openrouter.ai/api/v1" for OpenRouter
                 Defaults to "https://api.openai.com/v1".
             model (str, optional): Name of the model to use for translation.
-                Examples: "gpt-4o", "qwen2.5:72b", "mistral-large-latest"
+                Examples: "gpt-4o", "qwen2.5:72b", "mistral-large-latest", 
+                "deepseek-chat", "gemma3n:e4b", "Qwen/Qwen2.5-72B-Instruct-Turbo"
                 Defaults to "gpt-4o".
             verbose (bool, optional): Whether to print detailed progress information
-                during translation. Defaults to False.
+                during translation. Includes timing statistics, fluency scores, and
+                quality assessments. Defaults to False.
             epub_path (str, optional): Path to the EPUB file. Used to determine the
-                database name for caching translations.
+                database name for caching translations (appends .db to filename).
                 
         Attributes:
             api_key (str): The API key used for authentication
             base_url (str): The base URL for the API endpoint
             model (str): The model name used for translation
             verbose (bool): Whether verbose output is enabled
-            context (list): Cache for translation contexts to maintain
-                consistency across multiple translations
+            context (list): Translation context cache to maintain consistency
+                across multiple translations (limited to DEFAULT_CONTEXT_SIZE)
             db_path (str): Path to the SQLite database file
             conn (sqlite3.Connection): Database connection
+            output_dir (str): Directory for output files (markdown, xhtml)
                 
         Example:
             >>> translator = EPUBTranslator(
@@ -117,6 +159,11 @@ class EPUBTranslator:
             ...     model="gpt-4o",
             ...     verbose=True,
             ...     epub_path="book.epub"
+            ... )
+            >>> translator.translate_epub(
+            ...     input_path="book.epub",
+            ...     source_lang="English",
+            ...     target_lang="Romanian"
             ... )
         """
         self.api_key = api_key or os.environ.get('OPENAI_API_KEY', 'dummy-key')
@@ -1487,48 +1534,57 @@ class EPUBTranslator:
     def translate_epub(self, input_path: str, output_dir: str = "output", 
                       source_lang: str = "English", target_lang: str = "Romanian",
                       chapter_numbers: str = None):
-        """Translate EPUB books using direct translation method.
+        """Translate EPUB books using direct translation method with comprehensive workflow.
         
-        This method provides a translation workflow for EPUB books,
-        supporting direct translation from source to target language.
-        It processes each chapter individually, preserves document structure, 
-        and generates output formats.
+        This method provides a complete translation workflow for EPUB books, supporting
+        direct translation from source to target language. It processes each chapter
+        individually while preserving document structure, formatting, and maintaining
+        translation consistency across the entire document.
         
         Args:
             input_path (str): Path to the input EPUB file to be translated
             output_dir (str, optional): Directory where output files will be saved.
                 Defaults to "output". The directory will be created if it doesn't exist.
-            source_lang (str, optional): Source language name. Defaults to "English".
-            target_lang (str, optional): Target language name. Defaults to "Romanian".
+                Output includes:
+                - {original_name} {target_lang}.epub: Translated EPUB file
+                - {source_lang}/: Source chapters as markdown files
+                - {target_lang}/: Translated chapters as markdown and xhtml files
+            source_lang (str, optional): Source language name (case-insensitive).
+                Defaults to "English". Used for database organization and file naming.
+            target_lang (str, optional): Target language name (case-insensitive).
+                Defaults to "Romanian". Used for database organization and file naming.
             chapter_numbers (str, optional): Comma-separated list of chapter numbers to translate.
-                If None, translates all chapters. Defaults to None.
+                If None, translates all chapters. Chapter numbers are 1-based.
+                Example: "1,3,5-10" (Note: ranges not currently supported, use comma-separated)
                 
         Returns:
             None: Results are saved to files in the specified output directory.
                 
-        Output Files:
-            - translated.epub: EPUB with translated content
-                
         Translation Process:
-            1. Extracts text content from EPUB file
-            2. Processes each chapter individually
-            3. For each chapter:
-               - Performs direct translation
-               - Maintains translation context for consistency
-               - Preserves document structure and formatting
-            4. Generates output file
+            1. Database initialization and setup
+            2. EPUB content extraction and chapter identification
+            3. Database population with source text paragraphs
+            4. Chapter-by-chapter translation with:
+               - Context management for consistency
+               - Quality assessment (fluency scoring)
+               - Progress tracking and timing
+               - Error handling and retry logic
+            5. EPUB reconstruction with translated content
+            6. Output file generation
             
         Features:
-            - Handles both single paragraphs and multi-chapter documents
-            - Maintains translation context across chapters for consistency
-            - Preserves Markdown formatting and document structure
-            - Supports paragraph-level translation for better quality
-            - Uses temperature=0.3 for balanced creativity and accuracy
-            - Verbose progress reporting when enabled
+            - Comprehensive error handling with retry logic (5 attempts)
+            - Translation context management across chapters
             - Database caching for reliability and resume capability
+            - Quality assessment with fluency scoring
+            - Progress reporting with timing statistics
+            - Markdown and XHTML output for each chapter
+            - Preserves document structure and formatting
+            - Paragraph-level translation for optimal quality
+            - Temperature=0.3 for balanced creativity and accuracy
             
         Example:
-            >>> translator = EPUBTranslator()
+            >>> translator = EPUBTranslator(verbose=True)
             >>> translator.translate_epub(
             ...     input_path="book.epub",
             ...     output_dir="translations",
@@ -1536,7 +1592,8 @@ class EPUBTranslator:
             ...     target_lang="Romanian",
             ...     chapter_numbers="3,5,7"
             ... )
-            # Creates: translations/translated.epub with only chapters 3, 5, and 7
+            # Creates: translations/book Romanian.epub with only chapters 3, 5, and 7
+            # Also creates: translations/English/ and translations/Romanian/ directories
         """
         # Update database path if not set during initialization
         if not self.db_path and input_path:
@@ -2040,20 +2097,23 @@ def main():
     """Command-line interface for BookLingua EPUB translation tool.
     
     This function provides a comprehensive command-line interface for translating
-    EPUB books using various AI models and translation methods. It supports multiple
-    AI providers, translation modes, and configuration options.
+    EPUB books using various AI models and translation services. It supports multiple
+    AI providers, translation modes, and configuration options with extensive error handling.
     
     Command-line Arguments:
         input (str): Path to the input EPUB file (required)
-        -o, --output (str): Output directory for translated files (default: "output")
-        -M, --mode (str): Translation mode - "direct", "pivot", or "both" (default: "direct")
+        -o, --output (str): Output directory for translated files (default: filename without extension)
         -v, --verbose: Enable detailed progress output during translation
-        -s, --source-lang (str): Source language code (default: "English")
-        -p, --pivot-lang (str): Intermediate language for pivot translation (default: "French")
-        -t, --target-lang (str): Target language code (default: "Romanian")
+        -s, --source-lang (str): Source language name (default: "English")
+        -t, --target-lang (str): Target language name (default: "Romanian")
+        -c, --chapters (str): Comma-separated list of chapter numbers to translate (default: all chapters)
         -u, --base-url (str): Custom API endpoint URL
-        -m, --model (str): AI model name to use for translation
+        -m, --model (str): AI model name to use for translation (default: "gpt-4o")
         -k, --api-key (str): API key for authentication
+        
+    Data Management:
+        --export-csv (str): Export database to CSV file
+        --import-csv (str): Import translations from CSV file
         
     Preset Configurations:
         --openai: Use OpenAI API (https://api.openai.com/v1)
@@ -2075,14 +2135,11 @@ def main():
         # Basic direct translation
         python booklingua.py book.epub
         
-        # Direct translation with custom languages
+        # Translation with custom languages and verbose output
         python booklingua.py book.epub -s English -t Spanish -v
         
-        # Pivot translation with French as intermediate language
-        python booklingua.py book.epub -M pivot -p French
-        
-        # Both methods with comparison output
-        python booklingua.py book.epub -M both -o translations
+        # Translate specific chapters only
+        python booklingua.py book.epub -c "1,3,5-10"
         
         # Using OpenAI API with custom model
         python booklingua.py book.epub --openai -m gpt-4-turbo
@@ -2090,25 +2147,38 @@ def main():
         # Using Ollama local server
         python booklingua.py book.epub --ollama -m qwen2.5:72b
         
+        # Using Mistral AI with environment key
+        python booklingua.py book.epub --mistral
+        
+        # Export translations to CSV
+        python booklingua.py book.epub --export-csv translations.csv
+        
         # Using custom API endpoint
         python booklingua.py book.epub -u https://api.example.com/v1 -k your-api-key
         
     Features:
-        - Supports multiple AI providers and models
-        - Direct and pivot translation modes
-        - Comparison mode for analyzing translation quality
-        - Preserves EPUB structure and formatting
-        - Uses temperature=0.3 for balanced creativity and accuracy
-        - Verbose progress reporting
+        - Multi-provider AI support (OpenAI, Ollama, Mistral, DeepSeek, LM Studio, Together AI, OpenRouter)
+        - Direct translation method with comprehensive workflow
+        - Database caching for reliability and resume capability
+        - Quality assessment with fluency scoring
+        - Progress tracking with timing statistics
+        - Chapter-level translation control
+        - CSV export/import for translation data
+        - Verbose output with detailed progress information
         - Environment variable support for API keys
         - Preset configurations for common services
-        - Database caching for reliability and resume capability
         
-    Output:
-        - direct_translation.epub: Direct translation result
-        - pivot_translation.epub: Pivot translation result  
-        - comparison.html: Side-by-side comparison document
-        - book.db: SQLite database with all translations (same name as EPUB)
+    Output Files:
+        - {output_dir}/{original_name} {target_lang}.epub: Translated EPUB file
+        - {output_dir}/{source_lang}/: Source chapters as markdown files
+        - {output_dir}/{target_lang}/: Translated chapters as markdown and xhtml files
+        - {input_path}.db: SQLite database with all translations
+        - {export_csv}: CSV export file (if --export-csv specified)
+        
+    Note:
+        The tool uses temperature=0.3 for balanced creativity and accuracy.
+        Database caching allows for resuming interrupted translations.
+        Verbose mode provides detailed progress, timing, and quality information.
     """
     parser = argparse.ArgumentParser(description="BookLingua - Translate EPUB books using various AI models")
     parser.add_argument("input", help="Input EPUB file path")
