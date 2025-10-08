@@ -289,8 +289,6 @@ class EPUBTranslator:
             except Exception as e:
                 print(f"Warning: Error processing item: {e}")
                 continue
-        # Summary of chapters found
-        print(f"Found {len(chapters)} chapters to translate ...")
         # Return the list of chapter data
         return chapters
     
@@ -1355,6 +1353,8 @@ class EPUBTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Warning: Failed to delete empty translations: {e}")
+        # Summary of chapters found
+        print(f"Found {len(chapters)} chapters to translate ...")
         # Save all texts with empty translations
         try:
             for ch, chapter in enumerate(chapters):
