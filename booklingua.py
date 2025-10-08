@@ -967,16 +967,13 @@ class EPUBTranslator:
         """
         if not self.conn:
             raise Exception("Database connection not available")
-            
         # Split search string into words and limit to 10 words
         words = search_string.split()[:10]
         if not words:
             return []
-            
         # Build the SQL query with LIKE clauses for each word
-        query = "SELECT source, target, fluency FROM translations WHERE target IS NOT NULL"
+        query = "SELECT source, target, fluency FROM translations WHERE target IS NOT NULL and target != ''"
         params = []
-        
         # Add language filters if provided
         if source_lang:
             query += " AND source_lang = ?"
@@ -984,15 +981,12 @@ class EPUBTranslator:
         if target_lang:
             query += " AND target_lang = ?"
             params.append(target_lang)
-            
         # Add LIKE clauses for each word
         for word in words:
             query += " AND source LIKE ?"
             params.append(f"%{word}%")
-            
         # Order by fluency descending
-        query += " ORDER BY fluency DESC"
-        
+        query += " ORDER BY fluency DESC LIMIT 3"
         try:
             cursor = self.conn.cursor()
             cursor.execute(query, params)
