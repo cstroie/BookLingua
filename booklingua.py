@@ -948,6 +948,60 @@ class EPUBTranslator:
                 print(f"Database lookup failed: {e}")
             raise
 
+    def db_search(self, search_string: str, source_lang: str = None, target_lang: str = None) -> List[tuple]:
+        """Search for translations containing specific words in the source text.
+        
+        This method performs a search on the translations database, looking for entries
+        where the source text contains all the words from the search string.
+        
+        Args:
+            search_string (str): String containing words to search for (max 10 words)
+            source_lang (str, optional): Source language filter
+            target_lang (str, optional): Target language filter
+            
+        Returns:
+            List[tuple]: List of (source, target, fluency) tuples ordered by fluency descending
+            
+        Raises:
+            Exception: If database connection is not available
+        """
+        if not self.conn:
+            raise Exception("Database connection not available")
+            
+        # Split search string into words and limit to 10 words
+        words = search_string.split()[:10]
+        if not words:
+            return []
+            
+        # Build the SQL query with LIKE clauses for each word
+        query = "SELECT source, target, fluency FROM translations WHERE target IS NOT NULL"
+        params = []
+        
+        # Add language filters if provided
+        if source_lang:
+            query += " AND source_lang = ?"
+            params.append(source_lang)
+        if target_lang:
+            query += " AND target_lang = ?"
+            params.append(target_lang)
+            
+        # Add LIKE clauses for each word
+        for word in words:
+            query += " AND source LIKE ?"
+            params.append(f"%{word}%")
+            
+        # Order by fluency descending
+        query += " ORDER BY fluency DESC"
+        
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(query, params)
+            return cursor.fetchall()
+        except Exception as e:
+            if self.verbose:
+                print(f"Database search failed: {e}")
+            raise
+
     def db_get_translations(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> List[str]:
         """Get all translated texts in a chapter from the database.
         
