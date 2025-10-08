@@ -2295,6 +2295,10 @@ def main():
     parser.add_argument("--lmstudio", action="store_true", help="Use LM Studio local server")
     parser.add_argument("--together", action="store_true", help="Use Together AI API")
     parser.add_argument("--openrouter", action="store_true", help="Use OpenRouter AI API")
+    # Phase control arguments
+    parser.add_argument("--import", action="store_true", dest="import_phase", help="Run only the import phase")
+    parser.add_argument("--translate", action="store_true", dest="translate_phase", help="Run only the translate phase")
+    parser.add_argument("--build", action="store_true", dest="build_phase", help="Run only the build phase")
     # Parse arguments
     args = parser.parse_args()
     # Determine API configuration
@@ -2365,14 +2369,39 @@ def main():
     # Use language names with first letter uppercase
     source_lang = args.source_lang.capitalize()
     target_lang = args.target_lang.capitalize()
-    # Run translation
-    translator.translate_epub(
-        input_path=args.input,
-        output_dir=output_dir,
-        source_lang=source_lang,
-        target_lang=target_lang,
-        chapter_numbers=args.chapters
-    )
+    
+    # Check if any phase is explicitly requested
+    if args.import_phase or args.translate_phase or args.build_phase:
+        # Run specific phases
+        if args.import_phase:
+            translator.import_phase(
+                input_path=args.input,
+                output_dir=output_dir,
+                source_lang=source_lang
+            )
+        if args.translate_phase:
+            translator.translate_phase(
+                source_lang=source_lang,
+                target_lang=target_lang,
+                chapter_numbers=args.chapters
+            )
+        if args.build_phase:
+            translator.build_phase(
+                input_path=args.input,
+                output_dir=output_dir,
+                source_lang=source_lang,
+                target_lang=target_lang,
+                chapter_numbers=args.chapters
+            )
+    else:
+        # Run all phases in sequence (default behavior)
+        translator.translate_epub(
+            input_path=args.input,
+            output_dir=output_dir,
+            source_lang=source_lang,
+            target_lang=target_lang,
+            chapter_numbers=args.chapters
+        )
 
 # Run main function if executed as script
 if __name__ == "__main__":
