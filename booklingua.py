@@ -1199,25 +1199,26 @@ class EPUBTranslator:
         if not self.conn:
             raise Exception("Database connection not available")
         try:
+            # Count all paragraphs
+            total_paragraphs = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
             cursor = self.conn.cursor()
             # Single query to get all statistics
             cursor.execute('''
                 SELECT 
                     AVG(duration) as avg_time,
                     SUM(duration) as elapsed_time,
-                    COUNT(*) as total_paragraphs,
-                    COUNT(CASE WHEN target IS NOT NULL AND target != '' THEN 1 END) as translated_paragraphs
+                    COUNT(*) as translated_paragraphs
                 FROM translations 
                 WHERE edition = ? AND chapter = ? AND source_lang = ? AND target_lang = ? 
-                AND duration IS NOT NULL
+                AND target IS NOT NULL AND target != ''
+                AND duration IS NOT NULL AND duration > 0
             ''', (edition_number, chapter_number, source_lang, target_lang))
             result = cursor.fetchone()
             # Calculate
             if result:
                 avg_time = result[0] if result[0] else 0.0
                 elapsed_time = result[1] if result[1] else 0.0
-                total_paragraphs = result[2] if result[2] else 0
-                translated_paragraphs = result[3] if result[3] else 0
+                translated_paragraphs = result[2] if result[2] else 0
                 # Calculate remaining paragraphs and time
                 remaining_paragraphs = total_paragraphs - translated_paragraphs
                 remaining_time = avg_time * remaining_paragraphs if avg_time > 0 else 0.0
@@ -1391,7 +1392,7 @@ class EPUBTranslator:
             text (str): The text chunk to translate
             source_lang (str): Source language code
             target_lang (str): Target language code
-            prefill (bool): Whether this is a prefill context translation
+            use_cache (bool): Whether to use cached translations from the database
             
         Returns:
             str: Translated text in the target language
@@ -1758,7 +1759,7 @@ class EPUBTranslator:
                 translation = self.translate_text(text, source_lang, target_lang, False)
                 if self.verbose:
                     print(f"{self.sep3}")
-                    self.display_side_by_side(f"{text}:", f"{translation}:")
+                    self.display_side_by_side(f"{text}", f"{translation}")
                     print(f"{self.sep3}")
                 # Add to context immediately
                 self.context_add(text, translation)
