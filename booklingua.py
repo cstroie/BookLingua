@@ -49,6 +49,8 @@ Examples:
     python booklingua.py book.epub --export-csv translations.csv
 """
 
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
@@ -1075,7 +1077,7 @@ class EPUBTranslator:
             target_lang (str): Target language code
             edition_number (int): Edition number to filter chapters.
             by_length (bool): If True, sort chapters by number of paragraphs descending.
-                             If False, sort chapters by chapter number ascending.
+                              If False, sort chapters by chapter number ascending.
             
         Returns:
             List[int]: List of chapter numbers in specified order
@@ -1091,27 +1093,21 @@ class EPUBTranslator:
             cursor = self.conn.cursor()
             if by_length:
                 # Sort by number of paragraphs in descending order
-                cursor.execute('''
-                    SELECT chapter, COUNT(*) as paragraph_count FROM translations 
-                    WHERE source_lang = ? AND target_lang = ? AND edition = ?
-                    GROUP BY chapter
-                    ORDER BY paragraph_count DESC, chapter ASC
-                ''', (source_lang, target_lang, edition_number))
+                select = "chapter, COUNT(*) as paragraph_count"
+                order = "paragraph_count DESC, chapter ASC"
             else:
                 # Sort by chapter number in ascending order (default)
-                cursor.execute('''
-                    SELECT DISTINCT chapter FROM translations 
-                    WHERE source_lang = ? AND target_lang = ? AND edition = ?
-                    ORDER BY chapter ASC
-                ''', (source_lang, target_lang, edition_number))
+                select = "chapter"
+                order = "chapter ASC"
+            cursor.execute(f'''
+                SELECT {select} FROM translations 
+                WHERE source_lang = ? AND target_lang = ? AND edition = ?
+                GROUP BY chapter
+                ORDER BY {order}
+            ''', (source_lang, target_lang, edition_number))
             results = cursor.fetchall()
             # Return list of chapter numbers
-            if by_length:
-                # Return chapter numbers from the sorted results
-                return [result[0] for result in results if result[0] is not None] if results else []
-            else:
-                # Return chapter numbers from the default results
-                return [result[0] for result in results if result[0] is not None] if results else []
+            return [result[0] for result in results if result[0] is not None] if results else []
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup for chapters failed: {e}")
@@ -1549,7 +1545,7 @@ class EPUBTranslator:
                         print()
                         self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}", "✓ Using cached paragraph translation", self.console_width, 0, 4)
                         print(f"{self.sep3}")
-                        self.display_side_by_side(source, target, self.console_width)
+                        self.display_side_by_side(source, target)
                         print(f"{self.sep3}")
                     # Already translated, skip
                     continue
@@ -1564,7 +1560,7 @@ class EPUBTranslator:
                         continue
                     end_time = datetime.now()
                     print(f"{self.sep3}")
-                    self.display_side_by_side(source, target, self.console_width)
+                    self.display_side_by_side(source, target)
                     print(f"{self.sep3}")
                     # Calculate and store timing
                     elapsed = int((end_time - start_time).total_seconds() * 1000)  # Convert to milliseconds
@@ -1696,22 +1692,22 @@ class EPUBTranslator:
         chapters = self.book_extract_content(book, source_lang)
         # Save all content to database
         edition_number = self.db_save_chapters(chapters, source_lang, target_lang)
-        # Get chapter list first
-        chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number)
+        # Get chapter list first, ordered by number of paragraphs
+        chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, True)
         # If specific chapters requested, filter the list
         if chapter_numbers is not None:
             try:
                 # Parse comma-separated list of chapter numbers
                 requested_chapters = [int(ch.strip()) for ch in chapter_numbers.split(',')]
                 # Filter to only include chapters that exist in the database
-                filtered_chapters = [ch for ch in requested_chapters if ch in chapter_list]
+                filtered_chapters = [ch for ch in chapter_list if ch in requested_chapters]
                 # Check for any chapters that don't exist
                 missing_chapters = [ch for ch in requested_chapters if ch not in chapter_list]
                 if missing_chapters:
                     print(f"Warning: Chapters {missing_chapters} not found in database")
                 if filtered_chapters:
                     chapter_list = filtered_chapters
-                    print(f"Translating only chapters: {', '.join(map(str, filtered_chapters))}")
+                    print(f"Translating chapters: {', '.join(map(str, filtered_chapters))}")
                 else:
                     print("Warning: None of the requested chapters were found in database")
                     return
@@ -1762,7 +1758,7 @@ class EPUBTranslator:
                 translation = self.translate_text(text, source_lang, target_lang, False)
                 if self.verbose:
                     print(f"{self.sep3}")
-                    self.display_side_by_side(f"{text}:", f"{translation}:", self.console_width)
+                    self.display_side_by_side(f"{text}:", f"{translation}:")
                     print(f"{self.sep3}")
                 # Add to context immediately
                 self.context_add(text, translation)
@@ -2047,9 +2043,9 @@ Return only a single integer number between 0 and 100."""
             # Displays:
             #   Hello world          Bonjour le monde   
         """
-        # Use default width of 80 if not specified
+        # Use default console width if not specified
         if width is None:
-            width = 80
+            width = self.console_width
             
         # Calculate column width (equal for both columns)
         total_used_space = 2 * margin + gap
