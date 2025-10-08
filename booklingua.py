@@ -2331,19 +2331,15 @@ def main():
     if args.export_csv:
         try:
             translator.db_export_csv(args.export_csv)
-            print(f"Database exported to {args.export_csv}")
-            return
         except Exception as e:
-            print(f"Error exporting database: {e}")
-            return
+            pass
+        return
     if args.import_csv:
         try:
             translator.db_import_csv(args.import_csv)
-            print(f"Database imported from {args.import_csv}")
-            return
         except Exception as e:
-            print(f"Error importing database: {e}")
-            return
+            pass
+        return
     # Use language names with first letter uppercase
     source_lang = args.source_lang.capitalize()
     target_lang = args.target_lang.capitalize()
