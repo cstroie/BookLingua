@@ -1566,7 +1566,12 @@ class EPUBTranslator:
         # Show chapter completion time
         chapter_end_time = datetime.now()
         chapter_duration_ms = int((chapter_end_time - chapter_start_time).total_seconds() * 1000)
-        print(f"Translation completed in {chapter_duration_ms/1000:.2f}s")
+        
+        # Get paragraph count for average calculation
+        paragraph_count = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
+        avg_time_per_paragraph = chapter_duration_ms / paragraph_count if paragraph_count > 0 else 0
+        
+        print(f"Translation completed in {chapter_duration_ms/1000:.2f}s (avg {avg_time_per_paragraph/1000:.2f}s/paragraph)")
         # Run quality checks at the end of chapter translation
         try:
             # Get all translated texts in the chapter for quality assessment
