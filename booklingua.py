@@ -59,6 +59,7 @@ import argparse
 import re
 import sqlite3
 import time
+import shutil
 from typing import List, Dict, Optional
 from datetime import datetime
 
@@ -171,7 +172,7 @@ class EPUBTranslator:
         self.model = model
         self.verbose = verbose
         self.context = []
-        self.console_width = 80
+        self.console_width = shutil.get_terminal_size().columns
         
         # Initialize database
         self.epub_path = epub_path
@@ -2265,7 +2266,7 @@ def main():
     parser.add_argument("-e", "--export-csv", help="Export database to CSV file")
     parser.add_argument("-i", "--import-csv", help="Import translations from CSV file")
     # Console width for side-by-side display
-    parser.add_argument("-w", "--width", type=int, default=80, help="Console width for side-by-side display (default: 80)")
+    parser.add_argument("-w", "--width", type=int, default=None, help="Console width for side-by-side display (default: auto-detect)")
     # Preset configurations for common services
     parser.add_argument("--openai", action="store_true", help="Use OpenAI API")
     parser.add_argument("--ollama", action="store_true", help="Use Ollama local server")
@@ -2325,8 +2326,9 @@ def main():
         verbose=args.verbose,
         epub_path=args.input
     )
-    # Set console width
-    translator.set_console_width(args.width)
+    # Set console width (auto-detect if not specified)
+    if args.width is not None:
+        translator.set_console_width(args.width)
     # Handle CSV export/import operations
     if args.export_csv:
         try:
