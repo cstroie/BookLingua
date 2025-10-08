@@ -2170,13 +2170,13 @@ Return only a single integer number between 0 and 100."""
         stripped_text = text.strip()
         prefix = ""
         suffix = ""
-        # Find prefix (non-alphabetic characters at the beginning)
-        prefix_match = re.match(r'^([^a-zA-Z]+)', stripped_text)
+        # Find prefix (ASCII symbols and digits at the beginning)
+        prefix_match = re.match(r'^([^a-zA-Z\u0080-\uFFFF]+)', stripped_text)
         if prefix_match:
             prefix = prefix_match.group(1)
             stripped_text = stripped_text[len(prefix):]
-            # Find suffix (non-alphabetic characters at the end) only if prefix was found
-            suffix_match = re.search(r'([^a-zA-Z]+)$', stripped_text)
+            # Find suffix (ASCII symbols and digits at the end) only if prefix was found
+            suffix_match = re.search(r'([^a-zA-Z\u0080-\uFFFF]+)$', stripped_text)
             if suffix_match:
                 suffix = suffix_match.group(1)
                 stripped_text = stripped_text[:-len(suffix)]
