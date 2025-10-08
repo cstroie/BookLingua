@@ -171,7 +171,7 @@ class EPUBTranslator:
         self.model = model
         self.verbose = verbose
         self.context = []
-        self.console_width = 80  # Default console width
+        self.console_width = 80
         
         # Initialize database
         self.epub_path = epub_path
@@ -1501,9 +1501,9 @@ class EPUBTranslator:
             target_lang (str): Target language code
             total_chapters (int): Total number of chapters in the book
         """
-        print(f"\n{'='*80}")
+        print(f"\n{self.sep1}")
         print(f"Chapter {chapter_number}/{total_chapters}")
-        print(f"{'-'*80}")
+        print(f"{self.sep2}")
         # Check if chapter is fully translated
         if self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
             if self.verbose:
@@ -1528,10 +1528,10 @@ class EPUBTranslator:
                 if target:
                     if self.verbose:
                         print()
-                        self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}", "✓ Using cached paragraph translation", 80, 0, 4)
-                        print(f"{'~'*80}")
+                        self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}", "✓ Using cached paragraph translation", self.console_width, 0, 4)
+                        print(f"{self.sep3}")
                         self.display_side_by_side(source, target, self.console_width)
-                        print(f"{'~'*80}")
+                        print(f"{self.sep3}")
                     # Already translated, skip
                     continue
                 # Translate paragraph
@@ -1544,9 +1544,9 @@ class EPUBTranslator:
                         print("Error: Translation failed, skipping paragraph.")
                         continue
                     end_time = datetime.now()
-                    print(f"{'~'*80}")
+                    print(f"{self.sep3}")
                     self.display_side_by_side(source, target, self.console_width)
-                    print(f"{'~'*80}")
+                    print(f"{self.sep3}")
                     # Calculate and store timing
                     elapsed = int((end_time - start_time).total_seconds() * 1000)  # Convert to milliseconds
                     # Calculate fluency score
@@ -1665,7 +1665,7 @@ class EPUBTranslator:
             self.output_dir = output_dir
             os.makedirs(self.output_dir, exist_ok=True)
         # Load book and extract text
-        print(f"{'='*80}")
+        print(f"{self.sep1}")
         print(f"Translating from {source_lang} to {target_lang}")
         print(f"Reading EPUB from {input_path}...")
         book = epub.read_epub(input_path, options={'ignore_ncx': False})
@@ -1710,7 +1710,7 @@ class EPUBTranslator:
         if translated_chapters:
             self.book_finalize(translated_book, translated_chapters)
         # Save outputs
-        print(f"\n{'='*80}")
+        print(f"\n{self.sep1}")
         print("Saving output files...")
         # Create filename with original name + language edition
         original_filename = os.path.splitext(os.path.basename(input_path))[0]
@@ -1718,9 +1718,9 @@ class EPUBTranslator:
         translated_path = os.path.join(self.output_dir, translation_filename)
         epub.write_epub(translated_path, translated_book)
         print(f"✓ Translation saved: {translated_path}")
-        print(f"{'='*80}")
+        print(f"{self.sep1}")
         print("Translation complete!")
-        print(f"{'='*80}")
+        print(f"{self.sep1}")
 
     def translate_context(self, texts: List[str], source_lang: str, target_lang: str):
         """Translate texts and add them to context without storing in database.
@@ -1737,9 +1737,9 @@ class EPUBTranslator:
                 # Translation without storing in database
                 translation = self.translate_text(text, source_lang, target_lang, False)
                 if self.verbose:
-                    print(f"{'~'*80}")
-                    self.display_side_by_side(f"{text}:", f"{translation}:", 80)
-                    print(f"{'~'*80}")
+                    print(f"{self.sep3}")
+                    self.display_side_by_side(f"{text}:", f"{translation}:", self.console_width)
+                    print(f"{self.sep3}")
                 # Add to context immediately
                 self.context_add(text, translation)
             except Exception as e:
@@ -2250,7 +2250,9 @@ def main():
         Verbose mode provides detailed progress, timing, and quality information.
     """
     parser = argparse.ArgumentParser(description="BookLingua - Translate EPUB books using various AI models")
+    # Required input EPUB file
     parser.add_argument("input", help="Input EPUB file path")
+    # Optional arguments
     parser.add_argument("-o", "--output", default=None, help="Output directory (default: filename without extension)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("-s", "--source-lang", default="English", help="Source language (default: English)")
@@ -2259,11 +2261,11 @@ def main():
     parser.add_argument("-u", "--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
     parser.add_argument("-m", "--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
     parser.add_argument("-k", "--api-key", help="API key for the translation service")
-    
     # CSV export/import options
-    parser.add_argument("--export-csv", help="Export database to CSV file")
-    parser.add_argument("--import-csv", help="Import translations from CSV file")
-    
+    parser.add_argument("-e", "--export-csv", help="Export database to CSV file")
+    parser.add_argument("-i", "--import-csv", help="Import translations from CSV file")
+    # Console width for side-by-side display
+    parser.add_argument("-w", "--width", type=int, default=80, help="Console width for side-by-side display (default: 80)")
     # Preset configurations for common services
     parser.add_argument("--openai", action="store_true", help="Use OpenAI API")
     parser.add_argument("--ollama", action="store_true", help="Use Ollama local server")
@@ -2272,15 +2274,12 @@ def main():
     parser.add_argument("--lmstudio", action="store_true", help="Use LM Studio local server")
     parser.add_argument("--together", action="store_true", help="Use Together AI API")
     parser.add_argument("--openrouter", action="store_true", help="Use OpenRouter AI API")
-    parser.add_argument("--width", type=int, default=80, help="Console width for side-by-side display (default: 80)")
-    
+    # Parse arguments
     args = parser.parse_args()
-    
     # Determine API configuration
     api_key = args.api_key
     base_url = args.base_url
     model = args.model
-    
     # Handle preset configurations
     if args.openai:
         base_url = base_url or "https://api.openai.com/v1"
@@ -2311,16 +2310,13 @@ def main():
         model = model or "openai/gpt-4o"
         if not api_key:
             api_key = os.environ.get('OPENROUTER_API_KEY')
-    
     # Use environment variable as fallback for API key
     if not api_key:
         api_key = os.environ.get('OPENAI_API_KEY')
-    
     # Set default output directory to filename without extension if not specified
     output_dir = args.output
     if output_dir is None:
         output_dir = os.path.splitext(os.path.basename(args.input))[0]
-    
     # Initialize translator
     translator = EPUBTranslator(
         api_key=api_key,
@@ -2330,8 +2326,7 @@ def main():
         epub_path=args.input
     )
     # Set console width
-    translator.console_width = args.width
-    
+    translator.set_console_width(args.width)
     # Handle CSV export/import operations
     if args.export_csv:
         try:
@@ -2341,7 +2336,6 @@ def main():
         except Exception as e:
             print(f"Error exporting database: {e}")
             return
-    
     if args.import_csv:
         try:
             translator.db_import_csv(args.import_csv)
@@ -2350,11 +2344,9 @@ def main():
         except Exception as e:
             print(f"Error importing database: {e}")
             return
-    
     # Use language names with first letter uppercase
     source_lang = args.source_lang.capitalize()
     target_lang = args.target_lang.capitalize()
-    
     # Run translation
     translator.translate_epub(
         input_path=args.input,
