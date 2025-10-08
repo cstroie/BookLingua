@@ -274,7 +274,7 @@ class EPUBTranslator:
                                     os.makedirs(source_lang_dir, exist_ok=True)
                                     # Create a safe filename from the chapter name
                                     safe_name = re.sub(r'[^\w\-_\. ]', '_', item.get_name())
-                                    filename = f"{item.get_id()}_{safe_name}.md"
+                                    filename = f"{safe_name}.md"
                                     filepath = os.path.join(source_lang_dir, filename)
                                     # Write markdown content to file
                                     with open(filepath, 'w', encoding='utf-8') as f:
@@ -1401,6 +1401,9 @@ class EPUBTranslator:
                 return cached_result[0]  # Return only the translated text
         # Strip markdown formatting for cleaner translation
         stripped_text, prefix, suffix = self.strip_markdown_formatting(text)
+        # Return original if empty after stripping
+        if not stripped_text.strip():
+            return text
         # No cached translation, call the API with retry logic
         max_retries = 5
         for attempt in range(max_retries):
@@ -2122,19 +2125,17 @@ Return only a single integer number between 0 and 100."""
         stripped_text = text.strip()
         prefix = ""
         suffix = ""
-        
-        # Find prefix (non-alphanumeric characters at the beginning)
-        prefix_match = re.match(r'^([^a-zA-Z0-9]+)', stripped_text)
+        # Find prefix (non-alphabetic characters at the beginning)
+        prefix_match = re.match(r'^([^a-zA-Z]+)', stripped_text)
         if prefix_match:
             prefix = prefix_match.group(1)
             stripped_text = stripped_text[len(prefix):]
-        
-        # Find suffix (non-alphanumeric characters at the end)
-        suffix_match = re.search(r'([^a-zA-Z0-9]+)$', stripped_text)
-        if suffix_match:
-            suffix = suffix_match.group(1)
-            stripped_text = stripped_text[:-len(suffix)]
-            
+            # Find suffix (non-alphabetic characters at the end) only if prefix was found
+            suffix_match = re.search(r'([^a-zA-Z]+)$', stripped_text)
+            if suffix_match:
+                suffix = suffix_match.group(1)
+                stripped_text = stripped_text[:-len(suffix)]
+        # Return clean text with prefix and suffix
         return (stripped_text, prefix, suffix)
 
 def main():
