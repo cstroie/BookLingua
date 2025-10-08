@@ -2123,30 +2123,17 @@ Return only a single integer number between 0 and 100."""
         prefix = ""
         suffix = ""
         
-        # Handle headers (# Header)
-        header_match = re.match(r'^(#+)\s+(.*)', stripped_text)
-        if header_match:
-            prefix = header_match.group(1) + " "
-            stripped_text = header_match.group(2)
+        # Find prefix (non-alphanumeric characters at the beginning)
+        prefix_match = re.match(r'^([^a-zA-Z0-9]+)', stripped_text)
+        if prefix_match:
+            prefix = prefix_match.group(1)
+            stripped_text = stripped_text[len(prefix):]
         
-        # Handle list items (- Item or * Item)
-        elif stripped_text.startswith("- ") or stripped_text.startswith("* "):
-            prefix = stripped_text[:2]
-            stripped_text = stripped_text[2:]
-        
-        # Handle bold (**text**)
-        bold_match = re.match(r'^(\*{2})(.*?)(\*{2})$', stripped_text)
-        if bold_match:
-            prefix = bold_match.group(1)
-            stripped_text = bold_match.group(2)
-            suffix = bold_match.group(3)
-         
-        # Handle italic (*text*)
-        italic_match = re.match(r'^(\*)(.*?)(\*)$', stripped_text)
-        if italic_match and not bold_match:  # Only if not already handled as bold
-            prefix = italic_match.group(1)
-            stripped_text = italic_match.group(2)
-            suffix = italic_match.group(3)
+        # Find suffix (non-alphanumeric characters at the end)
+        suffix_match = re.search(r'([^a-zA-Z0-9]+)$', stripped_text)
+        if suffix_match:
+            suffix = suffix_match.group(1)
+            stripped_text = stripped_text[:-len(suffix)]
             
         return (stripped_text, prefix, suffix)
 
