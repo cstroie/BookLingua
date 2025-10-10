@@ -539,8 +539,12 @@ class EPUBTranslator:
                     elif tag.name == 'code':
                         replacement = f'`{text}`'
                     elif tag.name == 'img':
-                        # Preserve img tags as HTML
-                        replacement = str(tag)
+                        # Convert img tags to Markdown syntax
+                        src = tag.get('src', '')
+                        if src:
+                            replacement = f'!({src})'
+                        else:
+                            replacement = ''
                     elif tag.name == 'span':
                         try:
                             # Check for styling that mimics other tags
