@@ -1354,10 +1354,12 @@ class EPUBTranslator:
             cursor.execute('''
                 DELETE FROM translations 
                 WHERE source_lang = ? AND target_lang = ? AND (target IS NULL OR target = '')
+                RETURNING id
             ''', (source_lang, target_lang))
+            deleted_rows = cursor.fetchall()
             self.conn.commit()
             if self.verbose:
-                print("Deleted existing entries with empty translations")
+                print(f"Deleted {len(deleted_rows)} existing entries with empty translations")
         except Exception as e:
             if self.verbose:
                 print(f"Warning: Failed to delete empty translations: {e}")
