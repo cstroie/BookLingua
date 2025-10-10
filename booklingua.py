@@ -329,6 +329,13 @@ class EPUBTranslator:
                 descriptions = book.get_metadata('DC', 'description')
                 if descriptions:
                     description = descriptions[0][0]
+                    # Convert HTML description to Markdown if it contains HTML
+                    if description.strip().startswith('<'):
+                        try:
+                            desc_soup = BeautifulSoup(description, 'html.parser')
+                            description = self.html_to_markdown(desc_soup)
+                        except Exception as e:
+                            print(f"Warning: Failed to convert HTML description to Markdown: {e}")
                     metadata_parts.append(f"## Description\n\n{description}")
             except Exception as e:
                 print(f"Warning: Failed to extract description metadata: {e}")
