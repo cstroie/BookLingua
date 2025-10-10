@@ -487,11 +487,12 @@ class EPUBTranslator:
             
         Supported conversions:
             - <i>, <em> → *italic*
-            - <b>, <strong> → **bold**
+            - <b>, <strong> → **bold*
             - <u>, <ins> → __underline__
             - <s>, <del> → ~~strikethrough~~
             - <code> → `monospace`
             - <span> with CSS classes/styles → appropriate Markdown formatting
+            - <img> → preserved as HTML img tag
             
         CSS style detection:
             - font-weight: bold → **bold**
@@ -516,13 +517,13 @@ class EPUBTranslator:
             print(f"Warning: Failed to create element copy: {e}")
             return BeautifulSoup("", 'html.parser')
         # Inline tags to process
-        inline_tags = ['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span']
+        inline_tags = ['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span', 'img']
         try:
             # Process each inline tag
             for tag in element_copy.find_all(inline_tags):
                 try:
                     text = tag.get_text()
-                    if not text:
+                    if not text and tag.name != 'img':
                         continue
                     # Replace with appropriate Markdown formatting
                     if not tag.name:
@@ -537,6 +538,9 @@ class EPUBTranslator:
                         replacement = f'~~{text}~~'
                     elif tag.name == 'code':
                         replacement = f'`{text}`'
+                    elif tag.name == 'img':
+                        # Preserve img tags as HTML
+                        replacement = str(tag)
                     elif tag.name == 'span':
                         try:
                             # Check for styling that mimics other tags
