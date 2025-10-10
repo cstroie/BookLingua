@@ -301,6 +301,88 @@ class EPUBTranslator:
         if not book:
             print("Warning: No book provided to extract text from.")
             return chapters
+        # Extract metadata as first virtual chapter
+        try:
+            metadata_content = ""
+            metadata_parts = []
+            
+            # Extract title
+            try:
+                title_metadata = book.get_metadata('DC', 'title')
+                if title_metadata:
+                    title = title_metadata[0][0]
+                    metadata_parts.append(f"# {title}")
+            except Exception as e:
+                print(f"Warning: Failed to extract title metadata: {e}")
+            
+            # Extract authors
+            try:
+                authors = book.get_metadata('DC', 'creator')
+                if authors:
+                    author_names = [author[0] for author in authors]
+                    metadata_parts.append(f"## Authors\n\n{', '.join(author_names)}")
+            except Exception as e:
+                print(f"Warning: Failed to extract author metadata: {e}")
+            
+            # Extract description
+            try:
+                descriptions = book.get_metadata('DC', 'description')
+                if descriptions:
+                    description = descriptions[0][0]
+                    metadata_parts.append(f"## Description\n\n{description}")
+            except Exception as e:
+                print(f"Warning: Failed to extract description metadata: {e}")
+            
+            # Extract publisher
+            try:
+                publishers = book.get_metadata('DC', 'publisher')
+                if publishers:
+                    publisher = publishers[0][0]
+                    metadata_parts.append(f"## Publisher\n\n{publisher}")
+            except Exception as e:
+                print(f"Warning: Failed to extract publisher metadata: {e}")
+            
+            # Extract date
+            try:
+                dates = book.get_metadata('DC', 'date')
+                if dates:
+                    date = dates[0][0]
+                    metadata_parts.append(f"## Publication Date\n\n{date}")
+            except Exception as e:
+                print(f"Warning: Failed to extract date metadata: {e}")
+            
+            # Combine all metadata parts
+            if metadata_parts:
+                metadata_content = "\n\n".join(metadata_parts)
+                metadata_paragraphs = [p.strip() for p in metadata_content.split('\n\n') if p.strip()]
+                
+                # Create virtual chapter for metadata
+                metadata_chapter = {
+                    'id': 'metadata',
+                    'name': 'metadata',
+                    'content': metadata_content,
+                    'html': f'<div>{metadata_content}</div>',
+                    'paragraphs': metadata_paragraphs
+                }
+                chapters.append(metadata_chapter)
+                
+                # Save metadata as markdown if output directory exists
+                if self.output_dir and os.path.exists(self.output_dir):
+                    try:
+                        # Create source language subdirectory
+                        source_lang_dir = os.path.join(self.output_dir, source_lang)
+                        os.makedirs(source_lang_dir, exist_ok=True)
+                        # Save metadata
+                        filename = "metadata.md"
+                        filepath = os.path.join(source_lang_dir, filename)
+                        # Write markdown content to file
+                        with open(filepath, 'w', encoding='utf-8') as f:
+                            f.write(metadata_content)
+                    except Exception as e:
+                        print(f"Warning: Failed to save metadata as markdown: {e}")
+        except Exception as e:
+            print(f"Warning: Error processing metadata: {e}")
+        
         # Get all items in the book
         try:
             items = book.get_items()
