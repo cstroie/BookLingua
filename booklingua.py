@@ -59,6 +59,7 @@ import json
 import os
 import argparse
 import re
+import csv
 import sqlite3
 import time
 import shutil
@@ -433,13 +434,13 @@ class EPUBTranslator:
             for element in soup.find_all(block_elements, recursive=True):
                 try:
                     # Skip if parent is also a block element to avoid duplication
-                    parent = element.parent
-                    if parent and parent.name in block_elements \
-                        and parent.get_text(" ", strip=True) == element.get_text(" ", strip=True):
+                    if element.parent.name in block_elements:
                         continue
-                    # Handle line breaks and horizontal rules
-                    if element.name in ['br', 'hr']:
+                    # Handle elements with no text
+                    if element.name == 'hr':
                         markdown_lines.append('---')
+                    elif element.name == 'br':
+                        markdown_lines.append('***')
                     # Process inline tags within the element
                     processed_element = self.process_inline_tags(element)
                     text = processed_element.get_text(separator=' ', strip=True)
@@ -703,6 +704,9 @@ class EPUBTranslator:
                 # Handle horizontal rules
                 elif line.startswith('---'):
                     html_lines.append('<hr/>')
+                # Handle break
+                elif line.startswith('***'):
+                    html_lines.append('<br/>')
                 # Handle lists
                 elif line.startswith('- '):
                     try:
@@ -832,7 +836,6 @@ class EPUBTranslator:
             raise Exception("Database connection not available")
         
         try:
-            import csv
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT id, source_lang, target_lang, source, target, model, 
@@ -869,7 +872,6 @@ class EPUBTranslator:
             raise Exception("Database connection not available")
         
         try:
-            import csv
             cursor = self.conn.cursor()
             
             with open(csv_path, 'r', encoding='utf-8') as csvfile:
@@ -1610,11 +1612,11 @@ class EPUBTranslator:
             if self.verbose:
                 print(f"Warning: Quality checks failed for chapter {chapter_number}: {e}")
     
-    def phase_import(self, input_path: str, output_dir: str = "output",
+    def phase_extract(self, input_path: str, output_dir: str = "output",
                      source_lang: str = "English", target_lang: str = "Romanian") -> int:
         """Import phase: Extract content from EPUB and save to database.
         
-        This method handles the import phase of the translation workflow, which includes:
+        This method handles the extract/import phase of the translation workflow, which includes:
         1. Reading the EPUB file
         2. Extracting text content from all chapters
         3. Saving the content to the database for later translation
@@ -1662,10 +1664,10 @@ class EPUBTranslator:
         # We need the database connection
         if not self.conn:
             raise Exception("Database connection not available")
-        # Get the latest edition number, always translate the latest imported edition
+        # Get the latest edition number, always translate the latest edition
         edition_number = self.db_get_latest_edition(source_lang, target_lang)
         if edition_number == 0:
-            print("No content found in database. Please run import phase first.")
+            print("No content found in database. Please run extract phase first.")
             return
         print(f"{self.sep1}")
         print(f"Translating edition {edition_number} from {source_lang} to {target_lang}")
@@ -1847,7 +1849,7 @@ class EPUBTranslator:
             # Also creates: translations/English/ and translations/Romanian/ directories
         """
         # Run all three phases in sequence
-        self.phase_import(input_path, output_dir, source_lang)
+        self.phase_extract(input_path, output_dir, source_lang)
         self.phase_translate(source_lang, target_lang, chapter_numbers)
         self.phase_build(input_path, output_dir, source_lang, target_lang, chapter_numbers)
 
@@ -2061,7 +2063,6 @@ Return only a single integer number between 0 and 100."""
             # Evaluate in English
             result = self.translate_text(prompt, "English", "English", use_cache=False)
             # Extract numerical score from response
-            import re
             score_match = re.search(r'(\d+)', result)
             if score_match:
                 return min(100, max(0, int(score_match.group(1))))
@@ -2382,9 +2383,9 @@ def main():
     # Required input EPUB file
     parser.add_argument("input", help="Input EPUB file path")
     # Phase control arguments
-    parser.add_argument("--import", action="store_true", dest="phase_import", help="Run the import phase")
-    parser.add_argument("--translate", action="store_true", dest="phase_translate", help="Run the translate phase")
-    parser.add_argument("--build", action="store_true", dest="phase_build", help="Run the build phase")
+    parser.add_argument("--extract", action="store_true", dest="phase_extract", help="Run the text extract and import phase")
+    parser.add_argument("--translate", action="store_true", dest="phase_translate", help="Run the text translate phase")
+    parser.add_argument("--build", action="store_true", dest="phase_build", help="Run the book build phase")
     # Optional arguments
     parser.add_argument("-o", "--output", default=None, help="Output directory (default: filename without extension)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
@@ -2479,13 +2480,13 @@ def main():
     target_lang = args.target_lang.capitalize()
     
     # Check if any phase is specified; if none, run all phases
-    all_phases = False if (args.phase_import or args.phase_translate or args.phase_build) else True
-    print(f"Running phases: {'import ' if args.phase_import or all_phases else ''}"
+    all_phases = False if (args.phase_extract or args.phase_translate or args.phase_build) else True
+    print(f"Running phases: {'import ' if args.phase_extract or all_phases else ''}"
           f"{'translate ' if args.phase_translate or all_phases else ''}"
           f"{'build' if args.phase_build or all_phases else ''}")
     # Run specific phases
-    if args.phase_import or all_phases:
-        translator.phase_import(
+    if args.phase_extract or all_phases:
+        translator.phase_extract(
             input_path=args.input,
             output_dir=output_dir,
             source_lang=source_lang
