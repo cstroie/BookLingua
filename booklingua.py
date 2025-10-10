@@ -458,7 +458,22 @@ class EPUBTranslator:
             book (epub.EpubBook): The EPUB book object to finalize
             chapters (List[epub.EpubHtml]): List of chapter objects to include in navigation
         """
+        # Add CSS file if it exists
+        nav_css = None
+        css_file = 'ebook.css'
+        if os.path.exists(css_file):
+            with open(css_file, 'r', encoding='utf-8') as f:
+                css_content = f.read()
+            nav_css = epub.EpubItem(
+                uid="css",
+                file_name="style/ebook.css",
+                media_type="text/css",
+                content=css_content
+            )
+            book.add_item(nav_css)
         for chapter in chapters:
+            if nav_css:
+                chapter.add_item(nav_css)
             book.add_item(chapter)
         book.toc = tuple(chapters)
         book.add_item(epub.EpubNcx())
