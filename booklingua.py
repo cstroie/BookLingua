@@ -921,14 +921,14 @@ class EPUBTranslator:
             print(f"Failed to import database from CSV: {e}")
             raise
     
-    def db_get_translation(self, text: str, source_lang: str, target_lang: str) -> tuple:
+    def db_get_translation(self, source: str, source_lang: str, target_lang: str) -> tuple:
         """Retrieve the best translation from the database if it exists.
         
         This method retrieves translations ordered by fluency score in descending order
         and returns the highest quality translation available.
         
         Args:
-            text (str): Source text to look up
+            source (str): Source text to look up
             source_lang (str): Source language code
             target_lang (str): Target language code
             
@@ -948,7 +948,7 @@ class EPUBTranslator:
                 SELECT target, duration, fluency FROM translations 
                 WHERE source_lang = ? AND target_lang = ? AND source = ? AND target != ''
                 ORDER BY fluency DESC
-            ''', (source_lang, target_lang, text))
+            ''', (source_lang, target_lang, source))
             result = cursor.fetchone()
             if result:
                 return (result[0], result[1], result[2])  # (target, duration, fluency)
@@ -1365,7 +1365,7 @@ class EPUBTranslator:
                 print(f"Warning: Failed to delete empty translations: {e}")
         # Summary of chapters found
         print(f"Found {len(chapters)} chapters to translate ...")
-        # Save all texts with empty translations
+        # Save all texts
         try:
             for ch, chapter in enumerate(chapters):
                 texts = chapter.get('paragraphs', [])
@@ -1373,8 +1373,9 @@ class EPUBTranslator:
                 for par, text in enumerate(texts):
                     # Only save non-empty texts
                     if text.strip():
-                        # Check if text is purely non-alphabetic using regex
-                        if re.match(r'^[^a-zA-Z]*$', text):
+                        #(target, duration, fluency) = self.db_get_translation(text, source_lang, target_lang)
+                        # Check if the source contains no letters
+                        if re.match(r'^[^a-zA-Z]+$', text, re.UNICODE):
                             # Copy as-is with perfect fluency and zero duration
                             target, duration, fluency = text, 0, 100
                         else:
@@ -1383,7 +1384,7 @@ class EPUBTranslator:
                         # Insert with translation if not already there
                         cursor = self.conn.cursor()
                         if target is None:
-                            target, duration, fluency = text, -1, -1
+                            target, duration, fluency = '', -1, -1
                         cursor.execute('''
                             INSERT OR IGNORE INTO translations 
                             (source_lang, target_lang, source, target, model, edition, chapter, paragraph, duration, fluency)
