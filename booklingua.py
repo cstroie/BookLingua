@@ -1373,8 +1373,8 @@ class EPUBTranslator:
                 for par, text in enumerate(texts):
                     # Only save non-empty texts
                     if text.strip():
-                        # Check if text is purely non-alphabetic
-                        if all(not c.isalpha() for c in text):
+                        # Check if text is purely non-alphabetic using regex
+                        if re.match(r'^[^a-zA-Z]*$', text):
                             # Copy as-is with perfect fluency and zero duration
                             target, duration, fluency = text, 0, 100
                         else:
