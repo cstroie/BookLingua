@@ -763,11 +763,12 @@ class EPUBTranslator:
             str: Text with Markdown formatting converted to HTML tags
             
         Processing order (highest to lowest precedence):
-            1. Code blocks (`text`) → <code>text</code>
-            2. Strikethrough (~~text~~) → <s>text</s>
-            3. Bold text (**text**) → <strong>text</strong>
-            4. Italic text (*text*) → <em>text</em>
-            5. Underline (__text__) → <u>text</u>
+            1. Images (![](src)) → <img src="src"/>
+            2. Code blocks (`text`) → <code>text</code>
+            3. Strikethrough (~~text~~) → <s>text</s>
+            4. Bold text (**text**) → <strong>text</strong>
+            5. Italic text (*text*) → <em>text</em>
+            6. Underline (__text__) → <u>text</u>
             
         Note:
             The processing order is important to handle nested formatting correctly.
@@ -786,7 +787,9 @@ class EPUBTranslator:
         # Process inline formatting with regex substitutions
         try:
             # Process formatting in order of precedence
-            # Code (highest precedence)
+            # Images (highest precedence)
+            text = re.sub(r'!\(([^)]+)\)', r'<img src="\1"/>', text)
+            # Code
             text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
             # Strikethrough
             text = re.sub(r'~~([^~]+)~~', r'<s>\1</s>', text)
