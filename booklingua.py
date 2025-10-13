@@ -691,24 +691,21 @@ class BookTranslator:
         """
         # Get the original title
         original_title = original_book.get_metadata('DC', 'title')[0][0]
-        
         # Translate the title
         translated_title, _, _, _ = self.translate_text(original_title, source_lang, target_lang)
-        
         # Create title page content with HTML title tags
         title_content = f'<title>{translated_title}</title>'
         xhtml = f'<article id="titlepage">\n{title_content}\n</article>'
-        
         # Create the title page chapter
-        titlepage_chapter = epub.EpubHtml(
+        titlepage = epub.EpubHtml(
             title='Title Page',
             file_name='titlepage.xhtml',
             lang=self.get_language_code(target_lang),
             uid='titlepage'
         )
-        titlepage_chapter.content = xhtml
-        
-        return titlepage_chapter
+        titlepage.content = xhtml
+        # Return the title page chapter
+        return titlepage
 
     def book_create_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
         """Create an EPUB chapter from translated texts in the database.
