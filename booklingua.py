@@ -460,7 +460,7 @@ class EPUBTranslator:
         # Return the list of chapter data
         return chapters
 
-    def book_create_template(self, original_book, target_lang: str) -> epub.EpubBook:
+    def book_create_template(self, original_book, source_lang: str, target_lang: str) -> epub.EpubBook:
         """Create a new EPUB book template with metadata copied from original book.
         
         This method creates a new EPUB book object and copies essential metadata
@@ -469,6 +469,7 @@ class EPUBTranslator:
         
         Args:
             original_book: The original EPUB book object (ebooklib.epub.EpubBook)
+            source_lang (str): Source language code
             target_lang (str): Target language code for setting the book language
                 
         Returns:
@@ -477,7 +478,8 @@ class EPUBTranslator:
         new_book = epub.EpubBook()
         new_book.set_identifier(original_book.get_metadata('DC', 'identifier')[0][0])
         original_title = original_book.get_metadata('DC', 'title')[0][0]
-        new_book.set_title(f"{original_title}")
+        translated_title, _, _, _ = self.translate_text(original_title, source_lang, target_lang)
+        new_book.set_title(f"{translated_title}")
         # Set language using helper function
         new_book.set_language(self.get_language_code(target_lang))
         for author in original_book.get_metadata('DC', 'creator'):
@@ -504,7 +506,7 @@ class EPUBTranslator:
         translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
         # Convert translated content to HTML and extract title
         title, html_content = self.markdown_to_html(translated_content)
-        xhtml = '<article id="{id}">\n{content}\n</article>'.format(content=html_content, id=f'chapter_{chapter_number}')
+        xhtml = '<article id="{id}">\n{content}\n</article>'.format(content=html_content, id=f'chapter-{chapter_number}')
         # Save translated chapter as markdown if output directory exists
         if self.output_dir and os.path.exists(self.output_dir):
             try:
@@ -512,13 +514,13 @@ class EPUBTranslator:
                 target_lang_dir = os.path.join(self.output_dir, target_lang)
                 os.makedirs(target_lang_dir, exist_ok=True)
                 # Create markdown filename
-                filename = f"chapter_{chapter_number}.md"
+                filename = f"chapter-{chapter_number}.md"
                 filepath = os.path.join(target_lang_dir, filename)
                 # Write translated markdown content to file
                 with open(filepath, 'w', encoding='utf-8') as f:
                     f.write(translated_content)
                 # Create XHTML filename
-                filename = f"chapter_{chapter_number}.xhtml"
+                filename = f"chapter-{chapter_number}.xhtml"
                 filepath = os.path.join(target_lang_dir, filename)
                 # Write translated XHTML content to file
                 with open(filepath, 'w', encoding='utf-8') as f:
@@ -528,9 +530,9 @@ class EPUBTranslator:
         # Create chapter for book
         translated_chapter = epub.EpubHtml(
             title=title or f'Chapter {chapter_number}',
-            file_name=f'chapter_{chapter_number}.xhtml',
+            file_name=f'chapter-{chapter_number}.xhtml',
             lang=self.get_language_code(target_lang),
-            uid=f'chapter_{chapter_number}'
+            uid=f'chapter-{chapter_number}'
         )
         translated_chapter.content = xhtml
         # Return the reconstructed chapter
@@ -555,7 +557,7 @@ class EPUBTranslator:
                 css_content = f.read()
             css = epub.EpubItem(
                 uid="css",
-                file_name="style/ebook.css",
+                file_name="ebook.css",
                 media_type="text/css",
                 content=css_content
             )
@@ -1221,7 +1223,8 @@ class EPUBTranslator:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT target FROM translations 
-                WHERE edition = ? AND chapter = ? AND source_lang = ? AND target_lang = ? 
+                WHERE edition = ? AND chapter = ? AND paragraph > 0 
+                      AND source_lang = ? AND target_lang = ?
                 ORDER BY paragraph ASC
             ''', (edition_number, chapter_number, source_lang, target_lang))
             results = cursor.fetchall()
@@ -1942,7 +1945,7 @@ class EPUBTranslator:
         if output_dir:
             self.output_dir = output_dir
             os.makedirs(self.output_dir, exist_ok=True)
-        # We need the database connection           
+        # We need the database connection
         if not self.conn:
             raise Exception("Database connection not available")
         # Get the latest edition number. We always build the latest edition
@@ -1978,11 +1981,11 @@ class EPUBTranslator:
                 print("Error: Chapter numbers must be comma-separated integers")
                 return
         # Prepare output book
-        translated_book = self.book_create_template(book, target_lang)
+        translated_book = self.book_create_template(book, source_lang, target_lang)
         translated_chapters = []
         for chapter_number in chapter_list:
             # Only include chapters that are fully translated
-            if self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
+            if chapter_number > 0 and self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
                 translated_chapters.append(self.book_create_chapter(edition_number, chapter_number, source_lang, target_lang))
             else:
                 print(f"Warning: Chapter {chapter_number} is not fully translated and will be skipped")
@@ -2224,7 +2227,6 @@ class EPUBTranslator:
         self.sep3 = '~' * self.console_width
         if self.verbose:
             print(f"Console width set to {width} characters")
-
 
     def calculate_fluency_score(self, text: str) -> int:
         """Calculate fluency score based on linguistic patterns.
