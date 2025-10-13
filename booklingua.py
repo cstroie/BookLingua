@@ -440,7 +440,7 @@ class BookTranslator:
                 print("Error: Chapter numbers must be comma-separated integers")
                 return
         # Prepare output book
-        translated_book = self.book_create_template(book, target_lang)
+        translated_book = self.book_create_template(book, source_lang, target_lang)
         translated_chapters = []
         for chapter_number in chapter_list:
             # Only include chapters that are fully translated
