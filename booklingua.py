@@ -294,6 +294,7 @@ class BookTranslator:
             output_dir (str, optional): Directory for output files. Defaults to "output".
             source_lang (str, optional): Source language name. Defaults to "English".
             target_lang (str, optional): Target language name. Defaults to "Romanian".
+            new_edition (bool, optional): Whether to create a new edition in the database.
         """
         # Update database path if not set during initialization
         if not self.db_path and self.book_path:
@@ -422,8 +423,19 @@ class BookTranslator:
         # If specific chapters requested, filter the list
         if chapter_numbers is not None:
             try:
-                # Parse comma-separated list of chapter numbers
-                requested_chapters = [int(ch.strip()) for ch in chapter_numbers.split(',')]
+                # Parse comma-separated list of chapter numbers and ranges
+                requested_chapters = []
+                for part in chapter_numbers.split(','):
+                    part = part.strip()
+                    if '-' in part:
+                        # Handle range like "3-7"
+                        start, end = map(int, part.split('-'))
+                        requested_chapters.extend(range(start, end + 1))
+                    else:
+                        # Handle single chapter like "3"
+                        requested_chapters.append(int(part))
+                # Remove duplicates and sort
+                requested_chapters = sorted(list(set(requested_chapters)))
                 # Filter to only include chapters that exist in the database
                 filtered_chapters = [ch for ch in chapter_list if ch in requested_chapters]
                 # Check for any chapters that don't exist
@@ -432,12 +444,12 @@ class BookTranslator:
                     print(f"Warning: Chapters {missing_chapters} not found in database")
                 if filtered_chapters:
                     chapter_list = filtered_chapters
-                    print(f"Building with chapters: {', '.join(map(str, filtered_chapters))}")
+                    print(f"Building chapters: {', '.join(map(str, filtered_chapters))}")
                 else:
                     print("Warning: None of the requested chapters were found in database")
                     return
             except ValueError:
-                print("Error: Chapter numbers must be comma-separated integers")
+                print("Error: Chapter numbers must be comma-separated integers or ranges (e.g., '1,3,5' or'3-7')")
                 return
         # Prepare output book
         translated_book = self.book_create_template(book, source_lang, target_lang)
@@ -1760,6 +1772,7 @@ class BookTranslator:
             chapters (List[dict]): List of chapter dictionaries containing paragraphs
             source_lang (str): Source language code
             target_lang (str): Target language code
+            new_edition (bool): Whether to create a new edition or use the latest existing one
             
         Returns:
             int: Edition number used for these chapters
@@ -1770,10 +1783,8 @@ class BookTranslator:
         # We need the database connection
         if not self.conn:
             raise Exception("Database connection not available")
-        
         # Get the latest edition number
         latest_edition = self.db_get_latest_edition(source_lang, target_lang)
-        
         # Use latest edition by default, create new one only if requested or no editions exist
         if new_edition or latest_edition == 0:
             edition_number = latest_edition + 1
@@ -2695,6 +2706,8 @@ def main():
     parser.add_argument("--extract", action="store_true", dest="phase_extract", help="Run the text extract and import phase")
     parser.add_argument("--translate", action="store_true", dest="phase_translate", help="Run the text translate phase")
     parser.add_argument("--build", action="store_true", dest="phase_build", help="Run the book build phase")
+    # Edition control
+    parser.add_argument("--new-edition", action="store_true", help="Create a new edition instead of using the last one")
     # Optional arguments
     parser.add_argument("-o", "--output", default=None, help="Output directory (default: filename without extension)")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
@@ -2709,8 +2722,6 @@ def main():
     parser.add_argument("-i", "--import-csv", help="Import translations from CSV file")
     # Console width for side-by-side display
     parser.add_argument("-w", "--width", type=int, default=None, help="Console width for side-by-side display (default: auto-detect)")
-    # Edition control
-    parser.add_argument("--new-edition", action="store_true", help="Create a new edition instead of using the last one")
     # Preset configurations for common services
     parser.add_argument("--openai", action="store_true", help="Use OpenAI API")
     parser.add_argument("--ollama", action="store_true", help="Use Ollama local server")
