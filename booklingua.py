@@ -467,7 +467,7 @@ class BookTranslator:
                 title_metadata = book.get_metadata('DC', 'title')
                 if title_metadata:
                     title = title_metadata[0][0]
-                    metadata_parts.append(f"# {title}")
+                    metadata_parts.append(f"{title}")
             except Exception as e:
                 print(f"Warning: Failed to extract title metadata: {e}")
             # Extract authors
@@ -475,7 +475,6 @@ class BookTranslator:
                 authors = book.get_metadata('DC', 'creator')
                 if authors:
                     author_names = [author[0] for author in authors]
-                    metadata_parts.append(f"## Authors")
                     metadata_parts.append(', '.join(author_names))
             except Exception as e:
                 print(f"Warning: Failed to extract author metadata: {e}")
@@ -491,7 +490,6 @@ class BookTranslator:
                             description = self.html_to_markdown(desc_soup)
                         except Exception as e:
                             print(f"Warning: Failed to convert HTML description to Markdown: {e}")
-                    metadata_parts.append(f"## Description")
                     metadata_parts.extend(description.split('\n\n'))
             except Exception as e:
                 print(f"Warning: Failed to extract description metadata: {e}")
@@ -500,7 +498,6 @@ class BookTranslator:
                 publishers = book.get_metadata('DC', 'publisher')
                 if publishers:
                     publisher = publishers[0][0]
-                    metadata_parts.append(f"## Publisher")
                     metadata_parts.append(publisher)
             except Exception as e:
                 print(f"Warning: Failed to extract publisher metadata: {e}")
@@ -509,7 +506,6 @@ class BookTranslator:
                 dates = book.get_metadata('DC', 'date')
                 if dates:
                     date = dates[0][0]
-                    metadata_parts.append(f"## Publication Date")
                     metadata_parts.append(f"{date}")
             except Exception as e:
                 print(f"Warning: Failed to extract date metadata: {e}")
@@ -618,55 +614,6 @@ class BookTranslator:
         # Return the list of chapter data
         return chapters
 
-    def parse_chapter_numbers(self, chapter_numbers: str, available_chapters: List[int]) -> List[int]:
-        """Parse comma-separated list of chapter numbers and ranges.
-        
-        This method parses a string containing comma-separated chapter numbers
-        and ranges (e.g., "1,3,5-10") and returns a sorted list of individual
-        chapter numbers that exist in the available chapters.
-        
-        Args:
-            chapter_numbers (str): Comma-separated list of chapter numbers or ranges
-                Examples: "1,3,5" or "3-7" or "1,3-5,8-10"
-            available_chapters (List[int]): List of chapter numbers available in database
-            
-        Returns:
-            List[int]: Sorted list of valid chapter numbers
-            
-        Raises:
-            ValueError: If chapter numbers cannot be parsed
-        """
-        if chapter_numbers is None:
-            return available_chapters
-            
-        try:
-            # Parse comma-separated list of chapter numbers and ranges
-            requested_chapters = []
-            for part in chapter_numbers.split(','):
-                part = part.strip()
-                if '-' in part:
-                    # Handle range like "3-7"
-                    start, end = map(int, part.split('-'))
-                    requested_chapters.extend(range(start, end + 1))
-                else:
-                    # Handle single chapter like "3"
-                    requested_chapters.append(int(part))
-            # Remove duplicates and sort
-            requested_chapters = sorted(list(set(requested_chapters)))
-            # Filter to only include chapters that exist in the database
-            filtered_chapters = [ch for ch in requested_chapters if ch in available_chapters]
-            # Check for any chapters that don't exist
-            missing_chapters = [ch for ch in requested_chapters if ch not in available_chapters]
-            if missing_chapters:
-                print(f"Warning: Chapters {missing_chapters} not found in database")
-            if filtered_chapters:
-                return filtered_chapters
-            else:
-                print("Warning: None of the requested chapters were found in database")
-                return []
-        except ValueError:
-            raise ValueError("Chapter numbers must be comma-separated integers or ranges (e.g., '1,3,5' or '3-7')")
-
     def book_create_template(self, original_book, source_lang: str, target_lang: str) -> epub.EpubBook:
         """Create a new EPUB book template with metadata copied from original book.
         
@@ -685,7 +632,7 @@ class BookTranslator:
         new_book = epub.EpubBook()
         new_book.set_identifier(original_book.get_metadata('DC', 'identifier')[0][0])
         original_title = original_book.get_metadata('DC', 'title')[0][0]
-        translated_title, _, _, _ = self.translate_text(original_title, source_lang, target_lang)
+        translated_title, _, _, _ = self.translate_text(original_title, source_lang, target_lang, True)
         new_book.set_title(f"{translated_title}")
         # Set language using helper function
         new_book.set_language(self.get_language_code(target_lang))
@@ -693,7 +640,7 @@ class BookTranslator:
             new_book.add_author(author[0])
         return new_book
 
-    def book_create_titlepage(self, original_book, source_lang: str, target_lang: str) -> epub.EpubHtml:
+    def book_create_titlepage(self, book: epub.EpubBook, source_lang: str, target_lang: str) -> epub.EpubHtml:
         """Create a title page chapter containing only the book title.
         
         This method creates a simple EPUB chapter that serves as a title page,
@@ -709,12 +656,8 @@ class BookTranslator:
             epub.EpubHtml: EPUB HTML item for the title page chapter
         """
         # Get the original title
-        original_title = original_book.get_metadata('DC', 'title')[0][0]
-        # Translate the title
-        translated_title, _, _, _ = self.translate_text(original_title, source_lang, target_lang, True)
-        # Create title page content with HTML title tags
-        title_content = f'<title>{translated_title}</title>'
-        xhtml = f'<article id="titlepage">\n{title_content}\n</article>'
+        title = book.get_metadata('DC', 'title')[0][0]
+        xhtml = f'<article id="titlepage">\n<title>{title}</title>\n</article>'
         # Create the title page chapter
         titlepage = epub.EpubHtml(
             title='Title Page',
@@ -742,10 +685,12 @@ class BookTranslator:
         """
         # Get all translated texts in the chapter
         translated_texts = self.db_get_translations(edition_number, chapter_number, source_lang, target_lang)
+        # Pop first paragraph since it is the title (paragraph 0)
+        title = translated_texts.pop(0) if translated_texts else ""
         # Join all translated texts with double newlines
         translated_content = '\n\n'.join(translated_texts) if translated_texts else ""
         # Convert translated content to HTML and extract title
-        title, html_content = self.markdown_to_html(translated_content)
+        _, html_content = self.markdown_to_html(translated_content)
         xhtml = '<article id="{id}">\n{content}\n</article>'.format(content=html_content, id=f'chapter-{chapter_number}')
         # Save translated chapter as markdown if output directory exists
         if self.output_dir and os.path.exists(self.output_dir):
@@ -1472,7 +1417,7 @@ class BookTranslator:
             cursor = self.conn.cursor()
             cursor.execute('''
                 SELECT target FROM translations 
-                WHERE edition = ? AND chapter = ? AND paragraph > 0 
+                WHERE edition = ? AND chapter = ?
                       AND source_lang = ? AND target_lang = ?
                 ORDER BY paragraph ASC
             ''', (edition_number, chapter_number, source_lang, target_lang))
@@ -1873,6 +1818,8 @@ class BookTranslator:
         if use_cache and self.conn:
             # Check database first
             cached_result = self.db_get_translation(text, source_lang, target_lang)
+            # FIXME
+            print(cached_result)
             if cached_result[0]:
                 # Push to context list for continuity
                 self.context_add(text, cached_result[0])
@@ -2004,9 +1951,10 @@ class BookTranslator:
         self.context_prefill(source_lang, target_lang, chapter_number)
         # Get total paragraphs in chapter
         total_paragraphs = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
-        # Get the next chapter's paragraph from database
-        par = 0
+        # Start before first paragraph
+        par = -1
         while True:
+            # Get the next chapter's paragraph from database
             par, source, target = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
             if par:
                 # Check if already translated
@@ -2611,6 +2559,55 @@ Return only a single integer number between 0 and 100."""
                 stripped_text = stripped_text[:-len(suffix)]
         # Return clean text with prefix and suffix
         return (stripped_text, prefix, suffix)
+
+    def parse_chapter_numbers(self, chapter_numbers: str, available_chapters: List[int]) -> List[int]:
+        """Parse comma-separated list of chapter numbers and ranges.
+        
+        This method parses a string containing comma-separated chapter numbers
+        and ranges (e.g., "1,3,5-10") and returns a sorted list of individual
+        chapter numbers that exist in the available chapters.
+        
+        Args:
+            chapter_numbers (str): Comma-separated list of chapter numbers or ranges
+                Examples: "1,3,5" or "3-7" or "1,3-5,8-10"
+            available_chapters (List[int]): List of chapter numbers available in database
+            
+        Returns:
+            List[int]: Sorted list of valid chapter numbers
+            
+        Raises:
+            ValueError: If chapter numbers cannot be parsed
+        """
+        if chapter_numbers is None:
+            return available_chapters
+            
+        try:
+            # Parse comma-separated list of chapter numbers and ranges
+            requested_chapters = []
+            for part in chapter_numbers.split(','):
+                part = part.strip()
+                if '-' in part:
+                    # Handle range like "3-7"
+                    start, end = map(int, part.split('-'))
+                    requested_chapters.extend(range(start, end + 1))
+                else:
+                    # Handle single chapter like "3"
+                    requested_chapters.append(int(part))
+            # Remove duplicates and sort
+            requested_chapters = sorted(list(set(requested_chapters)))
+            # Filter to only include chapters that exist in the database
+            filtered_chapters = [ch for ch in requested_chapters if ch in available_chapters]
+            # Check for any chapters that don't exist
+            missing_chapters = [ch for ch in requested_chapters if ch not in available_chapters]
+            if missing_chapters:
+                print(f"Warning: Chapters {missing_chapters} not found in database")
+            if filtered_chapters:
+                return filtered_chapters
+            else:
+                print("Warning: None of the requested chapters were found in database")
+                return []
+        except ValueError:
+            raise ValueError("Chapter numbers must be comma-separated integers or ranges (e.g., '1,3,5' or '3-7')")
 
 def main():
     """Command-line interface for BookLingua EPUB translation tool.
