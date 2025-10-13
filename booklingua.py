@@ -251,12 +251,21 @@ class BookTranslator:
         self.model = model
         self.verbose = verbose
         self.context = []
+
+        # Console
+        self.console_width = 80
+        self.sep1 = '=' * self.console_width
+        self.sep2 = '-' * self.console_width
+        self.sep3 = '~' * self.console_width
+        # Auto-detect console width if possible
+        self.set_console_width(shutil.get_terminal_size().columns)
         
         # Initialize database
         self.book_path = book_path
         self.db_path = None
         self.output_dir = None
         self.conn = None
+        # If book path provided, set database path
         if book_path:
             self.db_path = os.path.splitext(book_path)[0] + '.db'
             self.db_init()
@@ -266,13 +275,194 @@ class BookTranslator:
             print(f"Using API endpoint: {base_url}")
         if self.db_path:
             print(f"Using database: {self.db_path}")
-        # Console width
-        self.set_console_width(shutil.get_terminal_size().columns)
     
     def __del__(self):
         """Clean up database connection when object is destroyed."""
         if self.conn:
             self.conn.close()
+    
+    def phase_extract(self, output_dir: str = "output",
+                     source_lang: str = "English", target_lang: str = "Romanian") -> int:
+        """Import phase: Extract content from EPUB and save to database.
+        
+        This method handles the extract/import phase of the translation workflow, which includes:
+        1. Reading the EPUB file
+        2. Extracting text content from all chapters
+        3. Saving the content to the database for later translation
+        
+        Args:
+            output_dir (str, optional): Directory for output files. Defaults to "output".
+            source_lang (str, optional): Source language name. Defaults to "English".
+            target_lang (str, optional): Target language name. Defaults to "Romanian".
+        """
+        # Update database path if not set during initialization
+        if not self.db_path and self.book_path:
+            self.db_path = os.path.splitext(self.book_path)[0] + '.db'
+            self.db_init()
+        # Create output directory if it doesn't exist
+        if output_dir:
+            self.output_dir = output_dir
+            os.makedirs(self.output_dir, exist_ok=True)
+        # Load book and extract text
+        print(f"{self.sep1}")
+        print(f"Importing content from {self.book_path}...")
+        book = epub.read_epub(self.book_path, options={'ignore_ncx': False})
+        chapters = self.book_extract_content(book, source_lang)
+        # Save all content to database
+        edition_number = self.db_save_chapters(chapters, source_lang, target_lang)
+        print(f"Import completed. Saved {len(chapters)} chapters to database.")
+        print(f"{self.sep1}")
+        # Return the edition number for reference
+        return edition_number
+
+    def phase_translate(self, source_lang: str = "English", target_lang: str = "Romanian",
+                       chapter_numbers: str = None):
+        """Translate phase: Translate content from database using AI.
+
+        This method handles the translation phase of the workflow, which includes:
+        1. Loading content from the database
+        2. Translating chapters using the AI model
+        3. Saving translations back to the database
+
+        Args:
+            source_lang (str, optional): Source language name. Defaults to "English".
+            target_lang (str, optional): Target language name. Defaults to "Romanian".
+            chapter_numbers (str, optional): Comma-separated list of chapter numbers or ranges to translate.
+                Examples: "1,3,5" or "3-7" or "1,3-5,8-10"
+        """
+        # We need the database connection
+        if not self.conn:
+            raise Exception("Database connection not available")
+        # Get the latest edition number, always translate the latest edition
+        edition_number = self.db_get_latest_edition(source_lang, target_lang)
+        if edition_number == 0:
+            print("No content found in database. Please run extract phase first.")
+            return
+        print(f"{self.sep1}")
+        print(f"Translating edition {edition_number} from {source_lang} to {target_lang}")
+        # Get chapter list first, ordered by number of paragraphs
+        chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, True)
+        # If specific chapters requested, filter the list
+        if chapter_numbers is not None:
+            try:
+                # Parse comma-separated list of chapter numbers and ranges
+                requested_chapters = []
+                for part in chapter_numbers.split(','):
+                    part = part.strip()
+                    if '-' in part:
+                        # Handle range like "3-7"
+                        start, end = map(int, part.split('-'))
+                        requested_chapters.extend(range(start, end + 1))
+                    else:
+                        # Handle single chapter like "3"
+                        requested_chapters.append(int(part))
+                # Remove duplicates and sort
+                requested_chapters = sorted(list(set(requested_chapters)))
+                # Filter to only include chapters that exist in the database
+                filtered_chapters = [ch for ch in chapter_list if ch in requested_chapters]
+                # Check for any chapters that don't exist
+                missing_chapters = [ch for ch in requested_chapters if ch not in chapter_list]
+                if missing_chapters:
+                    print(f"Warning: Chapters {missing_chapters} not found in database")
+                if filtered_chapters:
+                    chapter_list = filtered_chapters
+                    print(f"Translating chapters: {', '.join(map(str, filtered_chapters))}")
+                else:
+                    print("Warning: None of the requested chapters were found in database")
+                    return
+            except ValueError:
+                print("Error: Chapter numbers must be comma-separated integers or ranges (e.g., '1,3,5' or'3-7')")
+                return
+        # Process each chapter
+        for chapter_num in chapter_list:
+            self.translate_chapter(edition_number, chapter_num, source_lang, target_lang, len(chapter_list))
+        print(f"Translation phase completed.")
+        print(f"{self.sep1}")
+
+    def phase_build(self, output_dir: str = "output", 
+                   source_lang: str = "English", target_lang: str = "Romanian",
+                   chapter_numbers: str = None):
+        """Build phase: Create translated EPUB from database translations.
+        
+        This method handles the build phase of the workflow, which includes:
+        1. Loading translated content from the database
+        2. Creating a new EPUB with the translated content
+        3. Saving the final EPUB file
+        
+        Args:
+            output_dir (str, optional): Directory for output files. Defaults to "output".
+            source_lang (str, optional): Source language name. Defaults to "English".
+            target_lang (str, optional): Target language name. Defaults to "Romanian".
+            chapter_numbers (str, optional): Comma-separated list of chapter numbers or ranges to include.
+                Examples: "1,3,5" or "3-7" or "1,3-5,8-10"
+        """
+        # Update database path if not set during initialization
+        if not self.db_path and self.book_path:
+            self.db_path = os.path.splitext(self.book_path)[0] + '.db'
+            self.db_init()
+        # Create output directory if it doesn't exist
+        if output_dir:
+            self.output_dir = output_dir
+            os.makedirs(self.output_dir, exist_ok=True)
+        # We need the database connection           
+        if not self.conn:
+            raise Exception("Database connection not available")
+        # Get the latest edition number. We always build the latest edition
+        edition_number = self.db_get_latest_edition(source_lang, target_lang)
+        if edition_number == 0:
+            print("No translations found in database. Please run translation phase first.")
+            return
+        # Load book and extract text
+        print(f"{self.sep1}")
+        print(f"Building translated EPUB from {source_lang} to {target_lang}")
+        # Load original book for template
+        book = epub.read_epub(self.book_path, options={'ignore_ncx': False})
+        # Get chapter list
+        chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, False)
+        # If specific chapters requested, filter the list
+        if chapter_numbers is not None:
+            try:
+                # Parse comma-separated list of chapter numbers
+                requested_chapters = [int(ch.strip()) for ch in chapter_numbers.split(',')]
+                # Filter to only include chapters that exist in the database
+                filtered_chapters = [ch for ch in chapter_list if ch in requested_chapters]
+                # Check for any chapters that don't exist
+                missing_chapters = [ch for ch in requested_chapters if ch not in chapter_list]
+                if missing_chapters:
+                    print(f"Warning: Chapters {missing_chapters} not found in database")
+                if filtered_chapters:
+                    chapter_list = filtered_chapters
+                    print(f"Building with chapters: {', '.join(map(str, filtered_chapters))}")
+                else:
+                    print("Warning: None of the requested chapters were found in database")
+                    return
+            except ValueError:
+                print("Error: Chapter numbers must be comma-separated integers")
+                return
+        # Prepare output book
+        translated_book = self.book_create_template(book, target_lang)
+        translated_chapters = []
+        for chapter_number in chapter_list:
+            # Only include chapters that are fully translated
+            if self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
+                translated_chapters.append(self.book_create_chapter(edition_number, chapter_number, source_lang, target_lang))
+            else:
+                print(f"Warning: Chapter {chapter_number} is not fully translated and will be skipped")
+        # Use the database-retrieved chapters if available
+        if translated_chapters:
+            self.book_finalize(translated_book, translated_chapters)
+        # Save outputs
+        print(f"\n{self.sep1}")
+        print("Saving output files...")
+        # Create filename with original name + language edition
+        original_filename = os.path.splitext(os.path.basename(self.book_path))[0]
+        translation_filename = f"{original_filename} {target_lang.lower()}.epub"
+        translated_path = os.path.join(self.output_dir, translation_filename)
+        epub.write_epub(translated_path, translated_book)
+        print(f"✓ Translation saved: {translated_path}")
+        print(f"{self.sep1}")
+        print("Build phase completed!")
+        print(f"{self.sep1}")
 
     def book_extract_content(self, book, source_lang) -> List[dict]:
         """Extract text content from an already opened EPUB book object.
@@ -1823,189 +2013,6 @@ class BookTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Warning: Quality checks failed for chapter {chapter_number}: {e}")
-    
-    def phase_extract(self, output_dir: str = "output",
-                     source_lang: str = "English", target_lang: str = "Romanian") -> int:
-        """Import phase: Extract content from EPUB and save to database.
-        
-        This method handles the extract/import phase of the translation workflow, which includes:
-        1. Reading the EPUB file
-        2. Extracting text content from all chapters
-        3. Saving the content to the database for later translation
-        
-        Args:
-            output_dir (str, optional): Directory for output files. Defaults to "output".
-            source_lang (str, optional): Source language name. Defaults to "English".
-            target_lang (str, optional): Target language name. Defaults to "Romanian".
-        """
-        # Update database path if not set during initialization
-        if not self.db_path and self.book_path:
-            self.db_path = os.path.splitext(self.book_path)[0] + '.db'
-            self.db_init()
-        # Create output directory if it doesn't exist
-        if output_dir:
-            self.output_dir = output_dir
-            os.makedirs(self.output_dir, exist_ok=True)
-        # Load book and extract text
-        print(f"{self.sep1}")
-        print(f"Importing content from {self.book_path}...")
-        book = epub.read_epub(self.book_path, options={'ignore_ncx': False})
-        chapters = self.book_extract_content(book, source_lang)
-        # Save all content to database
-        edition_number = self.db_save_chapters(chapters, source_lang, target_lang)
-        print(f"Import completed. Saved {len(chapters)} chapters to database.")
-        print(f"{self.sep1}")
-        # Return the edition number for reference
-        return edition_number
-
-    def phase_translate(self, source_lang: str = "English", target_lang: str = "Romanian",
-                       chapter_numbers: str = None):
-        """Translate phase: Translate content from database using AI.
-
-        This method handles the translation phase of the workflow, which includes:
-        1. Loading content from the database
-        2. Translating chapters using the AI model
-        3. Saving translations back to the database
-
-        Args:
-            source_lang (str, optional): Source language name. Defaults to "English".
-            target_lang (str, optional): Target language name. Defaults to "Romanian".
-            chapter_numbers (str, optional): Comma-separated list of chapter numbers or ranges to translate.
-                Examples: "1,3,5" or "3-7" or "1,3-5,8-10"
-        """
-        # We need the database connection
-        if not self.conn:
-            raise Exception("Database connection not available")
-        # Get the latest edition number, always translate the latest edition
-        edition_number = self.db_get_latest_edition(source_lang, target_lang)
-        if edition_number == 0:
-            print("No content found in database. Please run extract phase first.")
-            return
-        print(f"{self.sep1}")
-        print(f"Translating edition {edition_number} from {source_lang} to {target_lang}")
-        # Get chapter list first, ordered by number of paragraphs
-        chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, True)
-        # If specific chapters requested, filter the list
-        if chapter_numbers is not None:
-            try:
-                # Parse comma-separated list of chapter numbers and ranges
-                requested_chapters = []
-                for part in chapter_numbers.split(','):
-                    part = part.strip()
-                    if '-' in part:
-                        # Handle range like "3-7"
-                        start, end = map(int, part.split('-'))
-                        requested_chapters.extend(range(start, end + 1))
-                    else:
-                        # Handle single chapter like "3"
-                        requested_chapters.append(int(part))
-                # Remove duplicates and sort
-                requested_chapters = sorted(list(set(requested_chapters)))
-                # Filter to only include chapters that exist in the database
-                filtered_chapters = [ch for ch in chapter_list if ch in requested_chapters]
-                # Check for any chapters that don't exist
-                missing_chapters = [ch for ch in requested_chapters if ch not in chapter_list]
-                if missing_chapters:
-                    print(f"Warning: Chapters {missing_chapters} not found in database")
-                if filtered_chapters:
-                    chapter_list = filtered_chapters
-                    print(f"Translating chapters: {', '.join(map(str, filtered_chapters))}")
-                else:
-                    print("Warning: None of the requested chapters were found in database")
-                    return
-            except ValueError:
-                print("Error: Chapter numbers must be comma-separated integers or ranges (e.g., '1,3,5' or'3-7')")
-                return
-        # Process each chapter
-        for chapter_num in chapter_list:
-            self.translate_chapter(edition_number, chapter_num, source_lang, target_lang, len(chapter_list))
-        print(f"Translation phase completed.")
-        print(f"{self.sep1}")
-
-    def phase_build(self, output_dir: str = "output", 
-                   source_lang: str = "English", target_lang: str = "Romanian",
-                   chapter_numbers: str = None):
-        """Build phase: Create translated EPUB from database translations.
-        
-        This method handles the build phase of the workflow, which includes:
-        1. Loading translated content from the database
-        2. Creating a new EPUB with the translated content
-        3. Saving the final EPUB file
-        
-        Args:
-            output_dir (str, optional): Directory for output files. Defaults to "output".
-            source_lang (str, optional): Source language name. Defaults to "English".
-            target_lang (str, optional): Target language name. Defaults to "Romanian".
-            chapter_numbers (str, optional): Comma-separated list of chapter numbers or ranges to include.
-                Examples: "1,3,5" or "3-7" or "1,3-5,8-10"
-        """
-        # Update database path if not set during initialization
-        if not self.db_path and self.book_path:
-            self.db_path = os.path.splitext(self.book_path)[0] + '.db'
-            self.db_init()
-        # Create output directory if it doesn't exist
-        if output_dir:
-            self.output_dir = output_dir
-            os.makedirs(self.output_dir, exist_ok=True)
-        # We need the database connection
-        if not self.conn:
-            raise Exception("Database connection not available")
-        # Get the latest edition number. We always build the latest edition
-        edition_number = self.db_get_latest_edition(source_lang, target_lang)
-        if edition_number == 0:
-            print("No translations found in database. Please run translation phase first.")
-            return
-        # Load book and extract text
-        print(f"{self.sep1}")
-        print(f"Building translated EPUB from {source_lang} to {target_lang}")
-        # Load original book for template
-        book = epub.read_epub(self.book_path, options={'ignore_ncx': False})
-        # Get chapter list
-        chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, False)
-        # If specific chapters requested, filter the list
-        if chapter_numbers is not None:
-            try:
-                # Parse comma-separated list of chapter numbers
-                requested_chapters = [int(ch.strip()) for ch in chapter_numbers.split(',')]
-                # Filter to only include chapters that exist in the database
-                filtered_chapters = [ch for ch in chapter_list if ch in requested_chapters]
-                # Check for any chapters that don't exist
-                missing_chapters = [ch for ch in requested_chapters if ch not in chapter_list]
-                if missing_chapters:
-                    print(f"Warning: Chapters {missing_chapters} not found in database")
-                if filtered_chapters:
-                    chapter_list = filtered_chapters
-                    print(f"Building with chapters: {', '.join(map(str, filtered_chapters))}")
-                else:
-                    print("Warning: None of the requested chapters were found in database")
-                    return
-            except ValueError:
-                print("Error: Chapter numbers must be comma-separated integers")
-                return
-        # Prepare output book
-        translated_book = self.book_create_template(book, source_lang, target_lang)
-        translated_chapters = []
-        for chapter_number in chapter_list:
-            # Only include chapters that are fully translated
-            if chapter_number > 0 and self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
-                translated_chapters.append(self.book_create_chapter(edition_number, chapter_number, source_lang, target_lang))
-            else:
-                print(f"Warning: Chapter {chapter_number} is not fully translated and will be skipped")
-        # Use the database-retrieved chapters if available
-        if translated_chapters:
-            self.book_finalize(translated_book, translated_chapters)
-        # Save outputs
-        print(f"\n{self.sep1}")
-        print("Saving output files...")
-        # Create filename with original name + language edition
-        original_filename = os.path.splitext(os.path.basename(self.book_path))[0]
-        translation_filename = f"{original_filename} {target_lang.lower()}.epub"
-        translated_path = os.path.join(self.output_dir, translation_filename)
-        epub.write_epub(translated_path, translated_book)
-        print(f"✓ Translation saved: {translated_path}")
-        print(f"{self.sep1}")
-        print("Build phase completed!")
-        print(f"{self.sep1}")
 
     def translate_epub(self, output_dir: str = "output", 
                       source_lang: str = "English", target_lang: str = "Romanian",
@@ -2206,25 +2213,6 @@ class BookTranslator:
         if len(self.context) > DEFAULT_CONTEXT_SIZE:
             self.context.pop(0)
 
-    def set_console_width(self, width: int):
-        """Set the console width for side-by-side display.
-        
-        This method allows dynamically changing the console width used for
-        displaying side-by-side translations during verbose output.
-        
-        Args:
-            width (int): Console width in characters (minimum 20)
-        """
-        if width < 20:
-            width = 20  # Minimum reasonable width
-        self.console_width = width
-        # Create separator strings with repeating characters for the new width
-        self.sep1 = '=' * self.console_width
-        self.sep2 = '-' * self.console_width
-        self.sep3 = '~' * self.console_width
-        if self.verbose:
-            print(f"Console width set to {width} characters")
-
     def calculate_fluency_score(self, text: str) -> int:
         """Calculate fluency score based on linguistic patterns.
         
@@ -2350,6 +2338,67 @@ Return only a single integer number between 0 and 100."""
         
         return errors
 
+    def generate_quality_report(self, chapters: List[dict], source_lang: str, target_lang: str) -> Dict:
+        """Generate comprehensive quality assessment report.
+        
+        Args:
+            chapters (List[dict]): List of chapter dictionaries
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            Dict: Quality assessment report with scores and metrics
+        """
+        report = {
+            'fluency_scores': [],
+            'adequacy_scores': [],
+            'consistency_score': 0,
+            'error_summary': {},
+            'overall_score': 0
+        }
+        
+        # Calculate fluency for each chapter
+        for chapter in chapters:
+            fluency = self.calculate_fluency_score(chapter['content'])
+            report['fluency_scores'].append(fluency)
+        
+        # Calculate adequacy for sample paragraphs
+        sample_size = min(5, len(chapters))
+        for i in range(sample_size):
+            original = chapters[i]['content']
+            translated, _, _, _ = self.translate_text(original, source_lang, target_lang)
+            adequacy = self.calculate_adequacy_score(original, translated, source_lang, target_lang)
+            report['adequacy_scores'].append(adequacy)
+        
+        # Calculate consistency
+        report['consistency_score'] = self.calculate_consistency_score(chapters)
+
+        # Overall score (weighted average)
+        avg_fluency = sum(report['fluency_scores']) / len(report['fluency_scores']) if report['fluency_scores'] else 0
+        avg_adequacy = sum(report['adequacy_scores']) / len(report['adequacy_scores']) if report['adequacy_scores'] else 0
+        report['overall_score'] = int(avg_fluency * 0.4 + avg_adequacy * 0.4 + report['consistency_score'] * 0.2)
+        
+        return report
+
+    def set_console_width(self, width: int):
+        """Set the console width for side-by-side display.
+        
+        This method allows dynamically changing the console width used for
+        displaying side-by-side translations during verbose output.
+        
+        Args:
+            width (int): Console width in characters (minimum 20)
+        """
+        if width < 20:
+            width = 20  # Minimum reasonable width
+        self.console_width = width
+        # Create separator strings with repeating characters for the new width
+        self.sep1 = '=' * self.console_width
+        self.sep2 = '-' * self.console_width
+        self.sep3 = '~' * self.console_width
+        if self.verbose:
+            print(f"Console width set to {width} characters")
+
     def display_side_by_side(self, text1: str, text2: str, width: int = None, margin: int = 2, gap: int = 4) -> None:
         """Display two texts side by side on a console with specified layout.
         
@@ -2416,48 +2465,6 @@ Return only a single integer number between 0 and 100."""
             # Combine with margins and gap
             display_line = ' ' * margin + formatted_left + ' ' * gap + formatted_right + ' ' * margin
             print(display_line)
-
-    def generate_quality_report(self, chapters: List[dict], source_lang: str, target_lang: str) -> Dict:
-        """Generate comprehensive quality assessment report.
-        
-        Args:
-            chapters (List[dict]): List of chapter dictionaries
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-            
-        Returns:
-            Dict: Quality assessment report with scores and metrics
-        """
-        report = {
-            'fluency_scores': [],
-            'adequacy_scores': [],
-            'consistency_score': 0,
-            'error_summary': {},
-            'overall_score': 0
-        }
-        
-        # Calculate fluency for each chapter
-        for chapter in chapters:
-            fluency = self.calculate_fluency_score(chapter['content'])
-            report['fluency_scores'].append(fluency)
-        
-        # Calculate adequacy for sample paragraphs
-        sample_size = min(5, len(chapters))
-        for i in range(sample_size):
-            original = chapters[i]['content']
-            translated, _, _, _ = self.translate_text(original, source_lang, target_lang)
-            adequacy = self.calculate_adequacy_score(original, translated, source_lang, target_lang)
-            report['adequacy_scores'].append(adequacy)
-        
-        # Calculate consistency
-        report['consistency_score'] = self.calculate_consistency_score(chapters)
-
-        # Overall score (weighted average)
-        avg_fluency = sum(report['fluency_scores']) / len(report['fluency_scores']) if report['fluency_scores'] else 0
-        avg_adequacy = sum(report['adequacy_scores']) / len(report['adequacy_scores']) if report['adequacy_scores'] else 0
-        report['overall_score'] = int(avg_fluency * 0.4 + avg_adequacy * 0.4 + report['consistency_score'] * 0.2)
-        
-        return report
 
     def get_language_code(self, language_name: str) -> str:
         """Get the first two letters of a language name in lowercase.
