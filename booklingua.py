@@ -367,9 +367,8 @@ class EPUBTranslator:
                 metadata_chapter = {
                     'id': 'metadata',
                     'name': 'metadata',
-                    'content': metadata_content,
-                    'html': f'<div>{metadata_content}</div>',
-                    'paragraphs': metadata_paragraphs
+                    'title': 'Metadata',
+                    'paragraphs': ['Metadata',] + metadata_paragraphs
                 }
                 chapters.append(metadata_chapter)
                 
@@ -389,18 +388,29 @@ class EPUBTranslator:
                         print(f"Warning: Failed to save metadata as markdown: {e}")
         except Exception as e:
             print(f"Warning: Error processing metadata: {e}")
-        
-        # Get all items in the book
-        try:
-            items = book.get_items()
-        except Exception as e:
+
+        toc = []
+        def _get_links_from_toc(contents):
+            """ Recursively get the links from TOC """
+            for item in contents:
+                if isinstance(item, tuple):
+                    _get_links_from_toc(item[1])
+                elif isinstance(item, epub.Link):
+                    toc.append(item)
+        _get_links_from_toc(book.toc)
+
+        if not toc:
             print(f"Warning: Failed to get items from book: {e}")
             return chapters
         # Process each item
         print("Extracting chapters from EPUB ...")
-        for item in items:
+        for toc_item in toc:
+            item = book.get_item_with_href(toc_item.href)
+            if not item:
+                continue
+            item.title = toc_item.title
             try:
-                if item.is_chapter():
+                if item.get_type() == ebooklib.ITEM_DOCUMENT:
                     # Extract HTML content
                     try:
                         html_content = item.get_content()
@@ -432,9 +442,8 @@ class EPUBTranslator:
                         chapter_data = {
                             'id': item.get_id(),
                             'name': item.get_name(),
-                            'content': markdown_content,
-                            'html': html_content,
-                            'paragraphs': paragraphs
+                            'title': item.title,
+                            'paragraphs': [item.title,] + paragraphs
                         }
                         # Append chapter data to list
                         chapters.append(chapter_data)
@@ -459,7 +468,7 @@ class EPUBTranslator:
                 continue
         # Return the list of chapter data
         return chapters
-    
+
     def book_create_template(self, original_book, target_lang: str) -> epub.EpubBook:
         """Create a new EPUB book template with metadata copied from original book.
         
@@ -1554,7 +1563,7 @@ class EPUBTranslator:
         try:
             for ch, chapter in enumerate(chapters):
                 texts = chapter.get('paragraphs', [])
-                print(f"{(ch+1):>4}: {(len(texts)):>6}  {chapter.get('name', 'Untitled Chapter')}")
+                print(f"{(ch):>3}: {(len(texts)):>5} {chapter['id'][:20]:<20} {chapter['title'][:20]:<20} {chapter.get('name', 'Untitled Chapter')[:25]:<25}")
                 for par, text in enumerate(texts):
                     # Only save non-empty texts
                     if text.strip():
@@ -1574,7 +1583,7 @@ class EPUBTranslator:
                             INSERT OR IGNORE INTO translations 
                             (source_lang, target_lang, source, target, model, edition, chapter, paragraph, duration, fluency)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (source_lang, target_lang, text, target, self.model, edition_number, ch+1, par+1, duration, fluency))
+                        ''', (source_lang, target_lang, text, target, self.model, edition_number, ch, par+1, duration, fluency))
             self.conn.commit()
             print(f"... with {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs from all chapters.")
             return edition_number
