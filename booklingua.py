@@ -282,7 +282,7 @@ class BookTranslator:
             self.conn.close()
     
     def phase_extract(self, output_dir: str = "output",
-                     source_lang: str = "English", target_lang: str = "Romanian") -> int:
+                     source_lang: str = "English", target_lang: str = "Romanian", new_edition: bool = False) -> int:
         """Import phase: Extract content from EPUB and save to database.
         
         This method handles the extract/import phase of the translation workflow, which includes:
@@ -309,7 +309,7 @@ class BookTranslator:
         book = epub.read_epub(self.book_path, options={'ignore_ncx': False})
         chapters = self.book_extract_content(book, source_lang)
         # Save all content to database
-        edition_number = self.db_save_chapters(chapters, source_lang, target_lang)
+        edition_number = self.db_save_chapters(chapters, source_lang, target_lang, new_edition)
         print(f"Import completed. Saved {len(chapters)} chapters to database.")
         print(f"{self.sep1}")
         # Return the edition number for reference
@@ -1750,7 +1750,7 @@ class BookTranslator:
                 print(f"Database save failed: {e}")
             raise
     
-    def db_save_chapters(self, chapters: List[dict], source_lang: str, target_lang: str) -> int:
+    def db_save_chapters(self, chapters: List[dict], source_lang: str, target_lang: str, new_edition: bool = False) -> int:
         """Save all paragraphs from all chapters to database with empty translations.
         
         This method saves all paragraphs from all chapters to the database with empty
@@ -1770,9 +1770,17 @@ class BookTranslator:
         # We need the database connection
         if not self.conn:
             raise Exception("Database connection not available")
-        # Get the latest edition number and increment it
-        edition_number = self.db_get_latest_edition(source_lang, target_lang) + 1
-        print(f"Starting edition {edition_number}.")
+        
+        # Get the latest edition number
+        latest_edition = self.db_get_latest_edition(source_lang, target_lang)
+        
+        # Use latest edition by default, create new one only if requested or no editions exist
+        if new_edition or latest_edition == 0:
+            edition_number = latest_edition + 1
+            print(f"Starting edition {edition_number}.")
+        else:
+            edition_number = latest_edition
+            print(f"Using existing edition {edition_number}.")
         # Delete all entries with empty translations for this language pair
         try:
             cursor = self.conn.cursor()
@@ -2701,6 +2709,8 @@ def main():
     parser.add_argument("-i", "--import-csv", help="Import translations from CSV file")
     # Console width for side-by-side display
     parser.add_argument("-w", "--width", type=int, default=None, help="Console width for side-by-side display (default: auto-detect)")
+    # Edition control
+    parser.add_argument("--new-edition", action="store_true", help="Create a new edition instead of using the last one")
     # Preset configurations for common services
     parser.add_argument("--openai", action="store_true", help="Use OpenAI API")
     parser.add_argument("--ollama", action="store_true", help="Use Ollama local server")
@@ -2790,7 +2800,9 @@ def main():
     if args.phase_extract or all_phases:
         translator.phase_extract(
             output_dir=output_dir,
-            source_lang=source_lang
+            source_lang=source_lang,
+            target_lang=target_lang,
+            new_edition=args.new_edition
         )
     if args.phase_translate or all_phases:
         translator.phase_translate(
