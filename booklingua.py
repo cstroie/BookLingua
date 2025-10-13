@@ -303,9 +303,7 @@ class EPUBTranslator:
             return chapters
         # Extract metadata as first virtual chapter
         try:
-            metadata_content = ""
             metadata_parts = []
-            
             # Extract title
             try:
                 title_metadata = book.get_metadata('DC', 'title')
@@ -314,16 +312,15 @@ class EPUBTranslator:
                     metadata_parts.append(f"# {title}")
             except Exception as e:
                 print(f"Warning: Failed to extract title metadata: {e}")
-            
             # Extract authors
             try:
                 authors = book.get_metadata('DC', 'creator')
                 if authors:
                     author_names = [author[0] for author in authors]
-                    metadata_parts.append(f"## Authors\n\n{', '.join(author_names)}")
+                    metadata_parts.append(f"## Authors")
+                    metadata_parts.append(', '.join(author_names))
             except Exception as e:
                 print(f"Warning: Failed to extract author metadata: {e}")
-            
             # Extract description
             try:
                 descriptions = book.get_metadata('DC', 'description')
@@ -336,42 +333,38 @@ class EPUBTranslator:
                             description = self.html_to_markdown(desc_soup)
                         except Exception as e:
                             print(f"Warning: Failed to convert HTML description to Markdown: {e}")
-                    metadata_parts.append(f"## Description\n\n{description}")
+                    metadata_parts.append(f"## Description")
+                    metadata_parts.extend(description.split('\n\n'))
             except Exception as e:
                 print(f"Warning: Failed to extract description metadata: {e}")
-            
             # Extract publisher
             try:
                 publishers = book.get_metadata('DC', 'publisher')
                 if publishers:
                     publisher = publishers[0][0]
-                    metadata_parts.append(f"## Publisher\n\n{publisher}")
+                    metadata_parts.append(f"## Publisher")
+                    metadata_parts.append(publisher)
             except Exception as e:
                 print(f"Warning: Failed to extract publisher metadata: {e}")
-            
             # Extract date
             try:
                 dates = book.get_metadata('DC', 'date')
                 if dates:
                     date = dates[0][0]
-                    metadata_parts.append(f"## Publication Date\n\n{date}")
+                    metadata_parts.append(f"## Publication Date")
+                    metadata_parts.append(f"{date}")
             except Exception as e:
                 print(f"Warning: Failed to extract date metadata: {e}")
-            
             # Combine all metadata parts
             if metadata_parts:
-                metadata_content = "\n\n".join(metadata_parts)
-                metadata_paragraphs = [p.strip() for p in metadata_content.split('\n\n') if p.strip()]
-                
                 # Create virtual chapter for metadata
                 metadata_chapter = {
                     'id': 'metadata',
                     'name': 'metadata',
                     'title': 'Metadata',
-                    'paragraphs': ['Metadata',] + metadata_paragraphs
+                    'paragraphs': ['Metadata',] + metadata_parts
                 }
                 chapters.append(metadata_chapter)
-                
                 # Save metadata as markdown if output directory exists
                 if self.output_dir and os.path.exists(self.output_dir):
                     try:
@@ -383,12 +376,12 @@ class EPUBTranslator:
                         filepath = os.path.join(source_lang_dir, filename)
                         # Write markdown content to file
                         with open(filepath, 'w', encoding='utf-8') as f:
-                            f.write(metadata_content)
+                            f.write("\n\n".join(metadata_parts))
                     except Exception as e:
                         print(f"Warning: Failed to save metadata as markdown: {e}")
         except Exception as e:
             print(f"Warning: Error processing metadata: {e}")
-
+        # Get the chapters order and titles from ToC
         toc = []
         def _get_links_from_toc(contents):
             """ Recursively get the links from TOC """
@@ -398,12 +391,10 @@ class EPUBTranslator:
                 elif isinstance(item, epub.Link):
                     toc.append(item)
         _get_links_from_toc(book.toc)
-
         if not toc:
             print(f"Warning: Failed to get items from book: {e}")
             return chapters
         # Process each item
-        print("Extracting chapters from EPUB ...")
         for toc_item in toc:
             item = book.get_item_with_href(toc_item.href)
             if not item:
@@ -1583,7 +1574,7 @@ class EPUBTranslator:
                             INSERT OR IGNORE INTO translations 
                             (source_lang, target_lang, source, target, model, edition, chapter, paragraph, duration, fluency)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (source_lang, target_lang, text, target, self.model, edition_number, ch, par+1, duration, fluency))
+                        ''', (source_lang, target_lang, text, target, self.model, edition_number, ch, par, duration, fluency))
             self.conn.commit()
             print(f"... with {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs from all chapters.")
             return edition_number
