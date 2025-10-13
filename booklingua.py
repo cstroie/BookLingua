@@ -446,7 +446,7 @@ class EPUBTranslator:
                                     source_lang_dir = os.path.join(self.output_dir, source_lang)
                                     os.makedirs(source_lang_dir, exist_ok=True)
                                     # Create a safe filename from the chapter name
-                                    safe_name = re.sub(r'[^\w\-_\. ]', '_', item.get_name())
+                                    safe_name = re.sub(r'[^\w\-_\. ]', '_', os.path.splitext(item.get_name())[0])
                                     filename = f"{safe_name}.md"
                                     filepath = os.path.join(source_lang_dir, filename)
                                     # Write markdown content to file
