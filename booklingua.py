@@ -692,7 +692,7 @@ class BookTranslator:
         # Get the original title
         original_title = original_book.get_metadata('DC', 'title')[0][0]
         # Translate the title
-        translated_title, _, _, _ = self.translate_text(original_title, source_lang, target_lang)
+        translated_title, _, _, _ = self.translate_text(original_title, source_lang, target_lang, True)
         # Create title page content with HTML title tags
         title_content = f'<title>{translated_title}</title>'
         xhtml = f'<article id="titlepage">\n{title_content}\n</article>'
@@ -785,22 +785,24 @@ class BookTranslator:
             book.add_item(css)
         # Create the titlepage and add it as the first chapter
         titlepage = self.book_create_titlepage(book, "English", book.language)
-        # Add all chapters to the book
-        chapters = [titlepage] + chapters  # Ensure titlepage is first
-        for chapter in chapters:
-            if css:
-                chapter.add_item(css)
-            book.add_item(chapter)
-        # Define Table of Contents and Spine
-        book.toc = tuple(chapters)
-        book.add_item(epub.EpubNcx())
+        if css:
+            titlepage.add_item(css)
+        book.add_item(titlepage)
         # Add navigation
         nav = epub.EpubNav()
         if css:
             nav.add_item(css)
         book.add_item(nav)
+        # Add all chapters to the book
+        for chapter in chapters:
+            if css:
+                chapter.add_item(css)
+            book.add_item(chapter)
+        # Define Table of Contents and Spine
+        book.toc = tuple([titlepage] + chapters)
+        book.add_item(epub.EpubNcx())
         # Define spine
-        book.spine = ['nav'] + chapters
+        book.spine = [titlepage, nav] + chapters
 
     def html_to_markdown(self, soup) -> str:
         """Convert HTML BeautifulSoup object to Markdown format.
@@ -2174,8 +2176,8 @@ class BookTranslator:
                 # Priority 1: Try to get existing translations
                 cursor.execute('''
                     SELECT source, target FROM translations 
-                    WHERE source_lang = ? AND target_lang = ? AND target != ''
-                    AND length(source) > 50 AND source != target AND chapter = ?
+                    WHERE source_lang = ? AND target_lang = ? AND target != '' AND chapter = ?
+                    AND length(source) > 50 AND length(source) < 200 AND source != target
                     ORDER BY id DESC LIMIT ?
                 ''', (source_lang, target_lang, chapter_number, DEFAULT_PREFILL_CONTEXT_SIZE))
                 translated_results = cursor.fetchall()
@@ -2191,7 +2193,7 @@ class BookTranslator:
                     cursor.execute('''
                         SELECT source FROM translations 
                         WHERE source_lang = ? AND target_lang = ? AND target = ''
-                        AND length(source) > 50 AND source GLOB '[A-Za-z]*'
+                        AND length(source) > 50 AND length(source) < 200 AND source GLOB '[A-Za-z]*'
                         ORDER BY RANDOM() LIMIT ?
                     ''', (source_lang, target_lang, needed_count))
                     untranslated_results = cursor.fetchall()
