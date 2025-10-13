@@ -2474,6 +2474,39 @@ Return only a single integer number between 0 and 100."""
         # Ensure we have a valid language code (default to 'en' if empty)
         return lang_code if lang_code.strip() else "en"
 
+    def remove_xml_tags(self, text: str, tag_name: str) -> str:
+        """Remove everything between specified XML tags, including the tags themselves.
+        
+        This function removes all occurrences of opening and closing tags with the
+        specified name, along with all content between them. It handles both
+        self-closing tags and tags with content.
+        
+        Args:
+            text (str): The text containing XML/HTML content
+            tag_name (str): The name of the tags to remove (e.g., "script", "style")
+            
+        Returns:
+            str: Text with specified tags and their content removed
+            
+        Example:
+            >>> text = "<p>Hello <script>alert('test')</script> world</p>"
+            >>> cleaned = translator.remove_xml_tags(text, "script")
+            >>> print(cleaned)
+            "<p>Hello  world</p>"
+        """
+        if not text or not tag_name:
+            return text
+            
+        # Remove self-closing tags (e.g., <tag />)
+        pattern_self_closing = rf'<{tag_name}\b[^>]*/?>'
+        text = re.sub(pattern_self_closing, '', text, flags=re.IGNORECASE | re.DOTALL)
+        
+        # Remove opening and closing tags with content between them
+        pattern_with_content = rf'<{tag_name}\b[^>]*>.*?</{tag_name}>'
+        text = re.sub(pattern_with_content, '', text, flags=re.IGNORECASE | re.DOTALL)
+        
+        return text
+
     def strip_markdown_formatting(self, text: str) -> tuple:
         """Strip markdown formatting and return clean text with prefix/suffix.
         
