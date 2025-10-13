@@ -1818,8 +1818,6 @@ class BookTranslator:
         if use_cache and self.conn:
             # Check database first
             cached_result = self.db_get_translation(text, source_lang, target_lang)
-            # FIXME
-            print(cached_result)
             if cached_result[0]:
                 # Push to context list for continuity
                 self.context_add(text, cached_result[0])
