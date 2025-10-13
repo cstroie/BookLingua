@@ -344,36 +344,15 @@ class BookTranslator:
         # Get chapter list first, ordered by number of paragraphs
         chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, True)
         # If specific chapters requested, filter the list
-        if chapter_numbers is not None:
-            try:
-                # Parse comma-separated list of chapter numbers and ranges
-                requested_chapters = []
-                for part in chapter_numbers.split(','):
-                    part = part.strip()
-                    if '-' in part:
-                        # Handle range like "3-7"
-                        start, end = map(int, part.split('-'))
-                        requested_chapters.extend(range(start, end + 1))
-                    else:
-                        # Handle single chapter like "3"
-                        requested_chapters.append(int(part))
-                # Remove duplicates and sort
-                requested_chapters = sorted(list(set(requested_chapters)))
-                # Filter to only include chapters that exist in the database
-                filtered_chapters = [ch for ch in chapter_list if ch in requested_chapters]
-                # Check for any chapters that don't exist
-                missing_chapters = [ch for ch in requested_chapters if ch not in chapter_list]
-                if missing_chapters:
-                    print(f"Warning: Chapters {missing_chapters} not found in database")
-                if filtered_chapters:
-                    chapter_list = filtered_chapters
-                    print(f"Translating chapters: {', '.join(map(str, filtered_chapters))}")
-                else:
-                    print("Warning: None of the requested chapters were found in database")
-                    return
-            except ValueError:
-                print("Error: Chapter numbers must be comma-separated integers or ranges (e.g., '1,3,5' or'3-7')")
-                return
+        try:
+            chapter_list = self.parse_chapter_numbers(chapter_numbers, chapter_list)
+            if chapter_numbers is not None and chapter_list:
+                print(f"Translating chapters: {', '.join(map(str, chapter_list))}")
+            elif chapter_numbers is not None and not chapter_list:
+                return  # No valid chapters to translate
+        except ValueError as e:
+            print(f"Error: {e}")
+            return
         # Process each chapter
         for chapter_num in chapter_list:
             self.translate_chapter(edition_number, chapter_num, source_lang, target_lang, len(chapter_list))
@@ -421,36 +400,15 @@ class BookTranslator:
         # Get chapter list
         chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, False)
         # If specific chapters requested, filter the list
-        if chapter_numbers is not None:
-            try:
-                # Parse comma-separated list of chapter numbers and ranges
-                requested_chapters = []
-                for part in chapter_numbers.split(','):
-                    part = part.strip()
-                    if '-' in part:
-                        # Handle range like "3-7"
-                        start, end = map(int, part.split('-'))
-                        requested_chapters.extend(range(start, end + 1))
-                    else:
-                        # Handle single chapter like "3"
-                        requested_chapters.append(int(part))
-                # Remove duplicates and sort
-                requested_chapters = sorted(list(set(requested_chapters)))
-                # Filter to only include chapters that exist in the database
-                filtered_chapters = [ch for ch in chapter_list if ch in requested_chapters]
-                # Check for any chapters that don't exist
-                missing_chapters = [ch for ch in requested_chapters if ch not in chapter_list]
-                if missing_chapters:
-                    print(f"Warning: Chapters {missing_chapters} not found in database")
-                if filtered_chapters:
-                    chapter_list = filtered_chapters
-                    print(f"Building chapters: {', '.join(map(str, filtered_chapters))}")
-                else:
-                    print("Warning: None of the requested chapters were found in database")
-                    return
-            except ValueError:
-                print("Error: Chapter numbers must be comma-separated integers or ranges (e.g., '1,3,5' or'3-7')")
-                return
+        try:
+            chapter_list = self.parse_chapter_numbers(chapter_numbers, chapter_list)
+            if chapter_numbers is not None and chapter_list:
+                print(f"Building chapters: {', '.join(map(str, chapter_list))}")
+            elif chapter_numbers is not None and not chapter_list:
+                return  # No valid chapters to build
+        except ValueError as e:
+            print(f"Error: {e}")
+            return
         # Prepare output book
         translated_book = self.book_create_template(book, source_lang, target_lang)
         translated_chapters = []
@@ -659,6 +617,55 @@ class BookTranslator:
                 continue
         # Return the list of chapter data
         return chapters
+
+    def parse_chapter_numbers(self, chapter_numbers: str, available_chapters: List[int]) -> List[int]:
+        """Parse comma-separated list of chapter numbers and ranges.
+        
+        This method parses a string containing comma-separated chapter numbers
+        and ranges (e.g., "1,3,5-10") and returns a sorted list of individual
+        chapter numbers that exist in the available chapters.
+        
+        Args:
+            chapter_numbers (str): Comma-separated list of chapter numbers or ranges
+                Examples: "1,3,5" or "3-7" or "1,3-5,8-10"
+            available_chapters (List[int]): List of chapter numbers available in database
+            
+        Returns:
+            List[int]: Sorted list of valid chapter numbers
+            
+        Raises:
+            ValueError: If chapter numbers cannot be parsed
+        """
+        if chapter_numbers is None:
+            return available_chapters
+            
+        try:
+            # Parse comma-separated list of chapter numbers and ranges
+            requested_chapters = []
+            for part in chapter_numbers.split(','):
+                part = part.strip()
+                if '-' in part:
+                    # Handle range like "3-7"
+                    start, end = map(int, part.split('-'))
+                    requested_chapters.extend(range(start, end + 1))
+                else:
+                    # Handle single chapter like "3"
+                    requested_chapters.append(int(part))
+            # Remove duplicates and sort
+            requested_chapters = sorted(list(set(requested_chapters)))
+            # Filter to only include chapters that exist in the database
+            filtered_chapters = [ch for ch in requested_chapters if ch in available_chapters]
+            # Check for any chapters that don't exist
+            missing_chapters = [ch for ch in requested_chapters if ch not in available_chapters]
+            if missing_chapters:
+                print(f"Warning: Chapters {missing_chapters} not found in database")
+            if filtered_chapters:
+                return filtered_chapters
+            else:
+                print("Warning: None of the requested chapters were found in database")
+                return []
+        except ValueError:
+            raise ValueError("Chapter numbers must be comma-separated integers or ranges (e.g., '1,3,5' or '3-7')")
 
     def book_create_template(self, original_book, source_lang: str, target_lang: str) -> epub.EpubBook:
         """Create a new EPUB book template with metadata copied from original book.
