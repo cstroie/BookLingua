@@ -783,16 +783,23 @@ class BookTranslator:
                 content=css_content
             )
             book.add_item(css)
+        # Create the titlepage and add it as the first chapter
+        titlepage = self.book_create_titlepage(book, "English", book.language)
+        # Add all chapters to the book
+        chapters = [titlepage] + chapters  # Ensure titlepage is first
         for chapter in chapters:
             if css:
                 chapter.add_item(css)
             book.add_item(chapter)
+        # Define Table of Contents and Spine
         book.toc = tuple(chapters)
         book.add_item(epub.EpubNcx())
+        # Add navigation
         nav = epub.EpubNav()
         if css:
             nav.add_item(css)
         book.add_item(nav)
+        # Define spine
         book.spine = ['nav'] + chapters
 
     def html_to_markdown(self, soup) -> str:
