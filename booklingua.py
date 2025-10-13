@@ -67,16 +67,14 @@ from typing import List, Dict, Optional
 from datetime import datetime
 
 # Constants for configurable values
-DEFAULT_TEMPERATURE = 0.3
+DEFAULT_TEMPERATURE = 0.2
 DEFAULT_MAX_TOKENS = 4096
 DEFAULT_CONTEXT_SIZE = 8
 DEFAULT_PREFILL_CONTEXT_SIZE = 5
 DEFAULT_KEEP_ALIVE = "30m"
 
 # System prompt template - will be formatted with actual languages when used
-SYSTEM_PROMPT = """# Fiction Translation System Prompt
-
-You are an expert fiction writer and translator specializing in literary translation from {source_lang} to {target_lang}.
+SYSTEM_PROMPT = """You are an expert fiction writer and translator specializing in literary translation from {source_lang} to {target_lang}.
 
 ## Core Expertise
 You excel at translating fictional works while preserving:
@@ -1663,6 +1661,12 @@ class BookTranslator:
                     "model": model_name,
                     "messages": messages,
                     "temperature": DEFAULT_TEMPERATURE,
+                    "min_p": 0.05,
+                    "top_k": 40,
+                    "top_p": 0.95,
+                    "repeat_last_n": 64,
+                    "repeat_penalty": 1,
+                    "cache_prompt": True,
                     "max_tokens": DEFAULT_MAX_TOKENS,
                     "keep_alive": DEFAULT_KEEP_ALIVE,
                     "stream": False
@@ -1686,12 +1690,14 @@ class BookTranslator:
                     raise Exception(f"API request failed with status {response.status_code}: {response.text}")
                 result = response.json()
                 try:
-                    translation = result["choices"][0]["message"]["content"].strip()
+                    translation = result["choices"][0]["message"]["content"]
                 except (KeyError, IndexError) as e:
                     if 'error' in result:
                         error_info = result['error']
                         raise Exception(f"API error: {error_info.get('message', 'Unknown error')}")
                     raise Exception(f"Unexpected API response format: {e}")
+                # Clean the translation
+                translation = self.remove_xml_tags(translation, 'think').strip()
                 # Update translation context for this language pair, already stripped of markdown
                 self.context_add(stripped_text, translation, False)
                 # Add back the markdown formatting
@@ -1733,8 +1739,6 @@ class BookTranslator:
         total_paragraphs = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
         # Initialize timing statistics for this chapter
         chapter_start_time = datetime.now()
-        # Reset context for each chapter to avoid drift (with smart preservation)
-        self.context_reset(total_paragraphs)
         # Pre-fill context with chapter-specific data
         self.context_prefill(source_lang, target_lang, chapter_number)
         # Get total paragraphs in chapter
@@ -2090,7 +2094,7 @@ class BookTranslator:
             finally:
                 print()
 
-    def context_prefill(self, source_lang: str, target_lang: str, chapter_number: int = None):
+    def context_prefill(self, source_lang: str, target_lang: str, chapter_number: int):
         """Pre-fill translation context with existing translations or random paragraphs.
         
         This method first tries to use existing translations from the database to
@@ -2121,9 +2125,9 @@ class BookTranslator:
                 cursor.execute('''
                     SELECT source, target FROM translations 
                     WHERE source_lang = ? AND target_lang = ? AND target != ''
-                    AND length(source) > 50
+                    AND length(source) > 50 AND source != target AND chapter = ?
                     ORDER BY id DESC LIMIT ?
-                ''', (source_lang, target_lang, DEFAULT_PREFILL_CONTEXT_SIZE))
+                ''', (source_lang, target_lang, chapter_number, DEFAULT_PREFILL_CONTEXT_SIZE))
                 translated_results = cursor.fetchall()
                 # Add to context in chronological order (oldest first)
                 for source, target in reversed(translated_results):
@@ -2137,7 +2141,7 @@ class BookTranslator:
                     cursor.execute('''
                         SELECT source FROM translations 
                         WHERE source_lang = ? AND target_lang = ? AND target = ''
-                        AND length(source) > 50
+                        AND length(source) > 50 AND source GLOB '[A-Za-z]*'
                         ORDER BY RANDOM() LIMIT ?
                     ''', (source_lang, target_lang, needed_count))
                     untranslated_results = cursor.fetchall()
@@ -2495,16 +2499,11 @@ Return only a single integer number between 0 and 100."""
             "<p>Hello  world</p>"
         """
         if not text or not tag_name:
-            return text
-            
-        # Remove self-closing tags (e.g., <tag />)
-        pattern_self_closing = rf'<{tag_name}\b[^>]*/?>'
-        text = re.sub(pattern_self_closing, '', text, flags=re.IGNORECASE | re.DOTALL)
-        
+            return text 
         # Remove opening and closing tags with content between them
         pattern_with_content = rf'<{tag_name}\b[^>]*>.*?</{tag_name}>'
         text = re.sub(pattern_with_content, '', text, flags=re.IGNORECASE | re.DOTALL)
-        
+        # Return cleaned text
         return text
 
     def strip_markdown_formatting(self, text: str) -> tuple:
