@@ -1000,16 +1000,16 @@ class EPUBTranslator:
             self.conn.execute('''
                 CREATE TABLE IF NOT EXISTS translations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    source_lang TEXT NOT NULL,
-                    target_lang TEXT NOT NULL,
-                    source TEXT NOT NULL,
-                    target TEXT NOT NULL,
-                    model TEXT NOT NULL,
                     edition INTEGER DEFAULT -1,
                     chapter INTEGER DEFAULT -1,
                     paragraph INTEGER DEFAULT -1,
+                    source_lang TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    target_lang TEXT NOT NULL,
+                    target TEXT NOT NULL,
                     duration INTEGER DEFAULT -1,
                     fluency INTEGER DEFAULT 1,
+                    model TEXT NOT NULL,
                     created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(source_lang, target_lang, edition, chapter, paragraph)
                 )
@@ -1034,8 +1034,9 @@ class EPUBTranslator:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT id, source_lang, target_lang, source, target, model, 
-                       edition, chapter, paragraph, duration, fluency, created 
+                SELECT id, edition, chapter, paragraph, 
+                       source_lang, source, target_lang, target, 
+                       duration, fluency, model, created 
                 FROM translations
                 ORDER BY source_lang, target_lang, edition, chapter, paragraph
             ''')
@@ -1044,8 +1045,10 @@ class EPUBTranslator:
                 writer = csv.writer(csvfile)
                 # Write header
                 writer.writerow([
-                    'id', 'source_lang', 'target_lang', 'source', 'target', 'model',
-                    'edition', 'chapter', 'paragraph', 'duration', 'fluency', 'created'
+                    'id', 'edition', 'chapter', 'paragraph',
+                    'source_lang', 'source',
+                    'target_lang', 'target',
+                    'duration', 'fluency', 'model', 'created'
                 ])
                 # Write data
                 writer.writerows(cursor.fetchall())
@@ -1078,21 +1081,22 @@ class EPUBTranslator:
                     try:
                         cursor.execute('''
                             INSERT OR REPLACE INTO translations 
-                            (id, source_lang, target_lang, source, target, model,
-                             edition, chapter, paragraph, duration, fluency, created)
+                            (id, edition, chapter, paragraph,
+                             source_lang, source, target_lang, target,
+                             duration, fluency, model, created)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (
                             int(row['id']) if row['id'] else None,
-                            row['source_lang'],
-                            row['target_lang'],
-                            row['source'],
-                            row['target'],
-                            row['model'],
                             int(row['edition']) if row['edition'] else -1,
                             int(row['chapter']) if row['chapter'] else -1,
                             int(row['paragraph']) if row['paragraph'] else -1,
+                            row['source_lang'],
+                            row['source'],
+                            row['target_lang'],
+                            row['target'],
                             int(row['duration']) if row['duration'] else -1,
                             int(row['fluency']) if row['fluency'] else 1,
+                            row['model'],
                             row['created'] if row['created'] else None
                         ))
                         imported_count += 1
@@ -1130,14 +1134,14 @@ class EPUBTranslator:
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
-                SELECT target, duration, fluency FROM translations 
+                SELECT target, duration, fluency, model FROM translations 
                 WHERE source_lang = ? AND target_lang = ? AND source = ? AND target != ''
                 ORDER BY fluency DESC
             ''', (source_lang, target_lang, source))
             result = cursor.fetchone()
             if result:
-                return (result[0], result[1], result[2])  # (target, duration, fluency)
-            return (None, None, None)
+                return (result[0], result[1], result[2], result[3])  # (target, duration, fluency, model)
+            return (None,) * 4
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup failed: {e}")
@@ -1468,7 +1472,7 @@ class EPUBTranslator:
     
     def db_save_translation(self, text: str, translation: str, source_lang: str, target_lang: str, 
                             edition_number: int = None, chapter_number: int = None, paragraph_number: int = None, 
-                            duration: int = None, fluency: int = None):
+                            duration: int = None, fluency: int = None, model: str = ''):
         """Save a translation to the database.
         
         Args:
@@ -1481,10 +1485,13 @@ class EPUBTranslator:
             paragraph_number (int, optional): Paragraph number within the chapter
             duration (int, optional): Time taken to process translation in milliseconds
             fluency (int, optional): Fluency score of the translation as percentage
+            model (str): AI model
             
         Raises:
             Exception: If database connection is not available
         """
+        if not model:
+            model = self.model
         if not self.conn:
             raise Exception("Database connection not available")
         try:
@@ -1494,7 +1501,7 @@ class EPUBTranslator:
                 UPDATE translations 
                 SET target = ?, model = ?, duration = ?, fluency = ?
                 WHERE source_lang = ? AND target_lang = ? AND edition = ? AND chapter = ? AND paragraph = ?
-            ''', (translation, self.model, duration, fluency, source_lang, target_lang, edition_number, chapter_number, paragraph_number))
+            ''', (translation, model, duration, fluency, source_lang, target_lang, edition_number, chapter_number, paragraph_number))
             
             # If no rows were updated, insert a new record
             if cursor.rowcount == 0:
@@ -1558,23 +1565,22 @@ class EPUBTranslator:
                 for par, text in enumerate(texts):
                     # Only save non-empty texts
                     if text.strip():
-                        #(target, duration, fluency) = self.db_get_translation(text, source_lang, target_lang)
                         # Check if the source contains no letters
                         if re.match(r'^[^a-zA-Z]+$', text, re.UNICODE):
                             # Copy as-is with perfect fluency and zero duration
-                            target, duration, fluency = text, 0, 100
+                            target, duration, fluency, model = text, 0, 100, 'copy'
                         else:
                             # Get an existing translation for this text if it exists
-                            (target, duration, fluency) = self.db_get_translation(text, source_lang, target_lang)
+                            (target, duration, fluency, model) = self.db_get_translation(text, source_lang, target_lang)
                         if target is None:
-                            target, duration, fluency = '', -1, -1
+                            target, duration, fluency, model = '', -1, -1, ''
                         # Insert with translation if not already there
                         cursor = self.conn.cursor()
                         cursor.execute('''
                             INSERT OR IGNORE INTO translations 
-                            (source_lang, target_lang, source, target, model, edition, chapter, paragraph, duration, fluency)
+                            (edition, chapter, paragraph, source_lang, source, target_lang, target, duration, fluency, model)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (source_lang, target_lang, text, target, self.model, edition_number, ch, par, duration, fluency))
+                        ''', (edition_number, ch, par, source_lang, text, target_lang, target, duration, fluency, model))
             self.conn.commit()
             print(f"... with {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs from all chapters.")
             return edition_number
@@ -1613,12 +1619,12 @@ class EPUBTranslator:
                 self.context_add(text, cached_result[0])
                 if self.verbose:
                     print("✓ Using cached translation")
-                return cached_result[0]  # Return only the translated text
+                return cached_result
         # Strip markdown formatting for cleaner translation
         stripped_text, prefix, suffix = self.strip_markdown_formatting(text)
         # Return original if empty after stripping
         if not stripped_text.strip():
-            return text
+            return text, 0, 100, 'copy'
         # No cached translation, call the API with retry logic
         max_retries = 5
         for attempt in range(max_retries):
@@ -1691,7 +1697,7 @@ class EPUBTranslator:
                 # Add back the markdown formatting
                 translation = prefix + translation + suffix
                 # Return the translated text
-                return translation
+                return translation, -1, -1, self.model
             except Exception as e:
                 if attempt < max_retries - 1:  # Don't sleep on the last attempt
                     wait_time = 2 ** (attempt + 1)  # 2, 4, 8, 16, 32 seconds
@@ -1753,7 +1759,7 @@ class EPUBTranslator:
                     print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}")
                     # Time the translation
                     start_time = datetime.now()
-                    target = self.translate_text(source, source_lang, target_lang)
+                    target, _, _, model = self.translate_text(source, source_lang, target_lang)
                     if not target:
                         print("Error: Translation failed, skipping paragraph.")
                         continue
@@ -1767,7 +1773,7 @@ class EPUBTranslator:
                     fluency = self.calculate_fluency_score(target)
                     # Save to database with timing and fluency info
                     self.db_save_translation(source, target, source_lang, target_lang,
-                                             edition_number, chapter_number, par, elapsed, fluency)
+                                             edition_number, chapter_number, par, elapsed, fluency, model)
                     # Calculate statistics for current chapter only
                     avg_time, elapsed_time, remaining_time = self.db_chapter_stats(edition_number, chapter_number, source_lang, target_lang)
                     if self.verbose:
@@ -1846,19 +1852,20 @@ class EPUBTranslator:
         # Return the edition number for reference
         return edition_number
 
-    def phase_translate(self, source_lang: str = "English", target_lang: str = "Romanian", 
+    def phase_translate(self, source_lang: str = "English", target_lang: str = "Romanian",
                        chapter_numbers: str = None):
         """Translate phase: Translate content from database using AI.
-        
+
         This method handles the translation phase of the workflow, which includes:
         1. Loading content from the database
         2. Translating chapters using the AI model
         3. Saving translations back to the database
-        
+
         Args:
             source_lang (str, optional): Source language name. Defaults to "English".
             target_lang (str, optional): Target language name. Defaults to "Romanian".
-            chapter_numbers (str, optional): Comma-separated list of chapter numbers to translate.
+            chapter_numbers (str, optional): Comma-separated list of chapter numbers or ranges to translate.
+                Examples: "1,3,5" or "3-7" or "1,3-5,8-10"
         """
         # We need the database connection
         if not self.conn:
@@ -1875,8 +1882,19 @@ class EPUBTranslator:
         # If specific chapters requested, filter the list
         if chapter_numbers is not None:
             try:
-                # Parse comma-separated list of chapter numbers
-                requested_chapters = [int(ch.strip()) for ch in chapter_numbers.split(',')]
+                # Parse comma-separated list of chapter numbers and ranges
+                requested_chapters = []
+                for part in chapter_numbers.split(','):
+                    part = part.strip()
+                    if '-' in part:
+                        # Handle range like "3-7"
+                        start, end = map(int, part.split('-'))
+                        requested_chapters.extend(range(start, end + 1))
+                    else:
+                        # Handle single chapter like "3"
+                        requested_chapters.append(int(part))
+                # Remove duplicates and sort
+                requested_chapters = sorted(list(set(requested_chapters)))
                 # Filter to only include chapters that exist in the database
                 filtered_chapters = [ch for ch in chapter_list if ch in requested_chapters]
                 # Check for any chapters that don't exist
@@ -1890,7 +1908,7 @@ class EPUBTranslator:
                     print("Warning: None of the requested chapters were found in database")
                     return
             except ValueError:
-                print("Error: Chapter numbers must be comma-separated integers")
+                print("Error: Chapter numbers must be comma-separated integers or ranges (e.g., '1,3,5' or'3-7')")
                 return
         # Process each chapter
         for chapter_num in chapter_list:
@@ -1913,7 +1931,8 @@ class EPUBTranslator:
             output_dir (str, optional): Directory for output files. Defaults to "output".
             source_lang (str, optional): Source language name. Defaults to "English".
             target_lang (str, optional): Target language name. Defaults to "Romanian".
-            chapter_numbers (str, optional): Comma-separated list of chapter numbers to include.
+            chapter_numbers (str, optional): Comma-separated list of chapter numbers or ranges to include.
+                Examples: "1,3,5" or "3-7" or "1,3-5,8-10"
         """
         # Update database path if not set during initialization
         if not self.db_path and input_path:
@@ -2005,9 +2024,9 @@ class EPUBTranslator:
                 Defaults to "English". Used for database organization and file naming.
             target_lang (str, optional): Target language name (case-insensitive).
                 Defaults to "Romanian". Used for database organization and file naming.
-            chapter_numbers (str, optional): Comma-separated list of chapter numbers to translate.
+            chapter_numbers (str, optional): Comma-separated list of chapter numbers or ranges to translate.
                 If None, translates all chapters. Chapter numbers are 1-based.
-                Example: "1,3,5-10" (Note: ranges not currently supported, use comma-separated)
+                Examples: "1,3,5" or "3-7" or "1,3-5,8-10"
                 
         Returns:
             None: Results are saved to files in the specified output directory.
@@ -2065,7 +2084,7 @@ class EPUBTranslator:
             print(f"Context {i+1}/{len(texts)}")
             try:
                 # Translation without storing in database
-                translation = self.translate_text(text, source_lang, target_lang, False)
+                translation, _, _, _ = self.translate_text(text, source_lang, target_lang, False)
                 if self.verbose:
                     print(f"{self.sep3}")
                     self.display_side_by_side(f"{text}", f"{translation}")
@@ -2260,7 +2279,7 @@ Return only a single integer number between 0 and 100."""
         # Use the existing translation system to evaluate
         try:
             # Evaluate in English
-            result = self.translate_text(prompt, "English", "English", use_cache=False)
+            result, _, _, _ = self.translate_text(prompt, "English", "English", use_cache=False)
             # Extract numerical score from response
             score_match = re.search(r'(\d+)', result)
             if score_match:
@@ -2427,7 +2446,7 @@ Return only a single integer number between 0 and 100."""
         sample_size = min(5, len(chapters))
         for i in range(sample_size):
             original = chapters[i]['content']
-            translated = self.translate_text(original, source_lang, target_lang)
+            translated, _, _, _ = self.translate_text(original, source_lang, target_lang)
             adequacy = self.calculate_adequacy_score(original, translated, source_lang, target_lang)
             report['adequacy_scores'].append(adequacy)
         
@@ -2504,7 +2523,7 @@ def main():
         -v, --verbose: Enable detailed progress output during translation
         -s, --source-lang (str): Source language name (default: "English")
         -t, --target-lang (str): Target language name (default: "Romanian")
-        -c, --chapters (str): Comma-separated list of chapter numbers to translate (default: all chapters)
+        -c, --chapters (str): Comma-separated list of chapter numbers or ranges to translate (default: all chapters)
         -u, --base-url (str): Custom API endpoint URL
         -m, --model (str): AI model name to use for translation (default: "gpt-4o")
         -k, --api-key (str): API key for authentication
@@ -2537,7 +2556,14 @@ def main():
         python booklingua.py book.epub -s English -t Spanish -v
         
         # Translate specific chapters only
+        # Translate specific chapters only
         python booklingua.py book.epub -c "1,3,5-10"
+
+        # Translate chapter ranges
+        python booklingua.py book.epub -c "3-7"
+
+        # Translate individual chapters and ranges
+        python booklingua.py book.epub -c "1,3-5,8-10"
         
         # Using OpenAI API with custom model
         python booklingua.py book.epub --openai -m gpt-4-turbo
