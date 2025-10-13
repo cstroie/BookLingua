@@ -674,6 +674,38 @@ class BookTranslator:
             new_book.add_author(author[0])
         return new_book
 
+    def book_create_titlepage(self, original_book, target_lang: str) -> epub.EpubHtml:
+        """Create a title page chapter containing only the book title.
+        
+        This method creates a simple EPUB chapter that serves as a title page,
+        containing only the book title in HTML title tags. This chapter will
+        be inserted as the first chapter in the translated book.
+        
+        Args:
+            original_book: The original EPUB book object to extract title from
+            target_lang (str): Target language code for the title page
+            
+        Returns:
+            epub.EpubHtml: EPUB HTML item for the title page chapter
+        """
+        # Get the original title
+        original_title = original_book.get_metadata('DC', 'title')[0][0]
+        
+        # Create title page content with HTML title tags
+        title_content = f'<title>{original_title}</title>'
+        xhtml = f'<article id="titlepage">\n{title_content}\n</article>'
+        
+        # Create the title page chapter
+        titlepage_chapter = epub.EpubHtml(
+            title='Title Page',
+            file_name='titlepage.xhtml',
+            lang=self.get_language_code(target_lang),
+            uid='titlepage'
+        )
+        titlepage_chapter.content = xhtml
+        
+        return titlepage_chapter
+
     def book_create_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
         """Create an EPUB chapter from translated texts in the database.
         
