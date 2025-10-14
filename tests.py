@@ -579,5 +579,190 @@ class TestBookTranslator(unittest.TestCase):
         result = self.translator.get_language_code("E")
         self.assertEqual(result, "e")
 
+    def test_context_add_with_cleaning(self):
+        """Test context_add with markdown cleaning."""
+        # Test with markdown formatting
+        self.translator.context_reset()
+        self.translator.context_add("**Hello**", "**Bonjour**", clean=True)
+        self.assertEqual(self.translator.context[0], ("Hello", "Bonjour"))
+        
+        # Test without cleaning
+        self.translator.context_reset()
+        self.translator.context_add("**Hello**", "**Bonjour**", clean=False)
+        self.assertEqual(self.translator.context[0], ("**Hello**", "**Bonjour**"))
+
+    def test_context_size_limit(self):
+        """Test that context size is limited."""
+        self.translator.context_reset()
+        # Add more items than the default context size
+        for i in range(15):
+            self.translator.context_add(f"Text {i}", f"Texte {i}")
+        
+        # Should be limited to DEFAULT_CONTEXT_SIZE
+        self.assertEqual(len(self.translator.context), 8)  # DEFAULT_CONTEXT_SIZE is 8
+        # Oldest items should be removed
+        self.assertEqual(self.translator.context[0], ("Text 7", "Texte 7"))  # First item after trimming
+
+    def test_translate_paragraph_with_empty_text(self):
+        """Test translate_paragraph with empty text."""
+        # Test with empty text
+        result = self.translator.translate_paragraph("", "English", "French")
+        self.assertEqual(result[0], "")  # target
+        self.assertEqual(result[1], 0)    # duration
+        self.assertEqual(result[2], 100)  # fluency
+        self.assertEqual(result[3], "copy")  # model
+
+    def test_translate_paragraph_with_non_empty_text(self):
+        """Test translate_paragraph with non-empty text."""
+        # Add a translation to database first
+        self.translator.db_insert_translation(
+            "Hello", "Bonjour", "English", "French", 1, 1, 1, 1000, 95, "test-model"
+        )
+        
+        # Test with existing translation
+        result = self.translator.translate_paragraph("Hello", "English", "French")
+        self.assertEqual(result[0], "Bonjour")
+        self.assertEqual(result[1], 1000)
+        self.assertEqual(result[2], 95)
+        self.assertEqual(result[3], "test-model")
+
+    def test_db_cleanup_empty(self):
+        """Test cleaning up empty translations."""
+        # Add some translations, including empty ones
+        self.translator.db_insert_translation(
+            "Hello", "Bonjour", "English", "French", 1, 1, 1, 1000, 95, "test-model"
+        )
+        self.translator.db_insert_translation(
+            "World", "", "English", "French", 1, 1, 2, -1, -1, ""
+        )
+        
+        # Check we have 2 entries
+        cursor = self.translator.conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM translations WHERE source_lang='English' AND target_lang='French'")
+        count_before = cursor.fetchone()[0]
+        self.assertEqual(count_before, 2)
+        
+        # Clean up empty translations
+        self.translator.db_cleanup_empty("English", "French")
+        
+        # Check we have only 1 entry now
+        cursor.execute("SELECT COUNT(*) FROM translations WHERE source_lang='English' AND target_lang='French'")
+        count_after = cursor.fetchone()[0]
+        self.assertEqual(count_after, 1)
+
+    def test_db_insert_all_chapters(self):
+        """Test inserting all chapters into database."""
+        # Create test chapters data
+        chapters = [
+            {
+                'id': 'chapter1',
+                'name': 'Chapter 1',
+                'title': 'Introduction',
+                'paragraphs': ['First paragraph', 'Second paragraph']
+            },
+            {
+                'id': 'chapter2',
+                'name': 'Chapter 2',
+                'title': 'Main Content',
+                'paragraphs': ['Another paragraph', 'Final paragraph']
+            }
+        ]
+        
+        # Insert chapters
+        self.translator.db_insert_all_chapters(chapters, "English", "French", 1)
+        
+        # Check that paragraphs were inserted
+        cursor = self.translator.conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM translations WHERE source_lang='English' AND target_lang='French'")
+        count = cursor.fetchone()[0]
+        self.assertEqual(count, 4)  # 2 chapters × 2 paragraphs each
+
+    def test_db_get_next_paragraph(self):
+        """Test getting the next paragraph."""
+        # Add some translations
+        self.translator.db_insert_translation(
+            "First", "Premier", "English", "French", 1, 1, 1, 1000, 95, "test-model"
+        )
+        self.translator.db_insert_translation(
+            "Second", "Deuxième", "English", "French", 1, 1, 2, 1000, 95, "test-model"
+        )
+        self.translator.db_insert_translation(
+            "Third", "Troisième", "English", "French", 1, 1, 3, 1000, 95, "test-model"
+        )
+        
+        # Get next paragraph after paragraph 1
+        par_num, source, target = self.translator.db_get_next_paragraph("English", "French", 1, 1, 1)
+        self.assertEqual(par_num, 2)
+        self.assertEqual(source, "Second")
+        self.assertEqual(target, "Deuxième")
+
+    def test_html_process_single_inline(self):
+        """Test processing single inline tags."""
+        # Test with empty tag
+        tag = BeautifulSoup("", 'html.parser')
+        self.translator.html_process_single_inline(tag)
+        # Should not raise an exception
+
+    def test_html_replace_inline(self):
+        """Test replacing inline tags."""
+        # Test with unknown tag
+        tag = BeautifulSoup('<unknown>text</unknown>', 'html.parser').unknown
+        result = self.translator.html_replace_inline(tag, "text")
+        self.assertEqual(result, "text")  # Should return text as-is
+
+    def test_html_process_span_with_css_class(self):
+        """Test processing span tags with CSS classes."""
+        # Test span with bold class
+        html = '<span class="bold">text</span>'
+        tag = BeautifulSoup(html, 'html.parser').span
+        result = self.translator.html_process_span(tag, "text")
+        self.assertEqual(result, "**text**")
+        
+        # Test span with italic class
+        html = '<span class="italic">text</span>'
+        tag = BeautifulSoup(html, 'html.parser').span
+        result = self.translator.html_process_span(tag, "text")
+        self.assertEqual(result, "*text*")
+
+    def test_markdown_to_html_headers(self):
+        """Test markdown to HTML header conversion."""
+        # Test all header levels
+        markdown = "# H1\n\n## H2\n\n### H3\n\n#### H4\n\n##### H5\n\n###### H6"
+        title, html = self.translator.markdown_to_html(markdown)
+        self.assertIn("<h1>H1</h1>", html)
+        self.assertIn("<h2>H2</h2>", html)
+        self.assertIn("<h3>H3</h3>", html)
+        self.assertIn("<h4>H4</h4>", html)
+        self.assertIn("<h5>H5</h5>", html)
+        self.assertIn("<h6>H6</h6>", html)
+
+    def test_markdown_to_html_lists_and_blockquotes(self):
+        """Test markdown to HTML lists and blockquotes conversion."""
+        # Test lists
+        markdown = "- Item 1\n- Item 2"
+        title, html = self.translator.markdown_to_html(markdown)
+        self.assertIn("<li>Item 1</li>", html)
+        self.assertIn("<li>Item 2</li>", html)
+        
+        # Test blockquotes
+        markdown = "> This is a quote"
+        title, html = self.translator.markdown_to_html(markdown)
+        self.assertIn("<blockquote>This is a quote</blockquote>", html)
+
+    def test_process_inline_markdown_images_and_hr(self):
+        """Test processing markdown images and horizontal rules."""
+        # Test horizontal rule
+        text = "Line 1\n\n---\n\nLine 2"
+        result = self.translator.process_inline_markdown(text)
+        # Note: This is handled at a higher level, so inline processing won't convert ---
+        
+        # Test that it doesn't crash with complex text
+        complex_text = "Text with **bold** and *italic* and `code` and ~~strikethrough~~"
+        result = self.translator.process_inline_markdown(complex_text)
+        self.assertIn("<strong>bold</strong>", result)
+        self.assertIn("<em>italic</em>", result)
+        self.assertIn("<code>code</code>", result)
+        self.assertIn("<s>strikethrough</s>", result)
+
 if __name__ == '__main__':
     unittest.main()
