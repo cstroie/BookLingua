@@ -1840,7 +1840,43 @@ class BookTranslator:
         
         # Check cache first
         if use_cache and self.conn:
-            # Check database first
+            cached_result = self._check_cache(text, source_lang, target_lang)
+            if cached_result:
+                return cached_result
+                
+        # Strip markdown formatting for cleaner translation
+        stripped_text, prefix, suffix = self.strip_markdown_formatting(text)
+        # Return original if empty after stripping
+        if not stripped_text.strip():
+            return text, 0, 100, 'copy'
+            
+        # No cached translation, call the API with retry logic
+        translation_result = self._translate_with_retry(stripped_text, source_lang, target_lang)
+        
+        if not translation_result:
+            return ""
+            
+        translation, model = translation_result
+        
+        # Update translation context for this language pair, already stripped of markdown
+        self.context_add(stripped_text, translation, False)
+        # Add back the markdown formatting
+        translation = prefix + translation + suffix
+        # Return the translated text
+        return translation, -1, -1, model
+
+    def _check_cache(self, text: str, source_lang: str, target_lang: str) -> tuple:
+        """Check database for existing translation.
+        
+        Args:
+            text (str): Text to look up
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            tuple: Cached translation result or None
+        """
+        try:
             cached_result = self.db_get_translation(text, source_lang, target_lang)
             if cached_result[0]:
                 # Push to context list for continuity
@@ -1848,92 +1884,27 @@ class BookTranslator:
                 if self.verbose:
                     print("✓ Using cached translation")
                 return cached_result
-        # Strip markdown formatting for cleaner translation
-        stripped_text, prefix, suffix = self.strip_markdown_formatting(text)
-        # Return original if empty after stripping
-        if not stripped_text.strip():
-            return text, 0, 100, 'copy'
-        # No cached translation, call the API with retry logic
+        except Exception as e:
+            if self.verbose:
+                print(f"Cache check failed: {e}")
+        return None
+
+    def _translate_with_retry(self, stripped_text: str, source_lang: str, target_lang: str) -> tuple:
+        """Translate text with retry logic.
+        
+        Args:
+            stripped_text (str): Text to translate (without markdown)
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            tuple: (translation, model) or None if failed
+        """
         max_retries = 5
         for attempt in range(max_retries):
             try:
-                headers = {
-                    "Content-Type": "application/json"
-                }
-                # Add API key if provided and not a local endpoint
-                if self.api_key and self.api_key != 'dummy-key':
-                    headers["Authorization"] = f"Bearer {self.api_key}"
-                # Build messages with context
-                messages = [
-                    {
-                        "role": "system",
-                        "content": SYSTEM_PROMPT.format(source_lang=source_lang, target_lang=target_lang)
-                    }
-                ]
-                # Find similar texts and add them to context
-                try:
-                    similar_texts = self.db_search(stripped_text, source_lang, target_lang)
-                    for source, target, _ in similar_texts:
-                        messages.append({"role": "user", "content": source})
-                        messages.append({"role": "assistant", "content": target})
-                except Exception as e:
-                    if self.verbose:
-                        print(f"Warning: Search failed: {e}")
-                # Add context from previous translations for this language pair
-                for user_msg, assistant_msg in self.context:
-                    messages.append({"role": "user", "content": user_msg})
-                    messages.append({"role": "assistant", "content": assistant_msg})
-                # Add current text to translate
-                messages.append({"role": "user", "content": stripped_text})
-                # Handle model name with provider (provider@model format)
-                model_name = self.model
-                payload = {
-                    "model": model_name,
-                    "messages": messages,
-                    "temperature": DEFAULT_TEMPERATURE,
-                    "min_p": 0.05,
-                    "top_k": 40,
-                    "top_p": 0.95,
-                    "repeat_last_n": 64,
-                    "repeat_penalty": 1,
-                    "cache_prompt": True,
-                    "max_tokens": DEFAULT_MAX_TOKENS,
-                    "keep_alive": DEFAULT_KEEP_ALIVE,
-                    "stream": False
-                }
-                # If model name contains '@', split it and add provider info
-                if '@' in self.model:
-                    model_parts = self.model.split('@', 1)
-                    model_name = model_parts[1]
-                    provider = model_parts[0]
-                    payload["model"] = model_name
-                    payload["provider"] = {
-                        "order": [provider]
-                    }
-                # Call the API
-                response = requests.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=payload
-                )
-                if response.status_code != 200:
-                    raise Exception(f"API request failed with status {response.status_code}: {response.text}")
-                result = response.json()
-                try:
-                    translation = result["choices"][0]["message"]["content"]
-                except (KeyError, IndexError) as e:
-                    if 'error' in result:
-                        error_info = result['error']
-                        raise Exception(f"API error: {error_info.get('message', 'Unknown error')}")
-                    raise Exception(f"Unexpected API response format: {e}")
-                # Clean the translation
-                translation = self.remove_xml_tags(translation, 'think').strip()
-                # Update translation context for this language pair, already stripped of markdown
-                self.context_add(stripped_text, translation, False)
-                # Add back the markdown formatting
-                translation = prefix + translation + suffix
-                # Return the translated text
-                return translation, -1, -1, self.model
+                translation = self._call_translation_api(stripped_text, source_lang, target_lang)
+                return translation, self.model
             except Exception as e:
                 if attempt < max_retries - 1:  # Don't sleep on the last attempt
                     wait_time = 2 ** (attempt + 1)  # 2, 4, 8, 16, 32 seconds
@@ -1942,7 +1913,110 @@ class BookTranslator:
                     time.sleep(wait_time)
                 else:
                     print(f"Error during translation after {max_retries} attempts: {e}")
-                    return ""
+                    return None
+
+    def _call_translation_api(self, stripped_text: str, source_lang: str, target_lang: str) -> str:
+        """Call the translation API with the given text.
+        
+        Args:
+            stripped_text (str): Text to translate (without markdown)
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            str: Translated text
+            
+        Raises:
+            Exception: If API call fails
+        """
+        headers = {
+            "Content-Type": "application/json"
+        }
+        # Add API key if provided and not a local endpoint
+        if self.api_key and self.api_key != 'dummy-key':
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            
+        # Build messages with context
+        messages = self._build_translation_messages(stripped_text, source_lang, target_lang)
+        
+        # Handle model name with provider (provider@model format)
+        model_name = self.model
+        payload = {
+            "model": model_name,
+            "messages": messages,
+            "temperature": DEFAULT_TEMPERATURE,
+            "min_p": 0.05,
+            "top_k": 40,
+            "top_p": 0.95,
+            "repeat_last_n": 64,
+            "repeat_penalty": 1,
+            "cache_prompt": True,
+            "max_tokens": DEFAULT_MAX_TOKENS,
+            "keep_alive": DEFAULT_KEEP_ALIVE,
+            "stream": False
+        }
+        # If model name contains '@', split it and add provider info
+        if '@' in self.model:
+            model_parts = self.model.split('@', 1)
+            model_name = model_parts[1]
+            provider = model_parts[0]
+            payload["model"] = model_name
+            payload["provider"] = {
+                "order": [provider]
+            }
+        # Call the API
+        response = requests.post(
+            f"{self.base_url}/chat/completions",
+            headers=headers,
+            json=payload
+        )
+        if response.status_code != 200:
+            raise Exception(f"API request failed with status {response.status_code}: {response.text}")
+        result = response.json()
+        try:
+            translation = result["choices"][0]["message"]["content"]
+        except (KeyError, IndexError) as e:
+            if 'error' in result:
+                error_info = result['error']
+                raise Exception(f"API error: {error_info.get('message', 'Unknown error')}")
+            raise Exception(f"Unexpected API response format: {e}")
+        # Clean the translation
+        translation = self.remove_xml_tags(translation, 'think').strip()
+        return translation
+
+    def _build_translation_messages(self, stripped_text: str, source_lang: str, target_lang: str) -> list:
+        """Build messages for translation API call.
+        
+        Args:
+            stripped_text (str): Text to translate (without markdown)
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            list: Messages for API call
+        """
+        messages = [
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT.format(source_lang=source_lang, target_lang=target_lang)
+            }
+        ]
+        # Find similar texts and add them to context
+        try:
+            similar_texts = self.db_search(stripped_text, source_lang, target_lang)
+            for source, target, _ in similar_texts:
+                messages.append({"role": "user", "content": source})
+                messages.append({"role": "assistant", "content": target})
+        except Exception as e:
+            if self.verbose:
+                print(f"Warning: Search failed: {e}")
+        # Add context from previous translations for this language pair
+        for user_msg, assistant_msg in self.context:
+            messages.append({"role": "user", "content": user_msg})
+            messages.append({"role": "assistant", "content": assistant_msg})
+        # Add current text to translate
+        messages.append({"role": "user", "content": stripped_text})
+        return messages
 
     def translate_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int):
         """Translate a single chapter and return an EPUB HTML item.
