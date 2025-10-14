@@ -1950,7 +1950,7 @@ class BookTranslator:
             par, source, target = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
             if par is not None:
                 # Check if already translated
-                if target:
+                if target.strip():
                     if self.verbose:
                         print()
                         self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, paragraph {par}/{total_count}", "✓ Using cached paragraph translation", self.console_width, 0, 4)
