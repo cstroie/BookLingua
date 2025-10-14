@@ -459,7 +459,7 @@ class BookTranslator:
             return chapters
             
         # Extract metadata as first virtual chapter
-        metadata_chapter = self._extract_metadata(book, source_lang)
+        metadata_chapter = self.book_extract_metadata(book, source_lang)
         if metadata_chapter:
             chapters.append(metadata_chapter)
             
@@ -482,7 +482,7 @@ class BookTranslator:
         # Return the list of chapter data
         return chapters
 
-    def _extract_metadata(self, book, source_lang: str) -> Optional[dict]:
+    def book_extract_metadata(self, book, source_lang: str) -> Optional[dict]:
         """Extract metadata from EPUB book and create metadata chapter.
         
         Args:
