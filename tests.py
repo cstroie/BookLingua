@@ -310,7 +310,7 @@ class TestBookTranslator(unittest.TestCase):
         # Test basic formatting tags
         html = '<p>This is <strong>bold</strong> and <em>italic</em> text.</p>'
         soup = BeautifulSoup(html, 'html.parser')
-        processed = self.translator.process_inline_tags(soup.p)
+        processed = self.translator.html_process_inlines(soup.p)
         text = processed.get_text()
         self.assertIn("**bold**", text)
         self.assertIn("*italic*", text)
@@ -318,14 +318,14 @@ class TestBookTranslator(unittest.TestCase):
         # Test code tags
         html = '<p>Use <code>print()</code> function.</p>'
         soup = BeautifulSoup(html, 'html.parser')
-        processed = self.translator.process_inline_tags(soup.p)
+        processed = self.translator.html_process_inlines(soup.p)
         text = processed.get_text()
         self.assertIn("`print()`", text)
         
         # Test strikethrough
         html = '<p>This is <s>strikethrough</s> text.</p>'
         soup = BeautifulSoup(html, 'html.parser')
-        processed = self.translator.process_inline_tags(soup.p)
+        processed = self.translator.html_process_inlines(soup.p)
         text = processed.get_text()
         self.assertIn("~~strikethrough~~", text)
 
