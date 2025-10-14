@@ -2171,6 +2171,9 @@ class BookTranslator:
                 error_info = result['error']
                 raise Exception(f"API error: {error_info.get('message', 'Unknown error')}")
             raise Exception(f"Unexpected API response format: {e}")
+                
+        # Clean the translation
+        translation = self.remove_xml_tags(translation, 'think').strip()
         
         # Extract translation from XML tags if present
         target_lang_lower = target_lang.lower()
@@ -2196,6 +2199,8 @@ class BookTranslator:
             result = response.json()
             try:
                 translation = result["choices"][0]["message"]["content"]
+                # Clean the translation
+                translation = self.remove_xml_tags(translation, 'think').strip()
                 match = re.search(pattern, translation, re.DOTALL)
                 if match:
                     translation = match.group(1).strip()
@@ -2207,9 +2212,6 @@ class BookTranslator:
                     error_info = result['error']
                     raise Exception(f"API error: {error_info.get('message', 'Unknown error')}")
                 raise Exception(f"Unexpected API response format: {e}")
-        
-        # Clean the translation
-        translation = self.remove_xml_tags(translation, 'think').strip()
         return translation
 
     def translate_api_prepare_chat(self, stripped_text: str, source_lang: str, target_lang: str) -> list:
