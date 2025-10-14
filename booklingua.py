@@ -2117,6 +2117,8 @@ class BookTranslator:
                 if self.verbose:
                     print(f"Throttling: Waiting {sleep_time:.2f}s before next request")
                 time.sleep(sleep_time)
+            # Update last request time for throttling
+            self.last_request_time = time.time()
         
         headers = {
             "Content-Type": "application/json"
@@ -2159,8 +2161,6 @@ class BookTranslator:
             headers=headers,
             json=payload
         )
-        # Update last request time for throttling
-        self.last_request_time = time.time()
         if response.status_code != 200:
             raise Exception(f"API request failed with status {response.status_code}: {response.text}")
         result = response.json()
