@@ -24,7 +24,6 @@ provides both direct and pivot translation methods with quality assessment featu
 
 Features:
 - Multi-provider AI support (OpenAI, Ollama, Mistral, DeepSeek, LM Studio, Together AI, OpenRouter)
-- Direct translation and pivot translation modes
 - EPUB structure preservation and formatting maintenance
 - Database caching for reliability and resume capability
 - Quality assessment with fluency, adequacy, and consistency scoring
