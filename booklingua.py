@@ -309,7 +309,7 @@ class BookTranslator:
         book = epub.read_epub(self.book_path, options={'ignore_ncx': False})
         chapters = self.book_extract_content(book, source_lang)
         # Save all content to database
-        edition_number = self.db_save_chapters(chapters, source_lang, target_lang, new_edition)
+        edition_number = self.book_insert_chapters(chapters, source_lang, target_lang, new_edition)
         print(f"Import completed. Saved {len(chapters)} chapters to database.")
         print(f"{self.sep1}")
         # Return the edition number for reference
@@ -341,7 +341,7 @@ class BookTranslator:
         print(f"{self.sep1}")
         print(f"Translating edition {edition_number} from {source_lang} to {target_lang}")
         # Get chapter list first, ordered by number of paragraphs
-        chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, True)
+        chapter_list = self.db_get_chapters_list(source_lang, target_lang, edition_number, True)
         # If specific chapters requested, filter the list
         try:
             chapter_list = self.parse_chapter_numbers(chapter_numbers, chapter_list)
@@ -397,7 +397,7 @@ class BookTranslator:
         # Load original book for template
         book = epub.read_epub(self.book_path, options={'ignore_ncx': False})
         # Get chapter list
-        chapter_list = self.db_get_chapters(source_lang, target_lang, edition_number, False)
+        chapter_list = self.db_get_chapters_list(source_lang, target_lang, edition_number, False)
         # If specific chapters requested, filter the list
         try:
             chapter_list = self.parse_chapter_numbers(chapter_numbers, chapter_list)
@@ -464,7 +464,7 @@ class BookTranslator:
             chapters.append(metadata_chapter)
             
         # Get the chapters order and titles from ToC
-        toc = self._get_toc_items(book)
+        toc = self.book_get_toc(book)
         if not toc:
             return chapters
             
@@ -475,7 +475,7 @@ class BookTranslator:
                 continue
             item.title = toc_item.title
             
-            chapter_data = self._process_toc_item(item, source_lang)
+            chapter_data = self.book_process_toc(item, source_lang)
             if chapter_data:
                 chapters.append(chapter_data)
                 
@@ -535,7 +535,7 @@ class BookTranslator:
             # Combine all metadata parts
             if metadata_parts:
                 # Save metadata as markdown if output directory exists
-                self._save_metadata_as_markdown(metadata_parts, source_lang)
+                self.save_metadata_as_markdown(metadata_parts, source_lang)
                 
                 # Create virtual chapter for metadata
                 return {
@@ -548,28 +548,7 @@ class BookTranslator:
             print(f"Warning: Error processing metadata: {e}")
         return None
 
-    def _save_metadata_as_markdown(self, metadata_parts: List[str], source_lang: str):
-        """Save metadata as markdown file.
-        
-        Args:
-            metadata_parts (List[str]): List of metadata parts to save
-            source_lang (str): Source language code for directory naming
-        """
-        if self.output_dir and os.path.exists(self.output_dir):
-            try:
-                # Create source language subdirectory
-                source_lang_dir = os.path.join(self.output_dir, source_lang)
-                os.makedirs(source_lang_dir, exist_ok=True)
-                # Save metadata
-                filename = "metadata.md"
-                filepath = os.path.join(source_lang_dir, filename)
-                # Write markdown content to file
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write("\n\n".join(metadata_parts))
-            except Exception as e:
-                print(f"Warning: Failed to save metadata as markdown: {e}")
-
-    def _get_toc_items(self, book) -> List:
+    def book_get_toc(self, book) -> List:
         """Get table of contents items from EPUB book.
         
         Args:
@@ -592,7 +571,7 @@ class BookTranslator:
             print(f"Warning: Failed to get items from book TOC: {e}")
         return toc
 
-    def _process_toc_item(self, item, source_lang: str) -> Optional[dict]:
+    def book_process_toc(self, item, source_lang: str) -> Optional[dict]:
         """Process a single TOC item and extract its content.
         
         Args:
@@ -647,35 +626,55 @@ class BookTranslator:
                 }
                 
                 # Save chapter as markdown if output directory exists
-                self._save_chapter_as_markdown(item, markdown_content, source_lang)
+                self.save_chapter_as_markdown(item, markdown_content, source_lang)
                 
                 return chapter_data
         except Exception as e:
             print(f"Warning: Error processing item: {e}")
         return None
-
-    def _save_chapter_as_markdown(self, item, markdown_content: str, source_lang: str):
-        """Save chapter content as markdown file.
+    
+    def book_insert_chapters(self, chapters: List[dict], source_lang: str, target_lang: str, new_edition: bool = False) -> int:
+        """Save all paragraphs from all chapters to database with empty translations.
+        
+        This method saves all paragraphs from all chapters to the database with empty
+        translations. This allows for tracking progress and resuming translations.
         
         Args:
-            item: EPUB item containing chapter data
-            markdown_content (str): Markdown content to save
-            source_lang (str): Source language code for directory naming
+            chapters (List[dict]): List of chapter dictionaries containing paragraphs
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            new_edition (bool): Whether to create a new edition or use the latest existing one
+            
+        Returns:
+            int: Edition number used for these chapters
+            
+        Raises:
+            Exception: If database connection is not available
         """
-        if self.output_dir and os.path.exists(self.output_dir):
-            try:
-                # Create source language subdirectory
-                source_lang_dir = os.path.join(self.output_dir, source_lang)
-                os.makedirs(source_lang_dir, exist_ok=True)
-                # Create a safe filename from the chapter name
-                safe_name = re.sub(r'[^\w\-_\. ]', '_', os.path.splitext(item.get_name())[0])
-                filename = f"{safe_name}.md"
-                filepath = os.path.join(source_lang_dir, filename)
-                # Write markdown content to file
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(markdown_content)
-            except Exception as e:
-                print(f"Warning: Failed to save chapter {item.get_id()} as markdown: {e}")
+        # We need the database connection
+        if not self.conn:
+            raise Exception("Database connection not available")
+            
+        # Determine edition number
+        latest_edition = self.db_get_latest_edition(source_lang, target_lang)
+        # Use latest edition by default, create new one only if requested or no editions exist
+        if new_edition or latest_edition == 0:
+            edition_number = latest_edition + 1
+            print(f"Starting edition {edition_number}.")
+        else:
+            edition_number = latest_edition
+            print(f"Using existing edition {edition_number}.")
+        
+        # Clean up empty translations
+        self.db_cleanup_empty(source_lang, target_lang)
+        
+        # Summary of chapters found
+        print(f"Found {len(chapters)} chapters to translate ...")
+        
+        # Save all texts
+        self.db_insert_all_chapters(chapters, source_lang, target_lang, edition_number)
+        
+        return edition_number
 
     def book_create_template(self, original_book, source_lang: str, target_lang: str) -> epub.EpubBook:
         """Create a new EPUB book template with metadata copied from original book.
@@ -831,6 +830,50 @@ class BookTranslator:
         # Define spine
         book.spine = [titlepage, nav] + chapters
 
+    def save_metadata_as_markdown(self, metadata_parts: List[str], source_lang: str):
+        """Save metadata as markdown file.
+        
+        Args:
+            metadata_parts (List[str]): List of metadata parts to save
+            source_lang (str): Source language code for directory naming
+        """
+        if self.output_dir and os.path.exists(self.output_dir):
+            try:
+                # Create source language subdirectory
+                source_lang_dir = os.path.join(self.output_dir, source_lang)
+                os.makedirs(source_lang_dir, exist_ok=True)
+                # Save metadata
+                filename = "metadata.md"
+                filepath = os.path.join(source_lang_dir, filename)
+                # Write markdown content to file
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write("\n\n".join(metadata_parts))
+            except Exception as e:
+                print(f"Warning: Failed to save metadata as markdown: {e}")
+
+    def save_chapter_as_markdown(self, item, markdown_content: str, source_lang: str):
+        """Save chapter content as markdown file.
+        
+        Args:
+            item: EPUB item containing chapter data
+            markdown_content (str): Markdown content to save
+            source_lang (str): Source language code for directory naming
+        """
+        if self.output_dir and os.path.exists(self.output_dir):
+            try:
+                # Create source language subdirectory
+                source_lang_dir = os.path.join(self.output_dir, source_lang)
+                os.makedirs(source_lang_dir, exist_ok=True)
+                # Create a safe filename from the chapter name
+                safe_name = re.sub(r'[^\w\-_\. ]', '_', os.path.splitext(item.get_name())[0])
+                filename = f"{safe_name}.md"
+                filepath = os.path.join(source_lang_dir, filename)
+                # Write markdown content to file
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(markdown_content)
+            except Exception as e:
+                print(f"Warning: Failed to save chapter {item.get_id()} as markdown: {e}")
+
     def html_to_markdown(self, soup) -> str:
         """Convert HTML BeautifulSoup object to Markdown format.
         
@@ -865,15 +908,15 @@ class BookTranslator:
             return ""
             
         # Remove script and style elements
-        self._remove_script_style_elements(soup)
+        self.html_remove_script_style(soup)
         
         # Process block elements
-        markdown_lines = self._process_block_elements(soup)
+        markdown_lines = self.html_process_blocks(soup)
         
         # Join with double newlines for paragraph separation
-        return self._join_markdown_lines(markdown_lines)
+        return "\n\n".join(markdown_lines)
 
-    def _remove_script_style_elements(self, soup):
+    def html_remove_script_style(self, soup):
         """Remove script and style elements from the soup.
         
         Args:
@@ -885,7 +928,7 @@ class BookTranslator:
         except Exception as e:
             print(f"Warning: Failed to remove script/style elements: {e}")
 
-    def _process_block_elements(self, soup) -> List[str]:
+    def html_process_blocks(self, soup) -> List[str]:
         """Process block elements and convert them to markdown lines.
         
         Args:
@@ -907,7 +950,7 @@ class BookTranslator:
                     if element.parent.name in block_elements:
                         continue
                         
-                    markdown_line = self._convert_element_to_markdown(element)
+                    markdown_line = self.html_convert_element(element)
                     if markdown_line is not None:
                         markdown_lines.append(markdown_line)
                 except Exception as e:
@@ -918,7 +961,7 @@ class BookTranslator:
             
         return markdown_lines
 
-    def _convert_element_to_markdown(self, element) -> Optional[str]:
+    def html_convert_element(self, element) -> Optional[str]:
         """Convert a single HTML element to markdown format.
         
         Args:
@@ -934,14 +977,14 @@ class BookTranslator:
             return '***'
             
         # Process inline tags within the element
-        processed_element = self.process_inline_tags(element)
+        processed_element = self.html_process_inlines(element)
         text = processed_element.get_text(separator=' ', strip=True)
         if not text:
             return None
             
         # Add appropriate Markdown formatting
         if element.name and element.name.startswith('h'):
-            return self._format_header(element.name, text)
+            return self.html_format_header(element.name, text)
         elif element.name == 'li':
             return '- ' + text
         elif element.name == 'blockquote':
@@ -949,7 +992,7 @@ class BookTranslator:
         else:
             return text
 
-    def _format_header(self, element_name: str, text: str) -> str:
+    def html_format_header(self, element_name: str, text: str) -> str:
         """Format header element to markdown header.
         
         Args:
@@ -964,23 +1007,8 @@ class BookTranslator:
             return '#' * level + ' ' + text
         except (ValueError, IndexError):
             return text  # Fallback to plain text
-
-    def _join_markdown_lines(self, markdown_lines: List[str]) -> str:
-        """Join markdown lines with double newlines.
-        
-        Args:
-            markdown_lines (List[str]): List of markdown lines
-            
-        Returns:
-            str: Joined markdown text
-        """
-        try:
-            return '\n\n'.join(markdown_lines)
-        except Exception as e:
-            print(f"Warning: Failed to join markdown lines: {e}")
-            return ""
     
-    def process_inline_tags(self, element) -> BeautifulSoup:
+    def html_process_inlines(self, element) -> BeautifulSoup:
         """Process inline HTML tags and convert them to Markdown-style formatting.
         
         This method processes inline HTML elements within a BeautifulSoup object and
@@ -1013,44 +1041,17 @@ class BookTranslator:
         Example:
             >>> html = '<p>This is <strong>bold</strong> and <em>italic</em> text</p>'
             >>> soup = BeautifulSoup(html, 'html.parser')
-            >>> processed = translator.process_inline_tags(soup.p)
+            >>> processed = translator.html_process_inlines(soup.p)
             >>> print(processed.get_text())
             'This is **bold** and *italic* text'
         """
         if not element:
             return BeautifulSoup("", 'html.parser')
             
-        element_copy = self._create_element_copy(element)
+        element_copy = BeautifulSoup(str(element), 'html.parser')
         if not element_copy:
             return BeautifulSoup("", 'html.parser')
-            
-        # Process each inline tag
-        self._process_inline_elements(element_copy)
-        
-        # Return the modified element
-        return element_copy
 
-    def _create_element_copy(self, element) -> BeautifulSoup:
-        """Create a copy of the element to avoid modifying the original.
-        
-        Args:
-            element (BeautifulSoup): Element to copy
-            
-        Returns:
-            BeautifulSoup: Copy of the element or None if failed
-        """
-        try:
-            return BeautifulSoup(str(element), 'html.parser')
-        except Exception as e:
-            print(f"Warning: Failed to create element copy: {e}")
-            return None
-
-    def _process_inline_elements(self, element_copy):
-        """Process all inline elements in the element copy.
-        
-        Args:
-            element_copy (BeautifulSoup): Element copy to process
-        """
         # Inline tags to process
         inline_tags = ['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span', 'img']
         
@@ -1058,14 +1059,17 @@ class BookTranslator:
             # Process each inline tag
             for tag in element_copy.find_all(inline_tags):
                 try:
-                    self._process_single_tag(tag)
+                    self.html_process_single_inline(tag)
                 except Exception as e:
                     print(f"Warning: Error processing tag: {e}")
                     continue
         except Exception as e:
             print(f"Warning: Failed to find inline tags: {e}")
 
-    def _process_single_tag(self, tag):
+        # Return the modified element
+        return element_copy
+
+    def html_process_single_inline(self, tag):
         """Process a single inline tag and convert it to markdown.
         
         Args:
@@ -1076,12 +1080,12 @@ class BookTranslator:
             return
             
         # Replace with appropriate Markdown formatting
-        replacement = self._get_markdown_replacement(tag, text)
+        replacement = self.html_replace_inline(tag, text)
         if replacement is not None:
             # Replace the tag with formatted text
             tag.replace_with(replacement)
 
-    def _get_markdown_replacement(self, tag, text: str) -> str:
+    def html_replace_inline(self, tag, text: str) -> str:
         """Get the markdown replacement for a tag.
         
         Args:
@@ -1104,13 +1108,13 @@ class BookTranslator:
         elif tag.name == 'code':
             return f'`{text}`'
         elif tag.name == 'img':
-            return self._format_image_tag(tag)
+            return self.html_process_img(tag)
         elif tag.name == 'span':
-            return self._format_span_tag(tag, text)
+            return self.html_process_span(tag, text)
         else:  # other tags
             return text
 
-    def _format_image_tag(self, tag) -> str:
+    def html_process_img(self, tag) -> str:
         """Format image tag to markdown syntax.
         
         Args:
@@ -1126,7 +1130,7 @@ class BookTranslator:
         else:
             return ''
 
-    def _format_span_tag(self, tag, text: str) -> str:
+    def html_process_span(self, tag, text: str) -> str:
         """Format span tag based on CSS styling.
         
         Args:
@@ -1659,7 +1663,7 @@ class BookTranslator:
                 print(f"Database lookup for latest edition failed: {e}")
             raise
 
-    def db_get_chapters(self, source_lang: str, target_lang: str, edition_number: int, by_length: bool = False) -> List[int]:
+    def db_get_chapters_list(self, source_lang: str, target_lang: str, edition_number: int, by_length: bool = False) -> List[int]:
         """Retrieve all chapter numbers from the database, ordered ascending.
         
         Args:
@@ -1772,6 +1776,41 @@ class BookTranslator:
                 print(f"Database count for chapter paragraphs failed: {e}")
             raise
 
+    def db_count_untranslated(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> int:
+        """Count the number of untranslated paragraphs in a chapter.
+        
+        Args:
+            edition_number (int): Edition number to check
+            chapter_number (int): Chapter number to check
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            int: Number of untranslated paragraphs in the chapter (0 if fully translated)
+            
+        Raises:
+            Exception: If database connection is not available
+        """
+        # Raise exception if no database connection
+        if not self.conn:
+            raise Exception("Database connection not available")
+        try:
+            cursor = self.conn.cursor()
+            # Count paragraphs with empty translations
+            cursor.execute('''
+                SELECT COUNT(*) FROM translations 
+                WHERE edition = ? AND chapter = ? AND source_lang = ? AND target_lang = ? 
+                AND (target IS NULL OR target = '')
+            ''', (edition_number, chapter_number, source_lang, target_lang))
+            empty_result = cursor.fetchone()
+            empty_paragraphs = empty_result[0] if empty_result else 0
+            # Return the count of untranslated paragraphs
+            return empty_paragraphs
+        except Exception as e:
+            if self.verbose:
+                print(f"Database check for untranslated paragraphs failed: {e}")
+            raise
+
     def db_chapter_stats(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> tuple:
         """Get chapter translation statistics for a given edition.
         
@@ -1823,45 +1862,10 @@ class BookTranslator:
             if self.verbose:
                 print(f"Database chapter stats query failed: {e}")
             raise
-
-    def db_count_untranslated(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> int:
-        """Count the number of untranslated paragraphs in a chapter.
-        
-        Args:
-            edition_number (int): Edition number to check
-            chapter_number (int): Chapter number to check
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-            
-        Returns:
-            int: Number of untranslated paragraphs in the chapter (0 if fully translated)
-            
-        Raises:
-            Exception: If database connection is not available
-        """
-        # Raise exception if no database connection
-        if not self.conn:
-            raise Exception("Database connection not available")
-        try:
-            cursor = self.conn.cursor()
-            # Count paragraphs with empty translations
-            cursor.execute('''
-                SELECT COUNT(*) FROM translations 
-                WHERE edition = ? AND chapter = ? AND source_lang = ? AND target_lang = ? 
-                AND (target IS NULL OR target = '')
-            ''', (edition_number, chapter_number, source_lang, target_lang))
-            empty_result = cursor.fetchone()
-            empty_paragraphs = empty_result[0] if empty_result else 0
-            # Return the count of untranslated paragraphs
-            return empty_paragraphs
-        except Exception as e:
-            if self.verbose:
-                print(f"Database check for untranslated paragraphs failed: {e}")
-            raise
     
-    def db_save_translation(self, text: str, translation: str, source_lang: str, target_lang: str, 
-                            edition_number: int = None, chapter_number: int = None, paragraph_number: int = None, 
-                            duration: int = None, fluency: int = None, model: str = ''):
+    def db_insert_translation(self, text: str, translation: str, source_lang: str, target_lang: str, 
+                              edition_number: int = None, chapter_number: int = None, paragraph_number: int = None, 
+                              duration: int = None, fluency: int = None, model: str = ''):
         """Save a translation to the database.
         
         Args:
@@ -1905,66 +1909,8 @@ class BookTranslator:
             if self.verbose:
                 print(f"Database save failed: {e}")
             raise
-    
-    def db_save_chapters(self, chapters: List[dict], source_lang: str, target_lang: str, new_edition: bool = False) -> int:
-        """Save all paragraphs from all chapters to database with empty translations.
-        
-        This method saves all paragraphs from all chapters to the database with empty
-        translations. This allows for tracking progress and resuming translations.
-        
-        Args:
-            chapters (List[dict]): List of chapter dictionaries containing paragraphs
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-            new_edition (bool): Whether to create a new edition or use the latest existing one
-            
-        Returns:
-            int: Edition number used for these chapters
-            
-        Raises:
-            Exception: If database connection is not available
-        """
-        # We need the database connection
-        if not self.conn:
-            raise Exception("Database connection not available")
-            
-        # Determine edition number
-        edition_number = self._determine_edition_number(source_lang, target_lang, new_edition)
-        
-        # Clean up empty translations
-        self._cleanup_empty_translations(source_lang, target_lang)
-        
-        # Summary of chapters found
-        print(f"Found {len(chapters)} chapters to translate ...")
-        
-        # Save all texts
-        self._save_chapters_content(chapters, source_lang, target_lang, edition_number)
-        
-        return edition_number
 
-    def _determine_edition_number(self, source_lang: str, target_lang: str, new_edition: bool) -> int:
-        """Determine the edition number to use for saving chapters.
-        
-        Args:
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-            new_edition (bool): Whether to create a new edition
-            
-        Returns:
-            int: Edition number to use
-        """
-        # Get the latest edition number
-        latest_edition = self.db_get_latest_edition(source_lang, target_lang)
-        # Use latest edition by default, create new one only if requested or no editions exist
-        if new_edition or latest_edition == 0:
-            edition_number = latest_edition + 1
-            print(f"Starting edition {edition_number}.")
-        else:
-            edition_number = latest_edition
-            print(f"Using existing edition {edition_number}.")
-        return edition_number
-
-    def _cleanup_empty_translations(self, source_lang: str, target_lang: str):
+    def db_cleanup_empty(self, source_lang: str, target_lang: str):
         """Delete all entries with empty translations for this language pair.
         
         Args:
@@ -1986,7 +1932,7 @@ class BookTranslator:
             if self.verbose:
                 print(f"Warning: Failed to delete empty translations: {e}")
 
-    def _save_chapters_content(self, chapters: List[dict], source_lang: str, target_lang: str, edition_number: int):
+    def db_insert_all_chapters(self, chapters: List[dict], source_lang: str, target_lang: str, edition_number: int):
         """Save all chapters content to the database.
         
         Args:
@@ -2003,7 +1949,7 @@ class BookTranslator:
                 for par, text in enumerate(texts):
                     # Only save non-empty texts
                     if text.strip():
-                        translation_data = self._process_paragraph_text(text, source_lang, target_lang)
+                        translation_data = self.translate_paragraph(text, source_lang, target_lang)
                         target, duration, fluency, model = translation_data
                         
                         # Insert with translation if not already there
@@ -2021,7 +1967,7 @@ class BookTranslator:
                 print(f"Failed to save chapters to database: {e}")
             raise
 
-    def _process_paragraph_text(self, text: str, source_lang: str, target_lang: str) -> tuple:
+    def translate_paragraph(self, text: str, source_lang: str, target_lang: str) -> tuple:
         """Process a paragraph text and determine its translation data.
         
         Args:
@@ -2067,7 +2013,7 @@ class BookTranslator:
         
         # Check cache first
         if use_cache and self.conn:
-            cached_result = self._check_cache(text, source_lang, target_lang)
+            cached_result = self.db_check_cache(text, source_lang, target_lang)
             if cached_result:
                 return cached_result
                 
@@ -2078,7 +2024,7 @@ class BookTranslator:
             return text, 0, 100, 'copy'
             
         # No cached translation, call the API with retry logic
-        translation_result = self._translate_with_retry(stripped_text, source_lang, target_lang)
+        translation_result = self.translate_with_retry(stripped_text, source_lang, target_lang)
         
         if not translation_result:
             return ""
@@ -2092,7 +2038,7 @@ class BookTranslator:
         # Return the translated text
         return translation, -1, -1, model
 
-    def _check_cache(self, text: str, source_lang: str, target_lang: str) -> tuple:
+    def db_check_cache(self, text: str, source_lang: str, target_lang: str) -> tuple:
         """Check database for existing translation.
         
         Args:
@@ -2116,7 +2062,7 @@ class BookTranslator:
                 print(f"Cache check failed: {e}")
         return None
 
-    def _translate_with_retry(self, stripped_text: str, source_lang: str, target_lang: str) -> tuple:
+    def translate_with_retry(self, stripped_text: str, source_lang: str, target_lang: str) -> tuple:
         """Translate text with retry logic.
         
         Args:
@@ -2130,7 +2076,7 @@ class BookTranslator:
         max_retries = 5
         for attempt in range(max_retries):
             try:
-                translation = self._call_translation_api(stripped_text, source_lang, target_lang)
+                translation = self.translate_api_call(stripped_text, source_lang, target_lang)
                 return translation, self.model
             except Exception as e:
                 if attempt < max_retries - 1:  # Don't sleep on the last attempt
@@ -2142,7 +2088,7 @@ class BookTranslator:
                     print(f"Error during translation after {max_retries} attempts: {e}")
                     return None
 
-    def _call_translation_api(self, stripped_text: str, source_lang: str, target_lang: str) -> str:
+    def translate_api_call(self, stripped_text: str, source_lang: str, target_lang: str) -> str:
         """Call the translation API with the given text.
         
         Args:
@@ -2164,7 +2110,7 @@ class BookTranslator:
             headers["Authorization"] = f"Bearer {self.api_key}"
             
         # Build messages with context
-        messages = self._build_translation_messages(stripped_text, source_lang, target_lang)
+        messages = self.translate_api_prepare_chat(stripped_text, source_lang, target_lang)
         
         # Handle model name with provider (provider@model format)
         model_name = self.model
@@ -2211,7 +2157,7 @@ class BookTranslator:
         translation = self.remove_xml_tags(translation, 'think').strip()
         return translation
 
-    def _build_translation_messages(self, stripped_text: str, source_lang: str, target_lang: str) -> list:
+    def translate_api_prepare_chat(self, stripped_text: str, source_lang: str, target_lang: str) -> list:
         """Build messages for translation API call.
         
         Args:
@@ -2263,7 +2209,7 @@ class BookTranslator:
         untranslated_count = self.db_count_untranslated(edition_number, chapter_number, source_lang, target_lang)
         
         # Display chapter header
-        self._display_chapter_header(chapter_number, total_chapters, total_count, untranslated_count)
+        self.display_chapter_header(chapter_number, total_chapters, total_count, untranslated_count)
         
         if untranslated_count == 0:
             return
@@ -2277,15 +2223,19 @@ class BookTranslator:
         self.context_prefill(source_lang, target_lang, chapter_number)
         
         # Translate all paragraphs in the chapter
-        self._translate_chapter_paragraphs(edition_number, chapter_number, source_lang, target_lang, total_chapters, total_count)
+        self.translate_one_chapter(edition_number, chapter_number, source_lang, target_lang, total_chapters, total_count)
         
         # Show chapter completion time
-        self._display_chapter_completion_time(chapter_start_time, total_count)
+        chapter_end_time = datetime.now()
+        chapter_duration_ms = int((chapter_end_time - chapter_start_time).total_seconds() * 1000)
+        # Average calculation
+        avg_time_per_paragraph = chapter_duration_ms / total_count if total_count > 0 else 0
+        print(f"Translation completed in {chapter_duration_ms/1000:.2f}s (avg {avg_time_per_paragraph/1000:.2f}s/paragraph)")
         
         # Run quality checks at the end of chapter translation
-        self._run_chapter_quality_checks(edition_number, chapter_number, source_lang, target_lang)
+        self.display_chapter_checks(edition_number, chapter_number, source_lang, target_lang)
 
-    def _display_chapter_header(self, chapter_number: int, total_chapters: int, total_count: int, untranslated_count: int):
+    def display_chapter_header(self, chapter_number: int, total_chapters: int, total_count: int, untranslated_count: int):
         """Display the chapter header with translation status.
         
         Args:
@@ -2301,7 +2251,7 @@ class BookTranslator:
         print(f"\n{self.sep1}")
         self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, {total_count} paragraphs", fully_translated_text, self.console_width, 0, 4)
 
-    def _translate_chapter_paragraphs(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int, total_count: int):
+    def translate_one_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int, total_count: int):
         """Translate all paragraphs in a chapter.
         
         Args:
@@ -2320,17 +2270,17 @@ class BookTranslator:
             if par is not None:
                 # Handle already translated paragraphs
                 if target.strip():
-                    self._handle_cached_paragraph(chapter_number, total_chapters, par, total_count, source, target)
+                    self.display_cached_paragraph(chapter_number, total_chapters, par, total_count, source, target)
                     continue
                     
                 # Translate paragraph if needed
                 if source.strip() and len(source.split()) < 1000:
-                    self._translate_single_paragraph(edition_number, chapter_number, total_chapters, par, total_count, source, source_lang, target_lang)
+                    self.translate_one_paragraph(edition_number, chapter_number, total_chapters, par, total_count, source, source_lang, target_lang)
             else:
                 # No more paragraphs to translate
                 break
 
-    def _handle_cached_paragraph(self, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, target: str):
+    def display_cached_paragraph(self, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, target: str):
         """Handle already translated paragraphs from cache.
         
         Args:
@@ -2348,7 +2298,7 @@ class BookTranslator:
             self.display_side_by_side(source, target)
             print(f"{self.sep3}")
 
-    def _translate_single_paragraph(self, edition_number: int, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, source_lang: str, target_lang: str):
+    def translate_one_paragraph(self, edition_number: int, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, source_lang: str, target_lang: str):
         """Translate a single paragraph and save to database.
         
         Args:
@@ -2382,7 +2332,7 @@ class BookTranslator:
         fluency = self.calculate_fluency_score(target)
         
         # Save to database with timing and fluency info
-        self.db_save_translation(source, target, source_lang, target_lang,
+        self.db_insert_translation(source, target, source_lang, target_lang,
                                  edition_number, chapter_number, par, elapsed, fluency, model)
         
         # Calculate statistics for current chapter only
@@ -2391,20 +2341,7 @@ class BookTranslator:
             # Show fluency score and timing stats
             print(f"Fluency: {fluency}% | Time: {elapsed/1000:.2f}s | Avg: {avg_time/1000:.2f}s | Remaining: {remaining_time/1000:.2f}s")
 
-    def _display_chapter_completion_time(self, chapter_start_time: datetime, total_count: int):
-        """Display the chapter completion time statistics.
-        
-        Args:
-            chapter_start_time (datetime): When the chapter translation started
-            total_count (int): Total paragraphs in the chapter
-        """
-        chapter_end_time = datetime.now()
-        chapter_duration_ms = int((chapter_end_time - chapter_start_time).total_seconds() * 1000)
-        # Average calculation
-        avg_time_per_paragraph = chapter_duration_ms / total_count if total_count > 0 else 0
-        print(f"Translation completed in {chapter_duration_ms/1000:.2f}s (avg {avg_time_per_paragraph/1000:.2f}s/paragraph)")
-
-    def _run_chapter_quality_checks(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str):
+    def display_chapter_checks(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str):
         """Run quality checks at the end of chapter translation.
         
         Args:
