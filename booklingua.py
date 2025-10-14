@@ -3132,7 +3132,7 @@ def main():
         model = model or "qwen2.5-72b"
     elif args.together:
         base_url = base_url or "https://api.together.xyz/v1"
-        model = model or "Qwen/Qwen2.5-72B-Instruct-Turbo"
+        model = model or "openai/gpt-oss-20b"
         if not api_key:
             api_key = os.environ.get('TOGETHER_API_KEY')
     elif args.openrouter:
