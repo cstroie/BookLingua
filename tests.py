@@ -608,9 +608,9 @@ class TestBookTranslator(unittest.TestCase):
         # Test with empty text
         result = self.translator.translate_paragraph("", "English", "French")
         self.assertEqual(result[0], "")  # target
-        self.assertEqual(result[1], 0)    # duration
-        self.assertEqual(result[2], 100)  # fluency
-        self.assertEqual(result[3], "copy")  # model
+        self.assertEqual(result[1], -1)   # duration
+        self.assertEqual(result[2], -1)   # fluency
+        self.assertEqual(result[3], "")   # model
 
     def test_translate_paragraph_with_non_empty_text(self):
         """Test translate_paragraph with non-empty text."""
