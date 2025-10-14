@@ -484,7 +484,15 @@ class BookTranslator:
         return chapters
 
     def _extract_metadata(self, book, source_lang: str) -> Optional[dict]:
-        """Extract metadata from EPUB book and create metadata chapter."""
+        """Extract metadata from EPUB book and create metadata chapter.
+        
+        Args:
+            book: An opened EPUB book object
+            source_lang (str): Source language code for saving metadata
+            
+        Returns:
+            Optional[dict]: Metadata chapter dictionary or None if extraction failed
+        """
         try:
             metadata_parts = []
             
@@ -542,7 +550,12 @@ class BookTranslator:
         return None
 
     def _save_metadata_as_markdown(self, metadata_parts: List[str], source_lang: str):
-        """Save metadata as markdown file."""
+        """Save metadata as markdown file.
+        
+        Args:
+            metadata_parts (List[str]): List of metadata parts to save
+            source_lang (str): Source language code for directory naming
+        """
         if self.output_dir and os.path.exists(self.output_dir):
             try:
                 # Create source language subdirectory
@@ -558,7 +571,14 @@ class BookTranslator:
                 print(f"Warning: Failed to save metadata as markdown: {e}")
 
     def _get_toc_items(self, book) -> List:
-        """Get table of contents items from EPUB book."""
+        """Get table of contents items from EPUB book.
+        
+        Args:
+            book: An opened EPUB book object
+            
+        Returns:
+            List: List of TOC items
+        """
         toc = []
         def _get_links_from_toc(contents):
             """ Recursively get the links from TOC """
@@ -574,7 +594,15 @@ class BookTranslator:
         return toc
 
     def _process_toc_item(self, item, source_lang: str) -> Optional[dict]:
-        """Process a single TOC item and extract its content."""
+        """Process a single TOC item and extract its content.
+        
+        Args:
+            item: EPUB item to process
+            source_lang (str): Source language code for saving chapters
+            
+        Returns:
+            Optional[dict]: Chapter data dictionary or None if processing failed
+        """
         try:
             if item.get_type() != ebooklib.ITEM_DOCUMENT:
                 return None
@@ -628,7 +656,13 @@ class BookTranslator:
         return None
 
     def _save_chapter_as_markdown(self, item, markdown_content: str, source_lang: str):
-        """Save chapter content as markdown file."""
+        """Save chapter content as markdown file.
+        
+        Args:
+            item: EPUB item containing chapter data
+            markdown_content (str): Markdown content to save
+            source_lang (str): Source language code for directory naming
+        """
         if self.output_dir and os.path.exists(self.output_dir):
             try:
                 # Create source language subdirectory
@@ -2117,7 +2151,14 @@ class BookTranslator:
         self._run_chapter_quality_checks(edition_number, chapter_number, source_lang, target_lang)
 
     def _display_chapter_header(self, chapter_number: int, total_chapters: int, total_count: int, untranslated_count: int):
-        """Display the chapter header with translation status."""
+        """Display the chapter header with translation status.
+        
+        Args:
+            chapter_number (int): Current chapter number
+            total_chapters (int): Total number of chapters
+            total_count (int): Total paragraphs in chapter
+            untranslated_count (int): Number of untranslated paragraphs
+        """
         if untranslated_count == 0:
             fully_translated_text = "✓ Chapter is fully translated"
         else:
@@ -2126,7 +2167,16 @@ class BookTranslator:
         self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, {total_count} paragraphs", fully_translated_text, self.console_width, 0, 4)
 
     def _translate_chapter_paragraphs(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int, total_count: int):
-        """Translate all paragraphs in a chapter."""
+        """Translate all paragraphs in a chapter.
+        
+        Args:
+            edition_number (int): Edition number for this translation
+            chapter_number (int): Chapter number to translate
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            total_chapters (int): Total number of chapters in the book
+            total_count (int): Total paragraphs in this chapter
+        """
         # Start before first paragraph
         par = -1
         while True:
@@ -2146,7 +2196,16 @@ class BookTranslator:
                 break
 
     def _handle_cached_paragraph(self, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, target: str):
-        """Handle already translated paragraphs from cache."""
+        """Handle already translated paragraphs from cache.
+        
+        Args:
+            chapter_number (int): Current chapter number
+            total_chapters (int): Total number of chapters
+            par (int): Paragraph number
+            total_count (int): Total paragraphs in chapter
+            source (str): Source text
+            target (str): Translated text
+        """
         if self.verbose:
             print()
             self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, paragraph {par}/{total_count}", "✓ Using cached paragraph translation", self.console_width, 0, 4)
@@ -2155,7 +2214,18 @@ class BookTranslator:
             print(f"{self.sep3}")
 
     def _translate_single_paragraph(self, edition_number: int, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, source_lang: str, target_lang: str):
-        """Translate a single paragraph and save to database."""
+        """Translate a single paragraph and save to database.
+        
+        Args:
+            edition_number (int): Edition number for this translation
+            chapter_number (int): Chapter number
+            total_chapters (int): Total number of chapters
+            par (int): Paragraph number
+            total_count (int): Total paragraphs in chapter
+            source (str): Source text to translate
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+        """
         print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_count}, {len(source.split())} words.")
         
         # Time the translation
@@ -2187,7 +2257,12 @@ class BookTranslator:
             print(f"Fluency: {fluency}% | Time: {elapsed/1000:.2f}s | Avg: {avg_time/1000:.2f}s | Remaining: {remaining_time/1000:.2f}s")
 
     def _display_chapter_completion_time(self, chapter_start_time: datetime, total_count: int):
-        """Display the chapter completion time statistics."""
+        """Display the chapter completion time statistics.
+        
+        Args:
+            chapter_start_time (datetime): When the chapter translation started
+            total_count (int): Total paragraphs in the chapter
+        """
         chapter_end_time = datetime.now()
         chapter_duration_ms = int((chapter_end_time - chapter_start_time).total_seconds() * 1000)
         # Average calculation
@@ -2195,7 +2270,14 @@ class BookTranslator:
         print(f"Translation completed in {chapter_duration_ms/1000:.2f}s (avg {avg_time_per_paragraph/1000:.2f}s/paragraph)")
 
     def _run_chapter_quality_checks(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str):
-        """Run quality checks at the end of chapter translation."""
+        """Run quality checks at the end of chapter translation.
+        
+        Args:
+            edition_number (int): Edition number for this translation
+            chapter_number (int): Chapter number that was translated
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+        """
         try:
             # Get all translated texts in the chapter for quality assessment
             translated_texts = self.db_get_translations(edition_number, chapter_number=chapter_number, source_lang=source_lang, target_lang=target_lang)
