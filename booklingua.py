@@ -1933,28 +1933,29 @@ class BookTranslator:
             target_lang (str): Target language code
             total_chapters (int): Total number of chapters in the book
         """
-        print(f"\n{self.sep1}")
-        print(f"Chapter {chapter_number}/{total_chapters}")
-        print(f"{self.sep2}")
-        # Check if chapter is fully translated
-        if self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
-            if self.verbose:
-                print("✓ Chapter is fully translated")
-            return
         # Get total paragraphs in chapter to determine chapter size
         total_paragraphs = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
+        # Check if chapter is fully translated
+        fully_translated = self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang)
+        if fully_translated:
+            fully_translated_text = "✓ Chapter is fully translated"
+        else:
+            fully_translated_text = "Needs translating"
+        print(f"\n{self.sep1}")
+        self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, {total_paragraphs} paragraphs", fully_translated_text, self.console_width, 0, 4)
+        if fully_translated:
+            return
+        print(f"{self.sep2}")
         # Initialize timing statistics for this chapter
         chapter_start_time = datetime.now()
         # Pre-fill context with chapter-specific data
         self.context_prefill(source_lang, target_lang, chapter_number)
-        # Get total paragraphs in chapter
-        total_paragraphs = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
         # Start before first paragraph
         par = -1
         while True:
             # Get the next chapter's paragraph from database
             par, source, target = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
-            if par:
+            if par is not None:
                 # Check if already translated
                 if target:
                     if self.verbose:
@@ -1996,11 +1997,8 @@ class BookTranslator:
         # Show chapter completion time
         chapter_end_time = datetime.now()
         chapter_duration_ms = int((chapter_end_time - chapter_start_time).total_seconds() * 1000)
-        
-        # Get paragraph count for average calculation
-        paragraph_count = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
-        avg_time_per_paragraph = chapter_duration_ms / paragraph_count if paragraph_count > 0 else 0
-        
+        # Average calculation
+        avg_time_per_paragraph = chapter_duration_ms / total_paragraphs if total_paragraphs > 0 else 0
         print(f"Translation completed in {chapter_duration_ms/1000:.2f}s (avg {avg_time_per_paragraph/1000:.2f}s/paragraph)")
         # Run quality checks at the end of chapter translation
         try:
