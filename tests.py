@@ -278,8 +278,11 @@ class TestBookTranslator(unittest.TestCase):
     def test_context_prefill(self):
         """Test context prefill functionality."""
         # Add some test data to database with non-empty target
+        # Use text that meets the length requirements (> 50 and < 200 characters)
         self.translator.db_insert_translation(
-            "Hello world", "Bonjour le monde", "English", "French", 1, 1, 1, 1000, 95, "test-model"
+            "Hello world this is a sample text that is longer than fifty characters for testing purposes", 
+            "Bonjour le monde ceci est un exemple de texte qui dépasse cinquante caractères à des fins de test", 
+            "English", "French", 1, 1, 1, 1000, 95, "test-model"
         )
         
         # Test prefill with existing translations
@@ -300,7 +303,7 @@ class TestBookTranslator(unittest.TestCase):
         self.assertEqual(len(self.translator.context), 0)
         
         # Test with small chapter size
-        self.translator.context_add("Hello", "Bonjour")
+        self.translator.context_add("Hello world this is a longer text that exceeds fifty characters to test the context preservation logic", "Bonjour le monde ceci est un texte plus long que cinquante caractères pour tester la logique")
         self.translator.context_reset(5)  # Small chapter size
         # Context should be preserved for small chapters
         self.assertEqual(len(self.translator.context), 1)

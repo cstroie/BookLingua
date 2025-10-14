@@ -2558,7 +2558,7 @@ class BookTranslator:
         if current_chapter_size is not None:
             # If chapter is small and context texts are substantial, preserve context
             if (current_chapter_size < 2 * DEFAULT_CONTEXT_SIZE and
-                all(len(text) > 50 for text, _ in self.context)):
+                len(self.context) > 0 and all(len(text) > 50 for text, _ in self.context)):
                 if self.verbose:
                     print("Preserving context for small chapter with substantial context texts")
                 return
