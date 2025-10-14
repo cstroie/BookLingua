@@ -150,7 +150,7 @@ You excel at translating fictional works while preserving:
 
 3. **Output rules:**
    - Respond ONLY with translated text
-   - NO explanations, notes, or meta-commentary
+   - NO explanations, NO notes, NO meta-commentary
    - NO untranslated portions unless they're proper nouns that shouldn't be translated
    - NO headers like "Here's the translation:" or similar
 
@@ -1541,7 +1541,7 @@ class BookTranslator:
                 print(f"Database lookup for next paragraph failed: {e}")
             raise
 
-    def db_count_paragraphs(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> int:
+    def db_count_total(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count total paragraphs in a chapter for a given edition.
         
         Args:
@@ -1593,7 +1593,7 @@ class BookTranslator:
             raise Exception("Database connection not available")
         try:
             # Count all paragraphs
-            total_paragraphs = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
+            total_count = self.db_count_total(edition_number, chapter_number, source_lang, target_lang)
             cursor = self.conn.cursor()
             # Single query to get all statistics
             cursor.execute('''
@@ -1613,7 +1613,7 @@ class BookTranslator:
                 elapsed_time = result[1] if result[1] else 0.0
                 translated_paragraphs = result[2] if result[2] else 0
                 # Calculate remaining paragraphs and time
-                remaining_paragraphs = total_paragraphs - translated_paragraphs
+                remaining_paragraphs = total_count - translated_paragraphs
                 remaining_time = avg_time * remaining_paragraphs if avg_time > 0 else 0.0
                 # Return the calculated statistics
                 return (avg_time, elapsed_time, remaining_time)
@@ -1927,7 +1927,7 @@ class BookTranslator:
             total_chapters (int): Total number of chapters in the book
         """
         # Get total paragraphs in chapter to determine chapter size
-        total_paragraphs = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
+        total_count = self.db_count_total(edition_number, chapter_number, source_lang, target_lang)
         # Check if chapter is fully translated
         untranslated_count = self.db_count_untranslated(edition_number, chapter_number, source_lang, target_lang)
         if untranslated_count == 0:
@@ -1935,7 +1935,7 @@ class BookTranslator:
         else:
             fully_translated_text = f"Needs translating ({untranslated_count} paragraphs)"
         print(f"\n{self.sep1}")
-        self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, {total_paragraphs} paragraphs", fully_translated_text, self.console_width, 0, 4)
+        self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, {total_count} paragraphs", fully_translated_text, self.console_width, 0, 4)
         if untranslated_count == 0:
             return
         print(f"{self.sep2}")
@@ -1953,7 +1953,7 @@ class BookTranslator:
                 if target:
                     if self.verbose:
                         print()
-                        self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}", "✓ Using cached paragraph translation", self.console_width, 0, 4)
+                        self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, paragraph {par}/{total_count}", "✓ Using cached paragraph translation", self.console_width, 0, 4)
                         print(f"{self.sep3}")
                         self.display_side_by_side(source, target)
                         print(f"{self.sep3}")
@@ -1961,7 +1961,7 @@ class BookTranslator:
                     continue
                 # Translate paragraph
                 if source.strip() and len(source.split()) < 1000:
-                    print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_paragraphs}")
+                    print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_count}, {len(source.split())} words.")
                     # Time the translation
                     start_time = datetime.now()
                     target, _, _, model = self.translate_text(source, source_lang, target_lang)
@@ -1991,7 +1991,7 @@ class BookTranslator:
         chapter_end_time = datetime.now()
         chapter_duration_ms = int((chapter_end_time - chapter_start_time).total_seconds() * 1000)
         # Average calculation
-        avg_time_per_paragraph = chapter_duration_ms / total_paragraphs if total_paragraphs > 0 else 0
+        avg_time_per_paragraph = chapter_duration_ms / total_count if total_count > 0 else 0
         print(f"Translation completed in {chapter_duration_ms/1000:.2f}s (avg {avg_time_per_paragraph/1000:.2f}s/paragraph)")
         # Run quality checks at the end of chapter translation
         try:
@@ -2093,7 +2093,7 @@ class BookTranslator:
             source_lang (str): Source language code
             target_lang (str): Target language code
         """
-        print("Pre-filling translation context with random paragraphs...")
+        print(f"Pre-filling translation context with {len(texts)} random paragraphs...")
         for i, text in enumerate(texts):
             print(f"Context {i+1}/{len(texts)}")
             try:
@@ -2136,22 +2136,36 @@ class BookTranslator:
         if self.conn:
             try:
                 cursor = self.conn.cursor()
+                needed_count = max(DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context), 0)
                 # Priority 1: Try to get existing translations
-                cursor.execute('''
-                    SELECT source, target FROM translations 
-                    WHERE source_lang = ? AND target_lang = ? AND target != '' AND chapter = ?
-                    AND length(source) > 50 AND length(source) < 200 AND source != target
-                    ORDER BY id DESC LIMIT ?
-                ''', (source_lang, target_lang, chapter_number, DEFAULT_PREFILL_CONTEXT_SIZE))
-                translated_results = cursor.fetchall()
-                # Add to context in chronological order (oldest first)
-                for source, target in reversed(translated_results):
-                    self.context.append((source, target))
-                # If we still need more context, continue with other priorities
-                needed_count = 0  # Initialize needed_count
-                if len(self.context) < DEFAULT_PREFILL_CONTEXT_SIZE:
-                    needed_count = DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context)
-                # Priority 2: Get untranslated paragraphs (only if we need more)
+                if needed_count > 0:
+                    cursor.execute('''
+                        SELECT source, target FROM translations
+                        WHERE source_lang = ? AND target_lang = ? AND target != '' AND chapter = ?
+                        AND length(source) > 50 AND length(source) < 200 AND source != target
+                        ORDER BY id DESC LIMIT ?
+                    ''', (source_lang, target_lang, chapter_number, needed_count))
+                    translated_results = cursor.fetchall()
+                    # Add to context in chronological order (oldest first)
+                    for source, target in reversed(translated_results):
+                        self.context.append((source, target))
+                    # If we still need more context, continue with other priorities
+                    needed_count = max(DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context), 0)
+                # Priority 2: Try to get existing translations from other chapters
+                if needed_count > 0:
+                    cursor.execute('''
+                        SELECT source, target FROM translations
+                        WHERE source_lang = ? AND target_lang = ? AND target != ''
+                        AND length(source) > 50 AND length(source) < 200 AND source != target
+                        ORDER BY RANDOM() LIMIT ?
+                    ''', (source_lang, target_lang, needed_count))
+                    translated_results = cursor.fetchall()
+                    # Add to context
+                    for source, target in translated_results:
+                        self.context.append((source, target))
+                    # If we still need more context, continue with other priorities
+                    needed_count = max(DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context), 0)
+                # Priority 3: Get untranslated paragraphs (only if we need more)
                 if needed_count > 0:
                     cursor.execute('''
                         SELECT source FROM translations 
