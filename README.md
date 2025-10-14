@@ -8,13 +8,14 @@ A Python tool for translating EPUB books using various AI models through their A
 
 - Translate EPUB books between any languages using various AI models
 - Support for multiple translation services (OpenAI, Ollama, Mistral, DeepSeek, Together AI, LM Studio, OpenRouter)
+- Three-phase workflow: extract → translate → build
 - Direct translation method (Source → Target)
 - Preserves original formatting and structure
-- Chunked translation for handling large texts
 - Database caching for reliability and resume capability
 - Context preservation for consistency across chapters
 - Quality assessment with fluency scoring
 - Progress tracking with timing statistics
+- Chapter-level translation control with selective chapter processing
 
 ## Installation
 
@@ -31,7 +32,7 @@ export OPENAI_API_KEY=your_api_key_here
 ## Quick Start
 
 ```bash
-# Basic translation
+# Basic translation (runs all three phases)
 python booklingua.py input.epub
 
 # Custom languages
@@ -39,6 +40,11 @@ python booklingua.py input.epub -s German -t Spanish
 
 # Verbose mode
 python booklingua.py input.epub --verbose
+
+# Run specific phases
+python booklingua.py input.epub --extract
+python booklingua.py input.epub --translate
+python booklingua.py input.epub --build
 ```
 
 ## Usage
@@ -46,7 +52,7 @@ python booklingua.py input.epub --verbose
 ### Basic Translation
 
 ```bash
-# Direct translation with default settings
+# Direct translation with default settings (runs all three phases)
 python booklingua.py input.epub
 
 # Custom languages
@@ -54,6 +60,11 @@ python booklingua.py input.epub -s German -t Spanish
 
 # Verbose mode for detailed progress
 python booklingua.py input.epub --verbose
+
+# Run specific phases
+python booklingua.py input.epub --extract
+python booklingua.py input.epub --translate
+python booklingua.py input.epub --build
 ```
 
 ### Language Configuration
@@ -104,32 +115,44 @@ python booklingua.py input.epub \
 | Service      | Flag        | Default Model                     | Default URL                     |
 |--------------|-------------|-----------------------------------|---------------------------------|
 | OpenAI       | `--openai`  | `gpt-4o`                          | https://api.openai.com/v1       |
-| Ollama       | `--ollama`  | `qwen2.5:72b`                     | http://localhost:11434/v1       |
+| Ollama       | `--ollama`  | `gemma3n:e4b`                     | http://localhost:11434/v1       |
 | Mistral AI   | `--mistral` | `mistral-large-latest`           | https://api.mistral.ai/v1       |
 | DeepSeek     | `--deepseek`| `deepseek-chat`                  | https://api.deepseek.com/v1     |
 | Together AI  | `--together`| `Qwen/Qwen2.5-72B-Instruct-Turbo`| https://api.together.xyz/v1     |
-| LM Studio    | `--lmstudio`| `qwen2.5:72b`                     | http://localhost:1234/v1        |
+| LM Studio    | `--lmstudio`| `qwen2.5-72b`                     | http://localhost:1234/v1        |
 | OpenRouter   | `--openrouter`| `openai/gpt-4o`                 | https://openrouter.ai/api/v1    |
 
 ## Output Files
 
-- `translated.epub` - The translated book
-- `book.db` - SQLite database with cached translations (same name as input EPUB)
+- `{original_name} {target_lang}.epub` - The translated book
+- `{original_name}.db` - SQLite database with cached translations (same name as input EPUB)
+- `{source_lang}/` - Directory with source chapters as markdown files
+- `{target_lang}/` - Directory with translated chapters as markdown and xhtml files
 
 ## How It Works
 
-1. **Extract** text content from EPUB chapters
-2. **Initialize** SQLite database for caching translations
-3. **Prefill** context with existing translations
-4. **Translate** each chapter with progress tracking
-5. **Reconstruct** translated content into complete chapters
-6. **Generate** new EPUB file with preserved structure
+1. **Extract** text content from EPUB chapters and save to database
+2. **Translate** chapters using AI models with context management
+3. **Build** translated EPUB file from database translations
+
+### Three-Phase Workflow
+
+BookLingua now uses a three-phase workflow that allows for better control and resume capability:
+
+1. **Extract Phase** (`--extract`): Extracts text content from the EPUB and saves it to the database
+2. **Translate Phase** (`--translate`): Translates chapters using the AI model and saves translations to the database
+3. **Build Phase** (`--build`): Creates the final translated EPUB file from database translations
+
+This workflow allows you to:
+- Run phases separately for better control
+- Resume interrupted translations
+- Translate specific chapters only
+- Rebuild the EPUB without re-translating
 
 ## Customization
 
 Adjust parameters in the code:
-- `chunk_size`: Max characters per request (default: 3000)
-- `temperature`: Translation randomness (default: 0.5)
+- `temperature`: Translation randomness (default: 0.2)
 - `max_tokens`: Max tokens per response (default: 4096)
 
 ### Database Caching
@@ -194,9 +217,10 @@ python booklingua.py book.epub
 ```
 
 This will create:
-- `output/translated.epub` - The translated book
-- `output/book.db` - SQLite database with cached translations
-- `output/` directory (if it doesn't exist)
+- `book Romanian.epub` - The translated book
+- `book.db` - SQLite database with cached translations
+- `English/` - Directory with source chapters as markdown files
+- `Romanian/` - Directory with translated chapters as markdown and xhtml files
 
 ### Advanced Usage
 
@@ -222,6 +246,44 @@ Save translations to a specific directory:
 
 ```bash
 python booklingua.py book.epub -o my_translations
+```
+
+#### Selective Chapter Translation
+
+Translate only specific chapters:
+
+```bash
+# Translate chapters 1, 3, and 5
+python booklingua.py book.epub -c "1,3,5"
+
+# Translate chapter range 3-7
+python booklingua.py book.epub -c "3-7"
+
+# Translate individual chapters and ranges
+python booklingua.py book.epub -c "1,3-5,8-10"
+```
+
+#### Three-Phase Workflow
+
+Run phases separately for better control:
+
+```bash
+# Extract content to database
+python booklingua.py book.epub --extract
+
+# Translate chapters
+python booklingua.py book.epub --translate
+
+# Build final EPUB
+python booklingua.py book.epub --build
+```
+
+#### New Edition
+
+Create a new translation edition instead of using existing translations:
+
+```bash
+python booklingua.py book.epub --new-edition
 ```
 
 ### AI Provider Presets
@@ -323,20 +385,19 @@ python booklingua.py book.epub --mistral
 #### Basic Translation
 
 ```python
-from booklingua import EPUBTranslator
+from booklingua import BookTranslator
 
 # Initialize translator
-translator = EPUBTranslator(
+translator = BookTranslator(
     api_key="your-api-key",
     base_url="https://api.openai.com/v1",
     model="gpt-4o",
     verbose=True,
-    epub_path="book.epub"
+    book_path="book.epub"
 )
 
-# Translate EPUB
+# Translate EPUB (runs all three phases)
 translator.translate_epub(
-    input_path="book.epub",
     output_dir="output",
     source_lang="English",
     target_lang="Romanian"
@@ -348,10 +409,18 @@ translator.translate_epub(
 ```python
 # Translate from English to Spanish
 translator.translate_epub(
-    input_path="book.epub",
     source_lang="English",
     target_lang="Spanish"
 )
+```
+
+#### Three-Phase Workflow
+
+```python
+# Run phases separately
+translator.phase_extract(output_dir="output", source_lang="English", target_lang="Spanish")
+translator.phase_translate(source_lang="English", target_lang="Spanish")
+translator.phase_build(output_dir="output", source_lang="English", target_lang="Spanish")
 ```
 
 ### Troubleshooting
@@ -420,16 +489,16 @@ done
 # batch_translate.py
 
 import os
-from booklingua import EPUBTranslator
+from booklingua import BookTranslator
 
-translator = EPUBTranslator(api_key="your-api-key")
+translator = BookTranslator(api_key="your-api-key")
 
 for filename in os.listdir("."):
     if filename.endswith(".epub"):
         print(f"Processing {filename}...")
         translator.translate_epub(
-            input_path=filename,
-            output_dir="output"
+            source_lang="English",
+            target_lang="Spanish"
         )
 ```
 
