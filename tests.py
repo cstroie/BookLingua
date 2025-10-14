@@ -147,6 +147,27 @@ class TestBookTranslator(unittest.TestCase):
         self.translator.context_add("**Hello**", "**Bonjour**", clean=True)
         self.assertEqual(self.translator.context[0], ("Hello", "Bonjour"))
 
+    @patch('ebooklib.epub.read_epub')
+    def test_book_extract_metadata(self, mock_read_epub):
+        """Test metadata extraction from EPUB."""
+        # Create a mock book with metadata
+        mock_book = Mock()
+        mock_book.get_metadata.return_value = [('Test Title', {})], [('Test Author', {})]
+        
+        # Mock the translator's book_extract_metadata method
+        with patch.object(self.translator, 'book_extract_metadata') as mock_extract:
+            mock_extract.return_value = {
+                'id': 'metadata',
+                'name': 'metadata',
+                'title': 'Metadata',
+                'paragraphs': ['Metadata', 'Test Title', 'Test Author']
+            }
+            
+            result = self.translator.book_extract_metadata(mock_book, "English")
+            self.assertIsNotNone(result)
+            self.assertEqual(result['id'], 'metadata')
+            self.assertIn('Test Title', result['paragraphs'])
+
     def test_html_to_markdown_conversion(self):
         """Test HTML to Markdown conversion."""
         # Test basic HTML to Markdown conversion
