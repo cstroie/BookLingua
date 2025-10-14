@@ -218,7 +218,7 @@ class TestBookTranslator(unittest.TestCase):
         self.assertIsNotNone(self.translator.conn)
         
         # Test saving and retrieving translations
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "Hello", "Bonjour", "English", "French", 1, 1, 1, 1000, 95, "test-model"
         )
         
@@ -231,10 +231,10 @@ class TestBookTranslator(unittest.TestCase):
     def test_chapter_statistics(self):
         """Test chapter statistics methods."""
         # Add some test data
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "Hello", "Bonjour", "English", "French", 1, 1, 1, 1000, 95, "test-model"
         )
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "World", "Monde", "English", "French", 1, 1, 2, 1500, 90, "test-model"
         )
         
@@ -278,7 +278,7 @@ class TestBookTranslator(unittest.TestCase):
     def test_context_prefill(self):
         """Test context prefill functionality."""
         # Add some test data to database
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "Hello world", "Bonjour le monde", "English", "French", 1, 1, 1, 1000, 95, "test-model"
         )
         
@@ -358,10 +358,10 @@ class TestBookTranslator(unittest.TestCase):
         self.assertEqual(edition, 0)
         
         # Add some translations
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "Hello", "Bonjour", "English", "French", 1, 1, 1, 1000, 95, "test-model"
         )
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "World", "Monde", "English", "French", 2, 1, 1, 1000, 95, "test-model"
         )
         
@@ -372,35 +372,35 @@ class TestBookTranslator(unittest.TestCase):
     def test_db_get_chapters(self):
         """Test getting chapter list."""
         # Initially should be empty
-        chapters = self.translator.db_get_chapters("English", "French", 1)
+        chapters = self.translator.db_get_chapters_list("English", "French", 1)
         self.assertEqual(chapters, [])
         
         # Add some translations across different chapters
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "Hello", "Bonjour", "English", "French", 1, 1, 1, 1000, 95, "test-model"
         )
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "World", "Monde", "English", "French", 1, 2, 1, 1000, 95, "test-model"
         )
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "Test", "Test", "English", "French", 1, 1, 2, 1000, 95, "test-model"
         )
         
         # Should return chapters in order
-        chapters = self.translator.db_get_chapters("English", "French", 1)
+        chapters = self.translator.db_get_chapters_list("English", "French", 1)
         self.assertEqual(chapters, [1, 2])
         
         # Test sorting by length
-        chapters = self.translator.db_get_chapters("English", "French", 1, by_length=True)
+        chapters = self.translator.db_get_chapters_list("English", "French", 1, by_length=True)
         self.assertEqual(chapters, [1, 2])  # Chapter 1 has 2 paragraphs, chapter 2 has 1
 
     def test_db_search(self):
         """Test database search functionality."""
         # Add some test data
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "Hello world example", "Bonjour le monde exemple", "English", "French", 1, 1, 1, 1000, 95, "test-model"
         )
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "Another world test", "Un autre test mondial", "English", "French", 1, 1, 2, 1000, 90, "test-model"
         )
         
@@ -413,7 +413,7 @@ class TestBookTranslator(unittest.TestCase):
     def test_db_export_import_csv(self):
         """Test CSV export and import functionality."""
         # Add some test data
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "Hello", "Bonjour", "English", "French", 1, 1, 1, 1000, 95, "test-model"
         )
         
@@ -490,10 +490,10 @@ class TestBookTranslator(unittest.TestCase):
     def test_book_create_chapter(self):
         """Test EPUB chapter creation."""
         # Add some test translations
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "Chapter Title", "Titre du Chapitre", "English", "French", 1, 1, 0, 1000, 95, "test-model"
         )
-        self.translator.db_save_translation(
+        self.translator.db_insert_translation(
             "Hello world", "Bonjour le monde", "English", "French", 1, 1, 1, 1000, 95, "test-model"
         )
         

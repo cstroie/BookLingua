@@ -2884,6 +2884,9 @@ Return only a single integer number between 0 and 100."""
         """
         if not text or not tag_name:
             return text 
+        # Remove self-closing tags
+        pattern_self_closing = rf'<{tag_name}\b[^>]*/?>'
+        text = re.sub(pattern_self_closing, '', text, flags=re.IGNORECASE)
         # Remove opening and closing tags with content between them
         pattern_with_content = rf'<{tag_name}\b[^>]*>.*?</{tag_name}>'
         text = re.sub(pattern_with_content, '', text, flags=re.IGNORECASE | re.DOTALL)
@@ -2903,6 +2906,8 @@ Return only a single integer number between 0 and 100."""
             tuple: (clean_text, prefix, suffix) where clean_text is the text without
                    formatting, and prefix/suffix contain the markdown formatting
         """
+        if text is None:
+            return ("", "", "")
         stripped_text = text.strip()
         prefix = ""
         suffix = ""
@@ -2940,11 +2945,17 @@ Return only a single integer number between 0 and 100."""
         if chapter_numbers is None:
             return available_chapters
             
+        # Handle empty string
+        if chapter_numbers.strip() == "":
+            return []
+            
         try:
             # Parse comma-separated list of chapter numbers and ranges
             requested_chapters = []
             for part in chapter_numbers.split(','):
                 part = part.strip()
+                if not part:  # Skip empty parts
+                    continue
                 if '-' in part:
                     # Handle range like "3-7"
                     start, end = map(int, part.split('-'))
