@@ -449,8 +449,7 @@ class BookTranslator:
             List[dict]: A list of chapter dictionaries, each containing:
                 - id (str): Chapter identifier from EPUB
                 - name (str): Chapter name/filename
-                - content (str): Full chapter content in Markdown format
-                - html (str): Original HTML content
+                - title (str): Chapter title
                 - paragraphs (List[str]): Individual paragraphs extracted from content
         """
         # List to hold chapter data
