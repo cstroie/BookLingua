@@ -1759,6 +1759,32 @@ class BookTranslator:
         # We need the database connection
         if not self.conn:
             raise Exception("Database connection not available")
+            
+        # Determine edition number
+        edition_number = self._determine_edition_number(source_lang, target_lang, new_edition)
+        
+        # Clean up empty translations
+        self._cleanup_empty_translations(source_lang, target_lang)
+        
+        # Summary of chapters found
+        print(f"Found {len(chapters)} chapters to translate ...")
+        
+        # Save all texts
+        self._save_chapters_content(chapters, source_lang, target_lang, edition_number)
+        
+        return edition_number
+
+    def _determine_edition_number(self, source_lang: str, target_lang: str, new_edition: bool) -> int:
+        """Determine the edition number to use for saving chapters.
+        
+        Args:
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            new_edition (bool): Whether to create a new edition
+            
+        Returns:
+            int: Edition number to use
+        """
         # Get the latest edition number
         latest_edition = self.db_get_latest_edition(source_lang, target_lang)
         # Use latest edition by default, create new one only if requested or no editions exist
@@ -1768,7 +1794,15 @@ class BookTranslator:
         else:
             edition_number = latest_edition
             print(f"Using existing edition {edition_number}.")
-        # Delete all entries with empty translations for this language pair
+        return edition_number
+
+    def _cleanup_empty_translations(self, source_lang: str, target_lang: str):
+        """Delete all entries with empty translations for this language pair.
+        
+        Args:
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+        """
         try:
             cursor = self.conn.cursor()
             cursor.execute('''
@@ -1783,25 +1817,27 @@ class BookTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Warning: Failed to delete empty translations: {e}")
-        # Summary of chapters found
-        print(f"Found {len(chapters)} chapters to translate ...")
-        # Save all texts
+
+    def _save_chapters_content(self, chapters: List[dict], source_lang: str, target_lang: str, edition_number: int):
+        """Save all chapters content to the database.
+        
+        Args:
+            chapters (List[dict]): List of chapter dictionaries containing paragraphs
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            edition_number (int): Edition number to use
+        """
         try:
+            total_paragraphs = 0
             for ch, chapter in enumerate(chapters):
                 texts = chapter.get('paragraphs', [])
                 print(f"{(ch):>3}: {(len(texts)):>5} {chapter['id'][:20]:<20} {chapter['title'][:20]:<20} {chapter.get('name', 'Untitled Chapter')[:25]:<25}")
                 for par, text in enumerate(texts):
                     # Only save non-empty texts
                     if text.strip():
-                        # Check if the source contains no letters
-                        if re.match(r'^[^a-zA-Z]+$', text, re.UNICODE):
-                            # Copy as-is with perfect fluency and zero duration
-                            target, duration, fluency, model = text, 0, 100, 'copy'
-                        else:
-                            # Get an existing translation for this text if it exists
-                            (target, duration, fluency, model) = self.db_get_translation(text, source_lang, target_lang)
-                        if target is None:
-                            target, duration, fluency, model = '', -1, -1, ''
+                        translation_data = self._process_paragraph_text(text, source_lang, target_lang)
+                        target, duration, fluency, model = translation_data
+                        
                         # Insert with translation if not already there
                         cursor = self.conn.cursor()
                         cursor.execute('''
@@ -1809,13 +1845,36 @@ class BookTranslator:
                             (edition, chapter, paragraph, source_lang, source, target_lang, target, duration, fluency, model)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ''', (edition_number, ch, par, source_lang, text, target_lang, target, duration, fluency, model))
+                        total_paragraphs += 1
             self.conn.commit()
-            print(f"... with {sum(len(chapter.get('paragraphs', [])) for chapter in chapters)} paragraphs from all chapters.")
-            return edition_number
+            print(f"... with {total_paragraphs} paragraphs from all chapters.")
         except Exception as e:
             if self.verbose:
                 print(f"Failed to save chapters to database: {e}")
             raise
+
+    def _process_paragraph_text(self, text: str, source_lang: str, target_lang: str) -> tuple:
+        """Process a paragraph text and determine its translation data.
+        
+        Args:
+            text (str): The text to process
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            
+        Returns:
+            tuple: (target, duration, fluency, model) translation data
+        """
+        # Check if the source contains no letters
+        if re.match(r'^[^a-zA-Z]+$', text, re.UNICODE):
+            # Copy as-is with perfect fluency and zero duration
+            return text, 0, 100, 'copy'
+        else:
+            # Get an existing translation for this text if it exists
+            translation_data = self.db_get_translation(text, source_lang, target_lang)
+            target, duration, fluency, model = translation_data
+            if target is None:
+                return '', -1, -1, ''
+            return target, duration, fluency, model
 
     def translate_text(self, text: str, source_lang: str, target_lang: str, use_cache: bool = True) -> str:
         """Translate a text chunk using OpenAI-compatible API with database caching.
