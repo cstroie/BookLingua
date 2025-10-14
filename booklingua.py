@@ -2884,12 +2884,12 @@ Return only a single integer number between 0 and 100."""
         """
         if not text or not tag_name:
             return text 
+        # Remove opening and closing tags with content between them (greedy match)
+        pattern_with_content = rf'<{tag_name}\b[^>]*>.*?</{tag_name}>'
+        text = re.sub(pattern_with_content, '', text, flags=re.IGNORECASE | re.DOTALL)
         # Remove self-closing tags
         pattern_self_closing = rf'<{tag_name}\b[^>]*/?>'
         text = re.sub(pattern_self_closing, '', text, flags=re.IGNORECASE)
-        # Remove opening and closing tags with content between them
-        pattern_with_content = rf'<{tag_name}\b[^>]*>.*?</{tag_name}>'
-        text = re.sub(pattern_with_content, '', text, flags=re.IGNORECASE | re.DOTALL)
         # Return cleaned text
         return text
 

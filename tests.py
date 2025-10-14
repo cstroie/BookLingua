@@ -277,7 +277,7 @@ class TestBookTranslator(unittest.TestCase):
 
     def test_context_prefill(self):
         """Test context prefill functionality."""
-        # Add some test data to database
+        # Add some test data to database with non-empty target
         self.translator.db_insert_translation(
             "Hello world", "Bonjour le monde", "English", "French", 1, 1, 1, 1000, 95, "test-model"
         )
