@@ -459,83 +459,107 @@ class BookTranslator:
         if not book:
             print("Warning: No book provided to extract text from.")
             return chapters
+            
         # Extract metadata as first virtual chapter
+        metadata_chapter = self._extract_metadata(book, source_lang)
+        if metadata_chapter:
+            chapters.append(metadata_chapter)
+            
+        # Get the chapters order and titles from ToC
+        toc = self._get_toc_items(book)
+        if not toc:
+            return chapters
+            
+        # Process each item
+        for toc_item in toc:
+            item = book.get_item_with_href(toc_item.href)
+            if not item:
+                continue
+            item.title = toc_item.title
+            
+            chapter_data = self._process_toc_item(item, source_lang)
+            if chapter_data:
+                chapters.append(chapter_data)
+                
+        # Return the list of chapter data
+        return chapters
+
+    def _extract_metadata(self, book, source_lang: str) -> Optional[dict]:
+        """Extract metadata from EPUB book and create metadata chapter."""
         try:
             metadata_parts = []
+            
             # Extract title
-            try:
-                title_metadata = book.get_metadata('DC', 'title')
-                if title_metadata:
-                    title = title_metadata[0][0]
-                    metadata_parts.append(f"{title}")
-            except Exception as e:
-                print(f"Warning: Failed to extract title metadata: {e}")
+            title_metadata = book.get_metadata('DC', 'title')
+            if title_metadata:
+                title = title_metadata[0][0]
+                metadata_parts.append(f"{title}")
+                
             # Extract authors
-            try:
-                authors = book.get_metadata('DC', 'creator')
-                if authors:
-                    author_names = [author[0] for author in authors]
-                    metadata_parts.append(', '.join(author_names))
-            except Exception as e:
-                print(f"Warning: Failed to extract author metadata: {e}")
+            authors = book.get_metadata('DC', 'creator')
+            if authors:
+                author_names = [author[0] for author in authors]
+                metadata_parts.append(', '.join(author_names))
+                
             # Extract description
-            try:
-                descriptions = book.get_metadata('DC', 'description')
-                if descriptions:
-                    description = descriptions[0][0]
-                    # Convert HTML description to Markdown if it contains HTML
-                    if description.strip().startswith('<'):
-                        try:
-                            desc_soup = BeautifulSoup(description, 'html.parser')
-                            description = self.html_to_markdown(desc_soup)
-                        except Exception as e:
-                            print(f"Warning: Failed to convert HTML description to Markdown: {e}")
-                    metadata_parts.extend(description.split('\n\n'))
-            except Exception as e:
-                print(f"Warning: Failed to extract description metadata: {e}")
+            descriptions = book.get_metadata('DC', 'description')
+            if descriptions:
+                description = descriptions[0][0]
+                # Convert HTML description to Markdown if it contains HTML
+                if description.strip().startswith('<'):
+                    try:
+                        desc_soup = BeautifulSoup(description, 'html.parser')
+                        description = self.html_to_markdown(desc_soup)
+                    except Exception as e:
+                        print(f"Warning: Failed to convert HTML description to Markdown: {e}")
+                metadata_parts.extend(description.split('\n\n'))
+                
             # Extract publisher
-            try:
-                publishers = book.get_metadata('DC', 'publisher')
-                if publishers:
-                    publisher = publishers[0][0]
-                    metadata_parts.append(publisher)
-            except Exception as e:
-                print(f"Warning: Failed to extract publisher metadata: {e}")
+            publishers = book.get_metadata('DC', 'publisher')
+            if publishers:
+                publisher = publishers[0][0]
+                metadata_parts.append(publisher)
+                
             # Extract date
-            try:
-                dates = book.get_metadata('DC', 'date')
-                if dates:
-                    date = dates[0][0]
-                    metadata_parts.append(f"{date}")
-            except Exception as e:
-                print(f"Warning: Failed to extract date metadata: {e}")
+            dates = book.get_metadata('DC', 'date')
+            if dates:
+                date = dates[0][0]
+                metadata_parts.append(f"{date}")
+                
             # Combine all metadata parts
             if metadata_parts:
+                # Save metadata as markdown if output directory exists
+                self._save_metadata_as_markdown(metadata_parts, source_lang)
+                
                 # Create virtual chapter for metadata
-                metadata_chapter = {
+                return {
                     'id': 'metadata',
                     'name': 'metadata',
                     'title': 'Metadata',
-                    'paragraphs': ['Metadata',] + metadata_parts
+                    'paragraphs': ['Metadata'] + metadata_parts
                 }
-                chapters.append(metadata_chapter)
-                # Save metadata as markdown if output directory exists
-                if self.output_dir and os.path.exists(self.output_dir):
-                    try:
-                        # Create source language subdirectory
-                        source_lang_dir = os.path.join(self.output_dir, source_lang)
-                        os.makedirs(source_lang_dir, exist_ok=True)
-                        # Save metadata
-                        filename = "metadata.md"
-                        filepath = os.path.join(source_lang_dir, filename)
-                        # Write markdown content to file
-                        with open(filepath, 'w', encoding='utf-8') as f:
-                            f.write("\n\n".join(metadata_parts))
-                    except Exception as e:
-                        print(f"Warning: Failed to save metadata as markdown: {e}")
         except Exception as e:
             print(f"Warning: Error processing metadata: {e}")
-        # Get the chapters order and titles from ToC
+        return None
+
+    def _save_metadata_as_markdown(self, metadata_parts: List[str], source_lang: str):
+        """Save metadata as markdown file."""
+        if self.output_dir and os.path.exists(self.output_dir):
+            try:
+                # Create source language subdirectory
+                source_lang_dir = os.path.join(self.output_dir, source_lang)
+                os.makedirs(source_lang_dir, exist_ok=True)
+                # Save metadata
+                filename = "metadata.md"
+                filepath = os.path.join(source_lang_dir, filename)
+                # Write markdown content to file
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write("\n\n".join(metadata_parts))
+            except Exception as e:
+                print(f"Warning: Failed to save metadata as markdown: {e}")
+
+    def _get_toc_items(self, book) -> List:
+        """Get table of contents items from EPUB book."""
         toc = []
         def _get_links_from_toc(contents):
             """ Recursively get the links from TOC """
@@ -544,75 +568,82 @@ class BookTranslator:
                     _get_links_from_toc(item[1])
                 elif isinstance(item, epub.Link):
                     toc.append(item)
-        _get_links_from_toc(book.toc)
-        if not toc:
-            print(f"Warning: Failed to get items from book: {e}")
-            return chapters
-        # Process each item
-        for toc_item in toc:
-            item = book.get_item_with_href(toc_item.href)
-            if not item:
-                continue
-            item.title = toc_item.title
+        try:
+            _get_links_from_toc(book.toc)
+        except Exception as e:
+            print(f"Warning: Failed to get items from book TOC: {e}")
+        return toc
+
+    def _process_toc_item(self, item, source_lang: str) -> Optional[dict]:
+        """Process a single TOC item and extract its content."""
+        try:
+            if item.get_type() != ebooklib.ITEM_DOCUMENT:
+                return None
+                
+            # Extract HTML content
             try:
-                if item.get_type() == ebooklib.ITEM_DOCUMENT:
-                    # Extract HTML content
-                    try:
-                        html_content = item.get_content()
-                    except Exception as e:
-                        print(f"Warning: Failed to get content from item {item.get_id()}: {e}")
-                        continue
-                    if not html_content:
-                        continue
-                    # Parse HTML with BeautifulSoup
-                    try:
-                        soup = BeautifulSoup(html_content, 'html.parser')
-                    except Exception as e:
-                        print(f"Warning: Failed to parse HTML content from item {item.get_id()}: {e}")
-                        continue
-                    # Convert HTML to Markdown
-                    try:
-                        markdown_content = self.html_to_markdown(soup)
-                    except Exception as e:
-                        print(f"Warning: Failed to convert HTML to Markdown for item {item.get_id()}: {e}")
-                        markdown_content = ""
-                    # Extract paragraphs from Markdown
-                    try:
-                        paragraphs = [p.strip() for p in markdown_content.split('\n\n') if p.strip()]
-                    except Exception as e:
-                        print(f"Warning: Failed to extract paragraphs from item {item.get_id()}: {e}")
-                        paragraphs = []
-                    # Only include non-empty chapters
-                    if markdown_content.strip():
-                        chapter_data = {
-                            'id': item.get_id(),
-                            'name': item.get_name(),
-                            'title': item.title,
-                            'paragraphs': [item.title,] + paragraphs
-                        }
-                        # Append chapter data to list
-                        chapters.append(chapter_data)
-                        # Save chapter as markdown if output directory exists
-                        if self.output_dir:
-                            if os.path.exists(self.output_dir):
-                                try:
-                                    # Create source language subdirectory
-                                    source_lang_dir = os.path.join(self.output_dir, source_lang)
-                                    os.makedirs(source_lang_dir, exist_ok=True)
-                                    # Create a safe filename from the chapter name
-                                    safe_name = re.sub(r'[^\w\-_\. ]', '_', os.path.splitext(item.get_name())[0])
-                                    filename = f"{safe_name}.md"
-                                    filepath = os.path.join(source_lang_dir, filename)
-                                    # Write markdown content to file
-                                    with open(filepath, 'w', encoding='utf-8') as f:
-                                        f.write(markdown_content)
-                                except Exception as e:
-                                    print(f"Warning: Failed to save chapter {item.get_id()} as markdown: {e}")
+                html_content = item.get_content()
             except Exception as e:
-                print(f"Warning: Error processing item: {e}")
-                continue
-        # Return the list of chapter data
-        return chapters
+                print(f"Warning: Failed to get content from item {item.get_id()}: {e}")
+                return None
+                
+            if not html_content:
+                return None
+                
+            # Parse HTML with BeautifulSoup
+            try:
+                soup = BeautifulSoup(html_content, 'html.parser')
+            except Exception as e:
+                print(f"Warning: Failed to parse HTML content from item {item.get_id()}: {e}")
+                return None
+                
+            # Convert HTML to Markdown
+            try:
+                markdown_content = self.html_to_markdown(soup)
+            except Exception as e:
+                print(f"Warning: Failed to convert HTML to Markdown for item {item.get_id()}: {e}")
+                markdown_content = ""
+                
+            # Extract paragraphs from Markdown
+            try:
+                paragraphs = [p.strip() for p in markdown_content.split('\n\n') if p.strip()]
+            except Exception as e:
+                print(f"Warning: Failed to extract paragraphs from item {item.get_id()}: {e}")
+                paragraphs = []
+                
+            # Only include non-empty chapters
+            if markdown_content.strip():
+                chapter_data = {
+                    'id': item.get_id(),
+                    'name': item.get_name(),
+                    'title': item.title,
+                    'paragraphs': [item.title] + paragraphs
+                }
+                
+                # Save chapter as markdown if output directory exists
+                self._save_chapter_as_markdown(item, markdown_content, source_lang)
+                
+                return chapter_data
+        except Exception as e:
+            print(f"Warning: Error processing item: {e}")
+        return None
+
+    def _save_chapter_as_markdown(self, item, markdown_content: str, source_lang: str):
+        """Save chapter content as markdown file."""
+        if self.output_dir and os.path.exists(self.output_dir):
+            try:
+                # Create source language subdirectory
+                source_lang_dir = os.path.join(self.output_dir, source_lang)
+                os.makedirs(source_lang_dir, exist_ok=True)
+                # Create a safe filename from the chapter name
+                safe_name = re.sub(r'[^\w\-_\. ]', '_', os.path.splitext(item.get_name())[0])
+                filename = f"{safe_name}.md"
+                filepath = os.path.join(source_lang_dir, filename)
+                # Write markdown content to file
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(markdown_content)
+            except Exception as e:
+                print(f"Warning: Failed to save chapter {item.get_id()} as markdown: {e}")
 
     def book_create_template(self, original_book, source_lang: str, target_lang: str) -> epub.EpubBook:
         """Create a new EPUB book template with metadata copied from original book.
