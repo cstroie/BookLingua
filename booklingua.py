@@ -864,16 +864,42 @@ class BookTranslator:
         # Return empty string if soup is None
         if not soup:
             return ""
+            
         # Remove script and style elements
+        self._remove_script_style_elements(soup)
+        
+        # Process block elements
+        markdown_lines = self._process_block_elements(soup)
+        
+        # Join with double newlines for paragraph separation
+        return self._join_markdown_lines(markdown_lines)
+
+    def _remove_script_style_elements(self, soup):
+        """Remove script and style elements from the soup.
+        
+        Args:
+            soup (BeautifulSoup): BeautifulSoup object to process
+        """
         try:
             for script in soup(["script", "style"]):
                 script.decompose()
         except Exception as e:
             print(f"Warning: Failed to remove script/style elements: {e}")
+
+    def _process_block_elements(self, soup) -> List[str]:
+        """Process block elements and convert them to markdown lines.
+        
+        Args:
+            soup (BeautifulSoup): BeautifulSoup object containing HTML content
+            
+        Returns:
+            List[str]: List of markdown formatted lines
+        """
         # Block elements to process
         block_elements = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'blockquote', 'br', 'hr']
         # Initialize list to hold markdown lines
         markdown_lines = []
+        
         try:
             # Process block elements
             for element in soup.find_all(block_elements, recursive=True):
@@ -881,35 +907,74 @@ class BookTranslator:
                     # Skip if parent is also a block element to avoid duplication
                     if element.parent.name in block_elements:
                         continue
-                    # Handle elements with no text
-                    if element.name == 'hr':
-                        markdown_lines.append('---')
-                    elif element.name == 'br':
-                        markdown_lines.append('***')
-                    # Process inline tags within the element
-                    processed_element = self.process_inline_tags(element)
-                    text = processed_element.get_text(separator=' ', strip=True)
-                    if not text:
-                        continue
-                    # Add appropriate Markdown formatting
-                    if element.name and element.name.startswith('h'):
-                        try:
-                            level = int(element.name[1])
-                            markdown_lines.append('#' * level + ' ' + text)
-                        except (ValueError, IndexError):
-                            markdown_lines.append(text)  # Fallback to plain text
-                    elif element.name == 'li':
-                        markdown_lines.append('- ' + text)
-                    elif element.name == 'blockquote':
-                        markdown_lines.append('> ' + text)
-                    else:
-                        markdown_lines.append(text)
+                        
+                    markdown_line = self._convert_element_to_markdown(element)
+                    if markdown_line is not None:
+                        markdown_lines.append(markdown_line)
                 except Exception as e:
                     print(f"Warning: Error processing element: {e}")
                     continue
         except Exception as e:
             print(f"Warning: Failed to find elements in soup: {e}")
-        # Join with double newlines for paragraph separation
+            
+        return markdown_lines
+
+    def _convert_element_to_markdown(self, element) -> Optional[str]:
+        """Convert a single HTML element to markdown format.
+        
+        Args:
+            element: BeautifulSoup element to convert
+            
+        Returns:
+            Optional[str]: Markdown formatted line or None if element should be skipped
+        """
+        # Handle special elements with no text
+        if element.name == 'hr':
+            return '---'
+        elif element.name == 'br':
+            return '***'
+            
+        # Process inline tags within the element
+        processed_element = self.process_inline_tags(element)
+        text = processed_element.get_text(separator=' ', strip=True)
+        if not text:
+            return None
+            
+        # Add appropriate Markdown formatting
+        if element.name and element.name.startswith('h'):
+            return self._format_header(element.name, text)
+        elif element.name == 'li':
+            return '- ' + text
+        elif element.name == 'blockquote':
+            return '> ' + text
+        else:
+            return text
+
+    def _format_header(self, element_name: str, text: str) -> str:
+        """Format header element to markdown header.
+        
+        Args:
+            element_name (str): HTML header element name (h1, h2, etc.)
+            text (str): Header text
+            
+        Returns:
+            str: Markdown formatted header
+        """
+        try:
+            level = int(element_name[1])
+            return '#' * level + ' ' + text
+        except (ValueError, IndexError):
+            return text  # Fallback to plain text
+
+    def _join_markdown_lines(self, markdown_lines: List[str]) -> str:
+        """Join markdown lines with double newlines.
+        
+        Args:
+            markdown_lines (List[str]): List of markdown lines
+            
+        Returns:
+            str: Joined markdown text
+        """
         try:
             return '\n\n'.join(markdown_lines)
         except Exception as e:
@@ -955,87 +1020,158 @@ class BookTranslator:
         """
         if not element:
             return BeautifulSoup("", 'html.parser')
+            
+        element_copy = self._create_element_copy(element)
+        if not element_copy:
+            return BeautifulSoup("", 'html.parser')
+            
+        # Process each inline tag
+        self._process_inline_elements(element_copy)
+        
+        # Return the modified element
+        return element_copy
+
+    def _create_element_copy(self, element) -> BeautifulSoup:
+        """Create a copy of the element to avoid modifying the original.
+        
+        Args:
+            element (BeautifulSoup): Element to copy
+            
+        Returns:
+            BeautifulSoup: Copy of the element or None if failed
+        """
         try:
-            # Create a copy to avoid modifying the original
-            element_copy = BeautifulSoup(str(element), 'html.parser')
+            return BeautifulSoup(str(element), 'html.parser')
         except Exception as e:
             print(f"Warning: Failed to create element copy: {e}")
-            return BeautifulSoup("", 'html.parser')
+            return None
+
+    def _process_inline_elements(self, element_copy):
+        """Process all inline elements in the element copy.
+        
+        Args:
+            element_copy (BeautifulSoup): Element copy to process
+        """
         # Inline tags to process
         inline_tags = ['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span', 'img']
+        
         try:
             # Process each inline tag
             for tag in element_copy.find_all(inline_tags):
                 try:
-                    text = tag.get_text()
-                    if not text and tag.name != 'img':
-                        continue
-                    # Replace with appropriate Markdown formatting
-                    if not tag.name:
-                        replacement = text
-                    elif tag.name in ['i', 'em']:
-                        replacement = f'*{text}*'
-                    elif tag.name in ['b', 'strong']:
-                        replacement = f'**{text}**'
-                    elif tag.name in ['u', 'ins']:
-                        replacement = f'__{text}__'
-                    elif tag.name in ['s', 'del']:
-                        replacement = f'~~{text}~~'
-                    elif tag.name == 'code':
-                        replacement = f'`{text}`'
-                    elif tag.name == 'img':
-                        # Convert img tags to Markdown syntax
-                        src = tag.get('src', '')
-                        if src:
-                            replacement = f'!({src})'
-                        else:
-                            replacement = ''
-                    elif tag.name == 'span':
-                        try:
-                            # Check for styling that mimics other tags
-                            style = tag.get('style', '').lower()
-                            css_class = tag.get('class', [])
-                            if isinstance(css_class, list):
-                                css_class = ' '.join(css_class).lower() if css_class else ''
-                            else:
-                                css_class = str(css_class).lower() if css_class else ''
-                            # Check for bold styling
-                            if ('font-weight' in style and 'bold' in style) \
-                                or any(cls in css_class for cls in ['bold', 'strong']):
-                                replacement = f'**{text}**'
-                            # Check for italic styling
-                            elif ('font-style' in style and 'italic' in style) \
-                                or any(cls in css_class for cls in ['italic', 'em']):
-                                replacement = f'*{text}*'
-                            # Check for underline styling
-                            elif ('text-decoration' in style and 'underline' in style) \
-                                or any(cls in css_class for cls in ['underline']):
-                                replacement = f'__{text}__'
-                            # Check for strikethrough styling
-                            elif ('text-decoration' in style and 'line-through' in style) \
-                                or any(cls in css_class for cls in ['strikethrough', 'line-through']):
-                                replacement = f'~~{text}~~'
-                            # Check for monospace styling
-                            elif ('font-family' in style and ('monospace' in style or 'courier' in style)) \
-                                or any(cls in css_class for cls in ['code', 'monospace']):
-                                replacement = f'`{text}`'
-                            else:
-                                # Default to plain text for other spans
-                                replacement = text
-                        except Exception as e:
-                            print(f"Warning: Error processing span tag: {e}")
-                            replacement = text
-                    else:  # other tags
-                        replacement = text
-                    # Replace the tag with formatted text
-                    tag.replace_with(replacement)
+                    self._process_single_tag(tag)
                 except Exception as e:
                     print(f"Warning: Error processing tag: {e}")
                     continue
         except Exception as e:
             print(f"Warning: Failed to find inline tags: {e}")
-        # Return the modified element
-        return element_copy
+
+    def _process_single_tag(self, tag):
+        """Process a single inline tag and convert it to markdown.
+        
+        Args:
+            tag: BeautifulSoup tag to process
+        """
+        text = tag.get_text()
+        if not text and tag.name != 'img':
+            return
+            
+        # Replace with appropriate Markdown formatting
+        replacement = self._get_markdown_replacement(tag, text)
+        if replacement is not None:
+            # Replace the tag with formatted text
+            tag.replace_with(replacement)
+
+    def _get_markdown_replacement(self, tag, text: str) -> str:
+        """Get the markdown replacement for a tag.
+        
+        Args:
+            tag: BeautifulSoup tag
+            text (str): Text content of the tag
+            
+        Returns:
+            str: Markdown formatted replacement text
+        """
+        if not tag.name:
+            return text
+        elif tag.name in ['i', 'em']:
+            return f'*{text}*'
+        elif tag.name in ['b', 'strong']:
+            return f'**{text}**'
+        elif tag.name in ['u', 'ins']:
+            return f'__{text}__'
+        elif tag.name in ['s', 'del']:
+            return f'~~{text}~~'
+        elif tag.name == 'code':
+            return f'`{text}`'
+        elif tag.name == 'img':
+            return self._format_image_tag(tag)
+        elif tag.name == 'span':
+            return self._format_span_tag(tag, text)
+        else:  # other tags
+            return text
+
+    def _format_image_tag(self, tag) -> str:
+        """Format image tag to markdown syntax.
+        
+        Args:
+            tag: BeautifulSoup img tag
+            
+        Returns:
+            str: Markdown formatted image or empty string
+        """
+        # Convert img tags to Markdown syntax
+        src = tag.get('src', '')
+        if src:
+            return f'!({src})'
+        else:
+            return ''
+
+    def _format_span_tag(self, tag, text: str) -> str:
+        """Format span tag based on CSS styling.
+        
+        Args:
+            tag: BeautifulSoup span tag
+            text (str): Text content of the tag
+            
+        Returns:
+            str: Markdown formatted text based on styling
+        """
+        try:
+            # Check for styling that mimics other tags
+            style = tag.get('style', '').lower()
+            css_class = tag.get('class', [])
+            if isinstance(css_class, list):
+                css_class = ' '.join(css_class).lower() if css_class else ''
+            else:
+                css_class = str(css_class).lower() if css_class else ''
+                
+            # Check for bold styling
+            if ('font-weight' in style and 'bold' in style) \
+                or any(cls in css_class for cls in ['bold', 'strong']):
+                return f'**{text}**'
+            # Check for italic styling
+            elif ('font-style' in style and 'italic' in style) \
+                or any(cls in css_class for cls in ['italic', 'em']):
+                return f'*{text}*'
+            # Check for underline styling
+            elif ('text-decoration' in style and 'underline' in style) \
+                or any(cls in css_class for cls in ['underline']):
+                return f'__{text}__'
+            # Check for strikethrough styling
+            elif ('text-decoration' in style and 'line-through' in style) \
+                or any(cls in css_class for cls in ['strikethrough', 'line-through']):
+                return f'~~{text}~~'
+            # Check for monospace styling
+            elif ('font-family' in style and ('monospace' in style or 'courier' in style)) \
+                or any(cls in css_class for cls in ['code', 'monospace']):
+                return f'`{text}`'
+            else:
+                # Default to plain text for other spans
+                return text
+        except Exception as e:
+            print(f"Warning: Error processing span tag: {e}")
+            return text
     
     def markdown_to_html(self, markdown_text: str) -> tuple:
         """Convert Markdown text back to HTML format.
