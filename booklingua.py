@@ -192,7 +192,7 @@ You excel at translating fictional works while preserving:
 
 
 class BookTranslator:
-    def __init__(self, api_key: str = None, base_url: str = None, model: str = "gpt-4o", verbose: bool = False, book_path: str = None, min_request_interval: float = 0.0):
+    def __init__(self, api_key: str = None, base_url: str = None, model: str = "gpt-4o", verbose: bool = False, book_path: str = None, throttle: float = 0.0):
         """
         Initialize the BookTranslator with an OpenAI-compatible API.
         
@@ -254,7 +254,7 @@ class BookTranslator:
         self.model = model
         self.verbose = verbose
         self.context = []
-        self.min_request_interval = min_request_interval  # Minimum time between API requests in seconds
+        self.throttle = throttle  # Minimum time between API requests in seconds
         self.last_request_time = 0  # Timestamp of last API request
 
         # Console
@@ -2109,11 +2109,11 @@ class BookTranslator:
             Exception: If API call fails
         """
         # Throttle API requests if needed
-        if self.min_request_interval > 0:
+        if self.throttle > 0:
             current_time = time.time()
             time_since_last_request = current_time - self.last_request_time
-            if time_since_last_request < self.min_request_interval:
-                sleep_time = self.min_request_interval - time_since_last_request
+            if time_since_last_request < self.throttle:
+                sleep_time = self.throttle - time_since_last_request
                 if self.verbose:
                     print(f"Throttling: Waiting {sleep_time:.2f}s before next request")
                 time.sleep(sleep_time)
@@ -3149,7 +3149,7 @@ def main():
     parser.add_argument("-u", "--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
     parser.add_argument("-m", "--model", help="Model name to use (default: gpt-4o)")
     parser.add_argument("-k", "--api-key", help="API key for the translation service")
-    parser.add_argument("--min-request-interval", type=float, default=0.0, help="Minimum time between API requests in seconds (default: 0.0)")
+    parser.add_argument("--throttle", type=float, default=0.0, help="Minimum time between API requests in seconds (default: 0.0)")
     # CSV export/import options
     parser.add_argument("-e", "--export-csv", help="Export database to CSV file")
     parser.add_argument("-i", "--import-csv", help="Import translations from CSV file")
@@ -3215,7 +3215,7 @@ def main():
         model=model,
         verbose=args.verbose,
         book_path=args.input,
-        min_request_interval=args.min_request_interval
+        throttle=args.throttle
     )
     # Set console width (auto-detect if not specified)
     if args.width is not None:
