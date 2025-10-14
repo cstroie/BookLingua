@@ -414,7 +414,7 @@ class BookTranslator:
         translated_chapters = []
         for chapter_number in chapter_list:
             # Only include chapters that are fully translated
-            if self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang):
+            if self.db_count_untranslated(edition_number, chapter_number, source_lang, target_lang) == 0:
                 translated_chapters.append(self.book_create_chapter(edition_number, chapter_number, source_lang, target_lang))
             else:
                 print(f"Warning: Chapter {chapter_number} is not fully translated and will be skipped")
@@ -1625,8 +1625,8 @@ class BookTranslator:
                 print(f"Database chapter stats query failed: {e}")
             raise
 
-    def db_chapter_is_translated(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> bool:
-        """Check if a chapter is fully translated.
+    def db_count_untranslated(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> int:
+        """Count the number of untranslated paragraphs in a chapter.
         
         Args:
             edition_number (int): Edition number to check
@@ -1635,7 +1635,7 @@ class BookTranslator:
             target_lang (str): Target language code
             
         Returns:
-            bool: True if chapter is fully translated, False otherwise
+            int: Number of untranslated paragraphs in the chapter (0 if fully translated)
             
         Raises:
             Exception: If database connection is not available
@@ -1645,13 +1645,6 @@ class BookTranslator:
             raise Exception("Database connection not available")
         try:
             cursor = self.conn.cursor()
-            # Count total paragraphs in the chapter
-            cursor.execute('''
-                SELECT COUNT(*) FROM translations 
-                WHERE edition = ? AND chapter = ? AND source_lang = ? AND target_lang = ?
-            ''', (edition_number, chapter_number, source_lang, target_lang))
-            total_result = cursor.fetchone()
-            total_paragraphs = total_result[0] if total_result else 0
             # Count paragraphs with empty translations
             cursor.execute('''
                 SELECT COUNT(*) FROM translations 
@@ -1660,11 +1653,11 @@ class BookTranslator:
             ''', (edition_number, chapter_number, source_lang, target_lang))
             empty_result = cursor.fetchone()
             empty_paragraphs = empty_result[0] if empty_result else 0
-            # Chapter is fully translated if there are no empty paragraphs
-            return empty_paragraphs == 0 and total_paragraphs > 0
+            # Return the count of untranslated paragraphs
+            return empty_paragraphs
         except Exception as e:
             if self.verbose:
-                print(f"Database check for chapter translation status failed: {e}")
+                print(f"Database check for untranslated paragraphs failed: {e}")
             raise
     
     def db_save_translation(self, text: str, translation: str, source_lang: str, target_lang: str, 
@@ -1936,14 +1929,14 @@ class BookTranslator:
         # Get total paragraphs in chapter to determine chapter size
         total_paragraphs = self.db_count_paragraphs(edition_number, chapter_number, source_lang, target_lang)
         # Check if chapter is fully translated
-        fully_translated = self.db_chapter_is_translated(edition_number, chapter_number, source_lang, target_lang)
-        if fully_translated:
+        untranslated_count = self.db_count_untranslated(edition_number, chapter_number, source_lang, target_lang)
+        if untranslated_count == 0:
             fully_translated_text = "✓ Chapter is fully translated"
         else:
-            fully_translated_text = "Needs translating"
+            fully_translated_text = f"Needs translating ({untranslated_count} paragraphs)"
         print(f"\n{self.sep1}")
         self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, {total_paragraphs} paragraphs", fully_translated_text, self.console_width, 0, 4)
-        if fully_translated:
+        if untranslated_count == 0:
             return
         print(f"{self.sep2}")
         # Initialize timing statistics for this chapter
