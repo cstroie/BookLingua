@@ -2155,7 +2155,49 @@ class BookTranslator:
             payload["provider"] = {
                 "order": [provider]
             }
-        # Call the API
+        
+        # Make the API call
+        translation = self._make_api_request(headers, payload)
+        
+        # Clean the translation
+        translation = self.remove_xml_tags(translation, 'think').strip()
+        
+        # Extract translation from XML tags if present
+        target_lang_lower = target_lang.lower()
+        pattern = f"<{target_lang_lower}>(.*?)</{target_lang_lower}>"
+        match = re.search(pattern, translation, re.DOTALL)
+        
+        if not match:
+            # If no XML tags found, add instruction and retry
+            messages.append({"role": "assistant", "content": translation})
+            messages.append({"role": "user", "content": f"Please wrap your translation in XML tags with the target language name in lowercase, like <{target_lang_lower}>translation</{target_lang_lower}>."})
+            
+            # Retry the API call
+            payload["messages"] = messages
+            translation = self._make_api_request(headers, payload)
+            
+            # Clean and try to extract again
+            translation = self.remove_xml_tags(translation, 'think').strip()
+            match = re.search(pattern, translation, re.DOTALL)
+            if not match:
+                # If still no XML tags, use the raw translation
+                return translation
+                
+        return match.group(1).strip()
+
+    def _make_api_request(self, headers: dict, payload: dict) -> str:
+        """Make the actual API request and handle the response.
+        
+        Args:
+            headers (dict): Request headers
+            payload (dict): Request payload
+            
+        Returns:
+            str: Translation content from the API response
+            
+        Raises:
+            Exception: If API call fails
+        """
         response = requests.post(
             f"{self.base_url}/chat/completions",
             headers=headers,
@@ -2165,54 +2207,12 @@ class BookTranslator:
             raise Exception(f"API request failed with status {response.status_code}: {response.text}")
         result = response.json()
         try:
-            translation = result["choices"][0]["message"]["content"]
+            return result["choices"][0]["message"]["content"]
         except (KeyError, IndexError) as e:
             if 'error' in result:
                 error_info = result['error']
                 raise Exception(f"API error: {error_info.get('message', 'Unknown error')}")
             raise Exception(f"Unexpected API response format: {e}")
-                
-        # Clean the translation
-        translation = self.remove_xml_tags(translation, 'think').strip()
-        
-        # Extract translation from XML tags if present
-        target_lang_lower = target_lang.lower()
-        pattern = f"<{target_lang_lower}>(.*?)</{target_lang_lower}>"
-        match = re.search(pattern, translation, re.DOTALL)
-        
-        if match:
-            translation = match.group(1).strip()
-        else:
-            # If no XML tags found, add instruction and retry
-            messages.append({"role": "assistant", "content": translation})
-            messages.append({"role": "user", "content": f"Please wrap your translation in XML tags with the target language name in lowercase, like <{target_lang_lower}>translation</{target_lang_lower}>."})
-            
-            # Retry the API call
-            payload["messages"] = messages
-            response = requests.post(
-                f"{self.base_url}/chat/completions",
-                headers=headers,
-                json=payload
-            )
-            if response.status_code != 200:
-                raise Exception(f"API request failed with status {response.status_code}: {response.text}")
-            result = response.json()
-            try:
-                translation = result["choices"][0]["message"]["content"]
-                # Clean the translation
-                translation = self.remove_xml_tags(translation, 'think').strip()
-                match = re.search(pattern, translation, re.DOTALL)
-                if match:
-                    translation = match.group(1).strip()
-                else:
-                    # If still no XML tags, use the raw translation
-                    pass
-            except (KeyError, IndexError) as e:
-                if 'error' in result:
-                    error_info = result['error']
-                    raise Exception(f"API error: {error_info.get('message', 'Unknown error')}")
-                raise Exception(f"Unexpected API response format: {e}")
-        return translation
 
     def translate_api_prepare_chat(self, stripped_text: str, source_lang: str, target_lang: str) -> list:
         """Build messages for translation API call.
