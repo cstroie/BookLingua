@@ -3089,7 +3089,7 @@ def main():
     parser.add_argument("-t", "--target-lang", default="Romanian", help="Target language (default: Romanian)")
     parser.add_argument("-c", "--chapters", type=str, help="Comma-separated list of chapter numbers to translate (default: all chapters)")
     parser.add_argument("-u", "--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
-    parser.add_argument("-m", "--model", default="gpt-4o", help="Model name to use (default: gpt-4o)")
+    parser.add_argument("-m", "--model", help="Model name to use (default: gpt-4o)")
     parser.add_argument("-k", "--api-key", help="API key for the translation service")
     # CSV export/import options
     parser.add_argument("-e", "--export-csv", help="Export database to CSV file")
@@ -3140,9 +3140,11 @@ def main():
         model = model or "openai/gpt-4o"
         if not api_key:
             api_key = os.environ.get('OPENROUTER_API_KEY')
-    # Use environment variable as fallback for API key
-    if not api_key:
-        api_key = os.environ.get('OPENAI_API_KEY')
+    # Set defaults if still not specified
+    if not base_url:
+        base_url =  "http://localhost:11434/v1"
+    if not model:
+        model = "gemma3n:e4b"
     # Set default output directory to filename without extension if not specified
     output_dir = args.output
     if output_dir is None:
