@@ -2126,8 +2126,8 @@ class BookTranslator:
         # Add API key if provided and not a local endpoint
         if self.api_key and self.api_key != 'dummy-key':
             headers["Authorization"] = f"Bearer {self.api_key}"
-            
-        # Build messages with context
+
+        # Build messages from context
         messages = self.translate_api_prepare_chat(stripped_text, source_lang, target_lang)
         
         # Handle model name with provider (provider@model format)
@@ -2157,9 +2157,9 @@ class BookTranslator:
             }
         
         # Make the API call
-        translation = self._make_api_request(headers, payload)
+        translation = self.make_api_request(headers, payload)
         
-        # Clean the translation
+        # Clean the thinking part from the response if present
         translation = self.remove_xml_tags(translation, 'think').strip()
         
         # Extract translation from XML tags if present
@@ -2170,11 +2170,11 @@ class BookTranslator:
         if not match:
             # If no XML tags found, add instruction and retry
             messages.append({"role": "assistant", "content": translation})
-            messages.append({"role": "user", "content": f"Please wrap your translation in XML tags with the target language name in lowercase, like <{target_lang_lower}>translation</{target_lang_lower}>."})
+            messages.append({"role": "user", "content": f"Please wrap your translation in XML tags with the target language name in lowercase, like this <{target_lang_lower}>...</{target_lang_lower}>."})
             
             # Retry the API call
             payload["messages"] = messages
-            translation = self._make_api_request(headers, payload)
+            translation = self.make_api_request(headers, payload)
             
             # Clean and try to extract again
             translation = self.remove_xml_tags(translation, 'think').strip()
@@ -2185,7 +2185,7 @@ class BookTranslator:
                 
         return match.group(1).strip()
 
-    def _make_api_request(self, headers: dict, payload: dict) -> str:
+    def make_api_request(self, headers: dict, payload: dict) -> str:
         """Make the actual API request and handle the response.
         
         Args:
