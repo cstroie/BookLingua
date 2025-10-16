@@ -1984,6 +1984,10 @@ class BookTranslator:
         Returns:
             tuple: (target, duration, fluency, model) translation data
         """
+        # If source and target languages are identical, simply return the text
+        if source_lang.lower() == target_lang.lower():
+            return text, 0, 100, 'copy'
+        
         # Check if the source contains no letters
         if re.match(r'^[^a-zA-Z]+$', text, re.UNICODE):
             # Copy as-is with perfect fluency and zero duration
@@ -2016,6 +2020,10 @@ class BookTranslator:
         Raises:
             Exception: If translation fails
         """
+        
+        # If source and target languages are identical, simply return the text
+        if source_lang.lower() == target_lang.lower():
+            return text, 0, 100, 'copy'
         
         # Check cache first
         if use_cache and self.conn:
