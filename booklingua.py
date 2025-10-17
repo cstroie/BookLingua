@@ -1843,6 +1843,7 @@ class BookTranslator:
             
         Returns:
             tuple: (source, target) of the specified paragraph,
+                   or (source, source) if not translated,
                    or (None, None) if not found
                    
         Raises:
@@ -1860,8 +1861,14 @@ class BookTranslator:
                 AND source_lang = ? AND target_lang = ?
             ''', (edition_number, chapter_number, paragraph_number, source_lang, target_lang))
             result = cursor.fetchone()
-            # Return the result or None if not found
-            return result if result else (None, None)
+            # Return the result, source if not translated, or None if not found
+            if result:
+                source, target = result
+                # If target is empty or None, return source as target
+                if not target:
+                    return (source, source)
+                return result
+            return (None, None)
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup for specific item failed: {e}")
