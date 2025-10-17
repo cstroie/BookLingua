@@ -314,7 +314,7 @@ class BookTranslator:
         if file_extension.lower() == '.epub':
             chapters = self.extract_epub(source_lang, target_lang)
         elif file_extension.lower() == '.html' or file_extension.lower() == '.htm':
-            chapters = self.extract_html(self.book_path, source_lang, target_lang)
+            chapters = self.extract_html(source_lang, target_lang)
         else:
             raise ValueError(f"Unsupported file format: {file_extension}")
         # Save all content to database
@@ -440,7 +440,7 @@ class BookTranslator:
         print("Build phase completed!")
         print(f"{self.sep1}")
 
-    def extract_html(self, html_path: str, source_lang: str = "English", target_lang: str = "Romanian") -> List[dict]:
+    def extract_html(self, source_lang: str = "English", target_lang: str = "Romanian") -> List[dict]:
         """Extract content from HTML file, identifying book title and chapter headings.
         
         This method processes an HTML file and extracts content organized by headings,
@@ -455,10 +455,10 @@ class BookTranslator:
             List[dict]: A list of chapter dictionaries containing extracted content
         """
         print(f"{self.sep1}")
-        print(f"Extracting content from {html_path}...")
+        print(f"Extracting content from {self.book_path}...")
         # Read HTML file
         try:
-            with open(html_path, 'r', encoding='utf-8') as f:
+            with open(self.book_path, 'r', encoding='utf-8') as f:
                 html_content = f.read()
         except Exception as e:
             print(f"Error reading HTML file: {e}")
@@ -474,7 +474,7 @@ class BookTranslator:
         # Save the complete markdown file if output directory exists
         if self.output_dir and os.path.exists(self.output_dir):
             try:
-                filename = os.path.splitext(os.path.basename(html_path))[0] + ".md"
+                filename = os.path.splitext(os.path.basename(self.book_path))[0] + ".md"
                 filepath = os.path.join(self.output_dir, filename)
                 with open(filepath, 'w', encoding='utf-8') as f:
                     f.write(markdown_content)
@@ -731,6 +731,15 @@ class BookTranslator:
             except Exception as e:
                 print(f"Warning: Failed to convert HTML to Markdown for item {item.get_id()}: {e}")
                 markdown_content = ""
+            # Save the complete markdown file if output directory exists
+            if self.output_dir and os.path.exists(self.output_dir):
+                try:
+                    filename = os.path.splitext(os.path.basename(self.book_path))[0] + ".md"
+                    filepath = os.path.join(self.output_dir, filename)
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        f.write(markdown_content)
+                except Exception as e:
+                    print(f"Warning: Failed to save complete markdown content: {e}")
             # Extract paragraphs from Markdown
             try:
                 paragraphs = [p.strip() for p in markdown_content.split('\n\n') if p.strip()]
