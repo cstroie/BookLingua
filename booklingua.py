@@ -455,7 +455,6 @@ class BookTranslator:
         """
         print(f"{self.sep1}")
         print(f"Extracting content from {html_path}...")
-        
         # Read HTML file
         try:
             with open(html_path, 'r', encoding='utf-8') as f:
@@ -463,20 +462,16 @@ class BookTranslator:
         except Exception as e:
             print(f"Error reading HTML file: {e}")
             return []
-            
         # Parse HTML with BeautifulSoup
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
         except Exception as e:
             print(f"Error parsing HTML content: {e}")
             return []
-            
         # Convert HTML to Markdown using existing method
         markdown_content = self.html_to_markdown(soup)
-        
         # Parse markdown content to extract chapters
         chapters = self.parse_markdown_content(markdown_content)
-        
         print(f"Extraction completed. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
@@ -491,8 +486,7 @@ class BookTranslator:
             List[dict]: A list of chapter dictionaries containing extracted content
         """
         # Split content into lines
-        lines = markdown_content.split('\n')
-        
+        lines = markdown_content.split('\n\n')
         # Create metadata chapter
         chapters = [{
             'id': 'metadata',
@@ -500,10 +494,8 @@ class BookTranslator:
             'title': 'Metadata',
             'paragraphs': ['Metadata']
         }]
-        
         current_chapter = None
         current_content = []
-        
         # Process each line
         for line in lines:
             # Check for headers
@@ -517,7 +509,6 @@ class BookTranslator:
                         paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
                         current_chapter['paragraphs'] = paragraphs
                         chapters.append(current_chapter)
-                
                 # Extract header level and text
                 header_level = 0
                 header_text = line
@@ -525,7 +516,6 @@ class BookTranslator:
                     header_level += 1
                     header_text = header_text[1:]
                 header_text = header_text.strip()
-                
                 # Start new chapter (skip the first heading as it's the title)
                 if header_level > 0:
                     current_chapter = {
@@ -538,7 +528,6 @@ class BookTranslator:
             # Add content to current chapter
             elif current_chapter is not None:
                 current_content.append(line)
-        
         # Don't forget the last chapter
         if current_chapter and current_content:
             content_text = '\n\n'.join(current_content).strip()
@@ -546,7 +535,7 @@ class BookTranslator:
                 paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
                 current_chapter['paragraphs'] = paragraphs
                 chapters.append(current_chapter)
-                
+        # Return the chapters array
         return chapters
 
     def extract_epub(self, source_lang: str = "English", target_lang: str = "Romanian") -> List[dict]:
