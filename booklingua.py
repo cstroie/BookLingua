@@ -1831,6 +1831,42 @@ class BookTranslator:
                 print(f"Database lookup for chapters failed: {e}")
             raise
 
+    def db_get_item(self, source_lang: str, target_lang: str, edition_number: int, chapter_number: int, paragraph_number: int) -> tuple:
+        """Get a specific source and target text for a given edition, chapter, and paragraph.
+        
+        Args:
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            edition_number (int): Edition number to search within
+            chapter_number (int): Chapter number to search within
+            paragraph_number (int): Paragraph number to retrieve
+            
+        Returns:
+            tuple: (source, target) of the specified paragraph,
+                   or (None, None) if not found
+                   
+        Raises:
+            Exception: If database connection is not available
+        """
+        # Raise exception if no database connection
+        if not self.conn:
+            raise Exception("Database connection not available")
+        # Query the specific paragraph
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute('''
+                SELECT source, target FROM translations 
+                WHERE edition = ? AND chapter = ? AND paragraph = ?
+                AND source_lang = ? AND target_lang = ?
+            ''', (edition_number, chapter_number, paragraph_number, source_lang, target_lang))
+            result = cursor.fetchone()
+            # Return the result or None if not found
+            return result if result else (None, None)
+        except Exception as e:
+            if self.verbose:
+                print(f"Database lookup for specific item failed: {e}")
+            raise
+
     def db_get_next_paragraph(self, source_lang: str, target_lang: str, edition_number: int, chapter_number: int, paragraph_number: int) -> tuple:
         """Get the next paragraph in a chapter after the specified paragraph number.
         
