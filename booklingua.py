@@ -851,7 +851,6 @@ class BookTranslator:
         """
         # Get the title
         title = self.db_get_item(source_lang, target_lang, edition_number, 0, 1)
-        print(f"Creating title page with title: {title}")
         if ':' in title:
             title = title.split(':', 1)[1].strip()
         # Create simple XHTML content with title
@@ -1833,7 +1832,8 @@ class BookTranslator:
                 order = "chapter ASC"
             cursor.execute(f'''
                 SELECT {select} FROM translations 
-                WHERE source_lang = ? AND target_lang = ? AND edition = ?
+                WHERE source_lang = ? AND target_lang = ?
+                AND edition = ? AND chapter > 0
                 GROUP BY chapter
                 ORDER BY {order}
             ''', (source_lang, target_lang, edition_number))
