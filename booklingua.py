@@ -424,7 +424,7 @@ class BookTranslator:
                 print(f"Warning: Chapter {chapter_number} is not fully translated and will be skipped")
         # Use the database-retrieved chapters if available
         if translated_chapters:
-            self.epub_finalize(translated_book, edition_number, translated_chapters)
+            self.epub_finalize(translated_book, edition_number, translated_chapters, source_lang, target_lang)
         # Save outputs
         print(f"\n{self.sep1}")
         print("Saving output files...")
@@ -921,7 +921,7 @@ class BookTranslator:
         # Return the reconstructed chapter
         return translated_chapter
 
-    def epub_finalize(self, book: epub.EpubBook, edition_number: int, chapters: List[epub.EpubHtml]):
+    def epub_finalize(self, book: epub.EpubBook, edition_number: int, chapters: List[epub.EpubHtml], source_lang: str, target_lang: str):
         """Add navigation elements and finalize EPUB book structure.
         
         This method completes the EPUB book by adding essential navigation components
@@ -932,6 +932,8 @@ class BookTranslator:
             book (epub.EpubBook): The EPUB book object to finalize
             edition_number (int): Edition number for the translation
             chapters (List[epub.EpubHtml]): List of chapter objects to include in navigation
+            source_lang (str): Source language code
+            target_lang (str): Target language code
         """
         # Add CSS file if it exists
         css = None
@@ -947,7 +949,7 @@ class BookTranslator:
             )
             book.add_item(css)
         # Create the titlepage and add it as the first chapter
-        titlepage = self.epub_create_titlepage(edition_number, "English", book.language)
+        titlepage = self.epub_create_titlepage(edition_number, source_lang, target_lang)
         if css:
             titlepage.add_item(css)
         book.add_item(titlepage)
