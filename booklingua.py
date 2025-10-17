@@ -414,7 +414,7 @@ class BookTranslator:
             print(f"Error: {e}")
             return
         # Prepare output book
-        translated_book = self.epub_create_template(source_lang, target_lang)
+        translated_book = self.epub_create_template(edition_number, source_lang, target_lang)
         translated_chapters = []
         for chapter_number in chapter_list:
             # Only include chapters that are fully translated
@@ -801,7 +801,7 @@ class BookTranslator:
         
         return edition_number
 
-    def epub_create_template(self, source_lang: str, target_lang: str) -> epub.EpubBook:
+    def epub_create_template(self, edition_number: int, source_lang: str, target_lang: str) -> epub.EpubBook:
         """Create a new EPUB book template with metadata copied from original book.
         
         This method creates a new EPUB book object and copies essential metadata
@@ -809,7 +809,7 @@ class BookTranslator:
         identifying information.
         
         Args:
-            original_book: The original EPUB book object (ebooklib.epub.EpubBook)
+            edition_number (int): Edition number for the translation
             source_lang (str): Source language code
             target_lang (str): Target language code for setting the book language
                 
@@ -817,14 +817,21 @@ class BookTranslator:
             epub.EpubBook: A new EPUB book object with copied metadata
         """
         new_book = epub.EpubBook()
-        new_book.set_identifier(self.db_get_item(source_lang, target_lang, edition, 0, 0))
-        original_title = "Unknown"
-        translated_title, _, _, _ = self.translate_text(original_title, source_lang, target_lang, True)
-        new_book.set_title(f"{translated_title}")
+        book_id = self.db_get_item(source_lang, target_lang, edition_number, 0, 0)
+        if ':' in book_id:
+            book_id = book_id.split(':', 1)[1].strip()
+        new_book.set_identifier(book_id)
+        book_title = self.db_get_item(source_lang, target_lang, edition_number, 0, 1)
+        if ':' in book_title:
+            book_title = book_title.split(':', 1)[1].strip()
+        new_book.set_title(book_title)
+        book_authors = self.db_get_items(source_lang, target_lang, edition_number, 0, 2)
+        if ':' in book_authors:
+            authors = book_authors.split(':', 1)[1].strip()
+            for author in authors.split(','):
+                new_book.add_author(author.strip())
         # Set language using helper function
         new_book.set_language(self.get_language_code(target_lang))
-        for author in original_book.get_metadata('DC', 'creator'):
-            new_book.add_author(author[0])
         return new_book
 
     def epub_create_titlepage(self, book: epub.EpubBook, source_lang: str, target_lang: str) -> epub.EpubHtml:
@@ -1831,7 +1838,7 @@ class BookTranslator:
                 print(f"Database lookup for chapters failed: {e}")
             raise
 
-    def db_get_item(self, source_lang: str, target_lang: str, edition_number: int, chapter_number: int, paragraph_number: int) -> tuple:
+    def db_get_item(self, source_lang: str, target_lang: str, edition_number: int, chapter_number: int, paragraph_number: int) -> str:
         """Get a specific source and target text for a given edition, chapter, and paragraph.
         
         Args:
@@ -1842,10 +1849,10 @@ class BookTranslator:
             paragraph_number (int): Paragraph number to retrieve
             
         Returns:
-            tuple: (source, target) of the specified paragraph,
-                   or (source, source) if not translated,
-                   or (None, None) if not found
-                   
+            str: The translated text of the specified paragraph,
+                 or the original text if not translated,
+                 or None if not found
+
         Raises:
             Exception: If database connection is not available
         """
@@ -1866,9 +1873,9 @@ class BookTranslator:
                 source, target = result
                 # If target is empty or None, return source as target
                 if not target:
-                    return (source, source)
-                return result
-            return (None, None)
+                    return source
+                return target
+            return None
         except Exception as e:
             if self.verbose:
                 print(f"Database lookup for specific item failed: {e}")
