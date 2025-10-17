@@ -1081,6 +1081,8 @@ class BookTranslator:
         text = processed_element.get_text(separator=' ', strip=True)
         text = text.replace('\n', '')
         text = text.replace('---', '\n')
+        # Replace '\s*---\s*' with newline
+        text = re.sub(r'\s*---\s*', '\n', text)
         if not text:
             return None
         # Add appropriate Markdown formatting
