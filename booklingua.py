@@ -424,7 +424,7 @@ class BookTranslator:
                 print(f"Warning: Chapter {chapter_number} is not fully translated and will be skipped")
         # Use the database-retrieved chapters if available
         if translated_chapters:
-            self.epub_finalize(translated_book, translated_chapters)
+            self.epub_finalize(translated_book, edition_number, translated_chapters)
         # Save outputs
         print(f"\n{self.sep1}")
         print("Saving output files...")
@@ -509,7 +509,7 @@ class BookTranslator:
             'id': f"{len(chapters):03d}",
             'name': f"{len(chapters):03d}. {title}",
             'title': f"{title}",
-            'paragraphs': [f"{title}", f"# {title}", f"{author}"]
+            'paragraphs': [f"{author} - {title}", f"{title}", f"{author}"]
         }
         # Process each paragraph
         for paragraph in paragraphs:
@@ -825,7 +825,7 @@ class BookTranslator:
         if ':' in book_title:
             book_title = book_title.split(':', 1)[1].strip()
         new_book.set_title(book_title)
-        book_authors = self.db_get_items(source_lang, target_lang, edition_number, 0, 2)
+        book_authors = self.db_get_item(source_lang, target_lang, edition_number, 0, 2)
         if ':' in book_authors:
             authors = book_authors.split(':', 1)[1].strip()
             for author in authors.split(','):
@@ -834,7 +834,7 @@ class BookTranslator:
         new_book.set_language(self.get_language_code(target_lang))
         return new_book
 
-    def epub_create_titlepage(self, book: epub.EpubBook, source_lang: str, target_lang: str) -> epub.EpubHtml:
+    def epub_create_titlepage(self, edition_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
         """Create a title page chapter containing only the book title.
         
         This method creates a simple EPUB chapter that serves as a title page,
@@ -842,15 +842,19 @@ class BookTranslator:
         be inserted as the first chapter in the translated book.
         
         Args:
-            original_book: The original EPUB book object to extract title from
+            edition_number (int): Edition number for the translation
             source_lang (str): Source language code for translation
             target_lang (str): Target language code for the title page
             
         Returns:
             epub.EpubHtml: EPUB HTML item for the title page chapter
         """
-        # Get the original title
-        title = book.get_metadata('DC', 'title')[0][0]
+        # Get the title
+        title = self.db_get_item(source_lang, target_lang, edition_number, 0, 1)
+        print(f"Creating title page with title: {title}")
+        if ':' in title:
+            title = title.split(':', 1)[1].strip()
+        # Create simple XHTML content with title
         xhtml = f'<article id="titlepage">\n<title>{title}</title>\n</article>'
         # Create the title page chapter
         titlepage = epub.EpubHtml(
@@ -916,8 +920,8 @@ class BookTranslator:
         translated_chapter.content = xhtml
         # Return the reconstructed chapter
         return translated_chapter
-    
-    def epub_finalize(self, book, chapters):
+
+    def epub_finalize(self, book: epub.EpubBook, edition_number: int, chapters: List[epub.EpubHtml]):
         """Add navigation elements and finalize EPUB book structure.
         
         This method completes the EPUB book by adding essential navigation components
@@ -926,6 +930,7 @@ class BookTranslator:
         
         Args:
             book (epub.EpubBook): The EPUB book object to finalize
+            edition_number (int): Edition number for the translation
             chapters (List[epub.EpubHtml]): List of chapter objects to include in navigation
         """
         # Add CSS file if it exists
@@ -942,7 +947,7 @@ class BookTranslator:
             )
             book.add_item(css)
         # Create the titlepage and add it as the first chapter
-        titlepage = self.ebook_create_titlepage(book, "English", book.language)
+        titlepage = self.epub_create_titlepage(edition_number, "English", book.language)
         if css:
             titlepage.add_item(css)
         book.add_item(titlepage)
