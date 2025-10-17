@@ -1022,6 +1022,34 @@ class BookTranslator:
         except Exception as e:
             print(f"Warning: Failed to remove script/style elements: {e}")
 
+    def html_is_empty_after_children_removal(self, element) -> bool:
+        """Check if element is empty after removing content of all first level children.
+        
+        Args:
+            element: BeautifulSoup element to check
+            
+        Returns:
+            bool: True if element is empty after children content removal, False otherwise
+        """
+        # Create a copy of the element to avoid modifying the original
+        element_copy = BeautifulSoup(str(element), 'html.parser')
+        if not element_copy:
+            return True
+            
+        # Get the first (and typically only) element from the copy
+        copied_element = element_copy.find()
+        if not copied_element:
+            return True
+            
+        # Remove all first level children
+        for child in list(copied_element.children):
+            if child.name:  # It's a tag
+                child.decompose()
+                
+        # Check if remaining text content is empty after stripping
+        remaining_text = copied_element.get_text(strip=True)
+        return len(remaining_text) == 0
+
     def html_process_blocks(self, soup) -> List[str]:
         """Process block elements and convert them to markdown lines.
         
@@ -1041,6 +1069,9 @@ class BookTranslator:
                 try:
                     # Skip if parent is also a block element to avoid duplication
                     if element.parent.name in block_elements:
+                        continue
+                    # Skip if element is empty after removing children content
+                    if self.html_is_empty_after_children_removal(element):
                         continue
                     markdown_line = self.html_convert_element(element)
 
