@@ -310,7 +310,9 @@ class BookTranslator:
             self.output_dir = output_dir
             os.makedirs(self.output_dir, exist_ok=True)
         # Extract content from EPUB
-        edition_number = self.extract_epub(source_lang)
+        chapters = self.extract_epub(source_lang, target_lang)
+        # Save all content to database
+        edition_number = self.book_insert_chapters(chapters, source_lang, target_lang, new_edition)
         # Return the edition number for reference
         return edition_number
 
@@ -432,7 +434,7 @@ class BookTranslator:
         print("Build phase completed!")
         print(f"{self.sep1}")
 
-    def extract_epub(self, source_lang: str = "English") -> List[dict]:
+    def extract_epub(self, source_lang: str = "English", target_lang: str = "Romanian") -> List[dict]:
         """Extract content from EPUB file.
         
         This method handles the extraction of text content from an EPUB file,
@@ -441,6 +443,7 @@ class BookTranslator:
         
         Args:
             source_lang (str, optional): Source language name. Defaults to "English".
+            target_lang (str, optional): Target language name. Defaults to "Romanian".
             
         Returns:
             List[dict]: A list of chapter dictionaries containing extracted content
@@ -472,8 +475,6 @@ class BookTranslator:
             chapter_data = self.extract_epub_content(item, source_lang)
             if chapter_data:
                 chapters.append(chapter_data)
-        # Save all content to database
-        edition_number = self.book_insert_chapters(chapters, source_lang, target_lang, new_edition)
         print(f"Extraction completed. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
