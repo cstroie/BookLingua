@@ -1003,13 +1003,10 @@ class BookTranslator:
         # Return empty string if soup is None
         if not soup:
             return ""
-            
         # Remove script and style elements
         self.html_remove_script_style(soup)
-        
         # Process block elements
         markdown_lines = self.html_process_blocks(soup)
-        
         # Join with double newlines for paragraph separation
         return "\n\n".join(markdown_lines)
 
@@ -1038,7 +1035,6 @@ class BookTranslator:
         block_elements = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'blockquote', 'br', 'hr']
         # Initialize list to hold markdown lines
         markdown_lines = []
-        
         try:
             # Process block elements
             for element in soup.find_all(block_elements, recursive=True):
@@ -1046,8 +1042,12 @@ class BookTranslator:
                     # Skip if parent is also a block element to avoid duplication
                     if element.parent.name in block_elements:
                         continue
-                        
                     markdown_line = self.html_convert_element(element)
+
+                    print(element.name)
+                    print(markdown_line)
+                    print()
+
                     if markdown_line is not None:
                         markdown_lines.append(markdown_line)
                 except Exception as e:
