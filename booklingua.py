@@ -1065,8 +1065,6 @@ class BookTranslator:
             # Process block elements
             for element in soup.find_all(block_elements, recursive=True):
                 try:
-                    if element.name == 'br':
-                        print(element.parent.name, element.parent.contents)
                     # Check if the element has significant text
                     has_text = False
                     for child in list(element.children):
