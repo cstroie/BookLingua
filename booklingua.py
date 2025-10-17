@@ -463,28 +463,22 @@ class BookTranslator:
         except Exception as e:
             print(f"Error reading HTML file: {e}")
             return []
-        
         # Parse HTML with BeautifulSoup
         try:
             soup = BeautifulSoup(html_content, 'html.parser')
         except Exception as e:
             print(f"Error parsing HTML content: {e}")
             return []
-        
         # Remove script and style elements
         self.html_remove_script_style(soup)
-        
         # Find all headings (h1-h6)
         headings = soup.find_all(re.compile(r'^h[1-6]$'))
-        
         if not headings:
             print("Warning: No headings found in HTML file.")
             return []
-        
         # Identify book title (first heading)
         title_heading = headings[0]
         book_title = title_heading.get_text().strip()
-        
         # Create metadata chapter
         chapters = [{
             'id': 'metadata',
@@ -492,17 +486,14 @@ class BookTranslator:
             'title': 'Metadata',
             'paragraphs': ['Metadata', book_title]
         }]
-        
         # Process chapters based on heading hierarchy
         current_chapter = None
         chapter_content = []
-        
         # Process all elements in order
         for element in soup.find_all():
             # Skip script and style elements
             if element.name in ['script', 'style']:
                 continue
-                
             # Check if this is a heading
             if element.name and re.match(r'^h[1-6]$', element.name):
                 # If we have accumulated content, save it as a chapter
@@ -513,12 +504,11 @@ class BookTranslator:
                         paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
                         current_chapter['paragraphs'] = paragraphs
                         chapters.append(current_chapter)
-                
                 # Start new chapter (skip the first heading as it's the title)
                 if element != title_heading:
                     current_chapter = {
-                        'id': f"chapter_{len(chapters)}",
-                        'name': f"chapter_{len(chapters)}",
+                        'id': f"chapter-{len(chapters)}",
+                        'name': f"chapter-{len(chapters)}",
                         'title': element.get_text().strip(),
                         'paragraphs': []
                     }
@@ -529,7 +519,6 @@ class BookTranslator:
                 markdown_line = self.html_convert_element(element)
                 if markdown_line:
                     chapter_content.append(markdown_line)
-        
         # Don't forget the last chapter
         if current_chapter and chapter_content:
             content_text = '\n\n'.join(chapter_content).strip()
@@ -537,7 +526,6 @@ class BookTranslator:
                 paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
                 current_chapter['paragraphs'] = paragraphs
                 chapters.append(current_chapter)
-        
         print(f"Extraction completed. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
@@ -599,19 +587,16 @@ class BookTranslator:
         """
         try:
             metadata_parts = []
-            
             # Extract title
             title_metadata = book.get_metadata('DC', 'title')
             if title_metadata:
                 title = title_metadata[0][0]
                 metadata_parts.append(f"{title}")
-                
             # Extract authors
             authors = book.get_metadata('DC', 'creator')
             if authors:
                 author_names = [author[0] for author in authors]
                 metadata_parts.append(', '.join(author_names))
-                
             # Extract description
             descriptions = book.get_metadata('DC', 'description')
             if descriptions:
@@ -624,24 +609,20 @@ class BookTranslator:
                     except Exception as e:
                         print(f"Warning: Failed to convert HTML description to Markdown: {e}")
                 metadata_parts.extend(description.split('\n\n'))
-                
             # Extract publisher
             publishers = book.get_metadata('DC', 'publisher')
             if publishers:
                 publisher = publishers[0][0]
                 metadata_parts.append(publisher)
-                
             # Extract date
             dates = book.get_metadata('DC', 'date')
             if dates:
                 date = dates[0][0]
                 metadata_parts.append(f"{date}")
-                
             # Combine all metadata parts
             if metadata_parts:
                 # Save metadata as markdown if output directory exists
                 self.save_metadata_as_markdown(metadata_parts, source_lang)
-                
                 # Create virtual chapter for metadata
                 return {
                     'id': 'metadata',
@@ -3341,7 +3322,7 @@ def main():
     # Check if any phase is specified; if none, run all phases
     all_phases = False if (args.phase_extract or args.phase_translate or args.phase_build) else True
     print(f"Running phases: "
-          f"{'import ' if args.phase_extract or all_phases else ''}"
+          f"{'extract ' if args.phase_extract or all_phases else ''}"
           f"{'translate ' if args.phase_translate or all_phases else ''}"
           f"{'build' if args.phase_build or all_phases else ''}")
     # Run specific phases
