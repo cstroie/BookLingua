@@ -481,16 +481,17 @@ class BookTranslator:
             except Exception as e:
                 print(f"Warning: Failed to save complete markdown content: {e}")
         # Parse markdown content to extract chapters
-        chapters = self.parse_markdown_content(markdown_content)
+        chapters = self.parse_markdown_content(markdown_content, source_lang)
         print(f"Extraction completed. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
 
-    def parse_markdown_content(self, markdown_content: str) -> List[dict]:
+    def parse_markdown_content(self, markdown_content: str, source_lang: str) -> List[dict]:
         """Parse markdown content and extract chapters based on headings.
         
         Args:
             markdown_content (str): Markdown content to parse
+            source_lang (str): Source language for saving chapter files
             
         Returns:
             List[dict]: A list of chapter dictionaries containing extracted content
@@ -521,7 +522,7 @@ class BookTranslator:
                     # Add current chapter to chapters list
                     chapters.append(current_chapter)
                     # Save individual chapter file if output directory exists
-                    self.save_chapter_as_markdown(current_chapter, source_lang="")
+                    self.save_chapter_as_markdown(current_chapter, source_lang=source_lang)
                 # Extract header level and text of the starting chapter
                 header_level = 0
                 header_text = paragraph
@@ -545,7 +546,7 @@ class BookTranslator:
             # Add the last chapter to chapters list
             chapters.append(current_chapter)
             # Save individual chapter file if output directory exists
-            self.save_chapter_as_markdown(current_chapter, source_lang="")
+            self.save_chapter_as_markdown(current_chapter, source_lang=source_lang)
         # Return the chapters array
         return chapters
 
