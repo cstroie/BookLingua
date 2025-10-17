@@ -496,8 +496,8 @@ class BookTranslator:
             except Exception as e:
                 print(f"Warning: Failed to save complete markdown content: {e}")
         
-        # Split content into lines
-        lines = markdown_content.split('\n\n')
+        # Split content into paragraphs
+        paragraphs = markdown_content.split('\n\n')
         # Create metadata chapter
         chapters = [{
             'id': 'metadata',
@@ -507,18 +507,18 @@ class BookTranslator:
         }]
         current_chapter = None
         current_content = []
-        # Process each line
-        for line in lines:
+        # Process each paragraph
+        for paragraph in paragraphs:
             # Check for headers
-            if line.startswith('#'):
+            if paragraph.startswith('#'):
                 # If we have accumulated content, save it as a chapter
                 if current_chapter and current_content:
                     # Clean up content
                     content_text = '\n\n'.join(current_content).strip()
                     if content_text:
                         # Split into paragraphs
-                        paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
-                        current_chapter['paragraphs'] = paragraphs
+                        chapter_paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
+                        current_chapter['paragraphs'] = chapter_paragraphs
                         chapters.append(current_chapter)
                         
                         # Save individual chapter file if output directory exists
@@ -535,7 +535,7 @@ class BookTranslator:
                                 print(f"Warning: Failed to save chapter {len(chapters)-1} as markdown: {e}")
                 # Extract header level and text
                 header_level = 0
-                header_text = line
+                header_text = paragraph
                 while header_text.startswith('#') and header_level < 6:
                     header_level += 1
                     header_text = header_text[1:]
@@ -551,13 +551,13 @@ class BookTranslator:
                     current_content = []
             # Add content to current chapter
             elif current_chapter is not None:
-                current_content.append(line)
+                current_content.append(paragraph)
         # Don't forget the last chapter
         if current_chapter and current_content:
             content_text = '\n\n'.join(current_content).strip()
             if content_text:
-                paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
-                current_chapter['paragraphs'] = paragraphs
+                chapter_paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
+                current_chapter['paragraphs'] = chapter_paragraphs
                 chapters.append(current_chapter)
                 
                 # Save individual chapter file if output directory exists
