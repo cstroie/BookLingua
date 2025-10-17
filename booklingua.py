@@ -520,6 +520,19 @@ class BookTranslator:
                         paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
                         current_chapter['paragraphs'] = paragraphs
                         chapters.append(current_chapter)
+                        
+                        # Save individual chapter file if output directory exists
+                        if self.output_dir and os.path.exists(self.output_dir):
+                            try:
+                                # Create a safe filename from the chapter title
+                                safe_title = re.sub(r'[^\w\-_\. ]', '_', current_chapter['title'])
+                                filename = f"chapter_{len(chapters)-1:03d}_{safe_title}.md"
+                                filepath = os.path.join(self.output_dir, filename)
+                                # Write chapter content to file
+                                with open(filepath, 'w', encoding='utf-8') as f:
+                                    f.write(content_text)
+                            except Exception as e:
+                                print(f"Warning: Failed to save chapter {len(chapters)-1} as markdown: {e}")
                 # Extract header level and text
                 header_level = 0
                 header_text = line
@@ -546,6 +559,19 @@ class BookTranslator:
                 paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
                 current_chapter['paragraphs'] = paragraphs
                 chapters.append(current_chapter)
+                
+                # Save individual chapter file if output directory exists
+                if self.output_dir and os.path.exists(self.output_dir):
+                    try:
+                        # Create a safe filename from the chapter title
+                        safe_title = re.sub(r'[^\w\-_\. ]', '_', current_chapter['title'])
+                        filename = f"chapter_{len(chapters)-1:03d}_{safe_title}.md"
+                        filepath = os.path.join(self.output_dir, filename)
+                        # Write chapter content to file
+                        with open(filepath, 'w', encoding='utf-8') as f:
+                            f.write(content_text)
+                    except Exception as e:
+                        print(f"Warning: Failed to save chapter {len(chapters)-1} as markdown: {e}")
         # Return the chapters array
         return chapters
 
