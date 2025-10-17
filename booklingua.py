@@ -498,6 +498,7 @@ class BookTranslator:
         # Split content into paragraphs
         paragraphs = markdown_content.split('\n\n')
         # Create metadata chapter
+        # TODO Add book title , author and description to metadata as paragraps
         chapters = [{
             'id': 'metadata',
             'name': 'metadata',
@@ -516,7 +517,7 @@ class BookTranslator:
                     content_text = '\n\n'.join(current_content).strip()
                     if content_text:
                         # Split into paragraphs again
-                        current_chapter['paragraphs'] = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
+                        current_chapter['paragraphs'] = [p.strip() for p in content_text.split('\n\n') if p.strip()]
                         chapters.append(current_chapter)
                         # Save individual chapter file if output directory exists
                         if self.output_dir and os.path.exists(self.output_dir):
@@ -545,7 +546,7 @@ class BookTranslator:
                         'title': header_text,
                         'paragraphs': []
                     }
-                    current_content = []
+                    current_content = [paragraph,]
             # Add content to current chapter
             elif current_chapter is not None:
                 current_content.append(paragraph)
@@ -553,7 +554,7 @@ class BookTranslator:
         if current_chapter and current_content:
             content_text = '\n\n'.join(current_content).strip()
             if content_text:
-                current_chapter['paragraphs'] = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
+                current_chapter['paragraphs'] = [p.strip() for p in content_text.split('\n\n') if p.strip()]
                 chapters.append(current_chapter)
                 # Save individual chapter file if output directory exists
                 if self.output_dir and os.path.exists(self.output_dir):
