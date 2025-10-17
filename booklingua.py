@@ -288,10 +288,10 @@ class BookTranslator:
     
     def phase_extract(self, output_dir: str = "output",
                      source_lang: str = "English", target_lang: str = "Romanian", new_edition: bool = False) -> int:
-        """Import phase: Extract content from EPUB and save to database.
+        """Import phase: Extract content from book file and save to database.
         
         This method handles the extract/import phase of the translation workflow, which includes:
-        1. Reading the EPUB file
+        1. Reading the book file (EPUB or HTML)
         2. Extracting text content from all chapters
         3. Saving the content to the database for later translation
         
@@ -309,8 +309,14 @@ class BookTranslator:
         if output_dir:
             self.output_dir = output_dir
             os.makedirs(self.output_dir, exist_ok=True)
-        # Extract content from EPUB
-        chapters = self.extract_epub(source_lang, target_lang)
+        # Determine file type by extension and call appropriate extract method
+        _, file_extension = os.path.splitext(self.book_path)
+        if file_extension.lower() == '.epub':
+            chapters = self.extract_epub(source_lang, target_lang)
+        elif file_extension.lower() == '.html' or file_extension.lower() == '.htm':
+            chapters = self.extract_html(self.book_path, source_lang)
+        else:
+            raise ValueError(f"Unsupported file format: {file_extension}")
         # Save all content to database
         edition_number = self.book_insert_chapters(chapters, source_lang, target_lang, new_edition)
         # Return the edition number for reference
