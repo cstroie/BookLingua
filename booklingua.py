@@ -1080,7 +1080,6 @@ class BookTranslator:
         processed_element = self.html_process_inlines(element)
         text = processed_element.get_text(separator=' ', strip=True)
         text = text.replace('\n', '')
-        text = text.replace('---', '\n')
         # Replace '\s*---\s*' with newline
         text = re.sub(r'\s*---\s*', '\n', text)
         if not text:
