@@ -817,7 +817,7 @@ class BookTranslator:
             epub.EpubBook: A new EPUB book object with copied metadata
         """
         new_book = epub.EpubBook()
-        new_book.set_identifier(self.db_get_translations_book_id(source_lang, target_lang))
+        new_book.set_identifier(self.db_get_item(source_lang, target_lang, edition, 0, 0))
         original_title = "Unknown"
         translated_title, _, _, _ = self.translate_text(original_title, source_lang, target_lang, True)
         new_book.set_title(f"{translated_title}")
