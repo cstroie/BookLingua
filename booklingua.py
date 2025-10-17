@@ -480,28 +480,8 @@ class BookTranslator:
                     f.write(markdown_content)
             except Exception as e:
                 print(f"Warning: Failed to save complete markdown content: {e}")
-        # Extract author and title from filename
-        filename = os.path.splitext(os.path.basename(self.book_path))[0]
-        if ' - ' in filename:
-            author, title = filename.split(' - ', 1)
-        else:
-            author = "Unknown Author"
-            title = filename
-        # Create metadata chapter
-        metadata_chapter = {
-            'id': 'metadata',
-            'name': 'metadata',
-            'title': 'Metadata',
-            'paragraphs': [f"Title: {title}", f"Author: {author}"]
-        }
         # Parse markdown content to extract chapters
-        content_chapters = self.parse_markdown_content(markdown_content)
-        # Replace the default metadata chapter with our custom one
-        if content_chapters and content_chapters[0]['id'] == 'metadata':
-            content_chapters[0] = metadata_chapter
-        else:
-            content_chapters.insert(0, metadata_chapter)
-        chapters = content_chapters
+        chapters = self.parse_markdown_content(markdown_content)
         print(f"Extraction completed. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
@@ -515,43 +495,44 @@ class BookTranslator:
         Returns:
             List[dict]: A list of chapter dictionaries containing extracted content
         """
+        chapters = []
+        # Extract author and title from filename
+        filename = os.path.splitext(os.path.basename(self.book_path))[0]
+        if ' - ' in filename:
+            author, title = filename.split(' - ', 1)
+        else:
+            author = "Unknown Author"
+            title = filename
         # Split content into paragraphs
         paragraphs = markdown_content.split('\n\n')
         # Create metadata chapter
-        # TODO Add book title , author and description to metadata as paragraps
-        chapters = [{
-            'id': 'metadata',
-            'name': 'metadata',
-            'title': 'Metadata',
-            'paragraphs': ['Metadata']
-        }]
-        current_chapter = None
-        current_content = []
+        current_chapter = {
+            'id': f"chapter-{len(chapters):03d}",
+            'name': f"chapter-{len(chapters):03d}",
+            'title': f"{title}",
+            'paragraphs': [f"{title}", f"# {title}", f"{author}"]
+        }
         # Process each paragraph
         for paragraph in paragraphs:
             # Check for headers
             if paragraph.startswith('#'):
-                # If we have accumulated content, save it as a chapter
-                if current_chapter and current_content:
-                    # Clean up content
-                    content_text = '\n\n'.join(current_content).strip()
-                    if content_text:
-                        # Split into paragraphs again
-                        current_chapter['paragraphs'] = [p.strip() for p in content_text.split('\n\n') if p.strip()]
-                        chapters.append(current_chapter)
-                        # Save individual chapter file if output directory exists
-                        if self.output_dir and os.path.exists(self.output_dir):
-                            try:
-                                # Create a safe filename from the chapter title
-                                safe_title = re.sub(r'[^\w\-_\. ]', '_', current_chapter['title'])
-                                filename = f"chapter_{len(chapters)-1:03d}_{safe_title}.md"
-                                filepath = os.path.join(self.output_dir, filename)
-                                # Write chapter content to file
-                                with open(filepath, 'w', encoding='utf-8') as f:
-                                    f.write('\n\n'.join(current_chapter['paragraphs']))
-                            except Exception as e:
-                                print(f"Warning: Failed to save chapter {len(chapters)-1} as markdown: {e}")
-                # Extract header level and text
+                # New header, new chapter, save current chapter if exists
+                if current_chapter['paragraphs']:
+                    # Add current chapter to chapters list
+                    chapters.append(current_chapter)
+                    # Save individual chapter file if output directory exists
+                    if self.output_dir and os.path.exists(self.output_dir):
+                        try:
+                            # Create a safe filename from the chapter title
+                            safe_title = re.sub(r'[^\w\-_\. ]', '_', current_chapter['title'])
+                            filename = f"{len(chapters)-1:03d}. {safe_title}.md"
+                            filepath = os.path.join(self.output_dir, filename)
+                            # Write chapter content to file
+                            with open(filepath, 'w', encoding='utf-8') as f:
+                                f.write('\n\n'.join(current_chapter['paragraphs'][1:]))  # Skip title in file
+                        except Exception as e:
+                            print(f"Warning: Failed to save chapter {len(chapters)-1} as markdown: {e}")
+                # Extract header level and text of the starting chapter
                 header_level = 0
                 header_text = paragraph
                 while header_text.startswith('#') and header_level < 6:
@@ -561,33 +542,30 @@ class BookTranslator:
                 # Start new chapter (skip the first heading as it's the title)
                 if header_level > 0:
                     current_chapter = {
-                        'id': f"chapter-{len(chapters)}",
-                        'name': f"chapter-{len(chapters)}",
+                        'id': f"chapter-{len(chapters):03d}",
+                        'name': f"chapter-{len(chapters):03d}",
                         'title': header_text,
-                        'paragraphs': []
+                        'paragraphs': [header_text, paragraph]
                     }
-                    current_content = [paragraph,]
-            # Add content to current chapter
-            elif current_chapter is not None:
-                current_content.append(paragraph)
+            # Add the paragraph to current chapter (not a header) if not empty
+            elif paragraph.strip():
+                current_chapter['paragraphs'].append(paragraph)
         # Don't forget the last chapter
-        if current_chapter and current_content:
-            content_text = '\n\n'.join(current_content).strip()
-            if content_text:
-                current_chapter['paragraphs'] = [p.strip() for p in content_text.split('\n\n') if p.strip()]
-                chapters.append(current_chapter)
-                # Save individual chapter file if output directory exists
-                if self.output_dir and os.path.exists(self.output_dir):
-                    try:
-                        # Create a safe filename from the chapter title
-                        safe_title = re.sub(r'[^\w\-_\. ]', '_', current_chapter['title'])
-                        filename = f"chapter_{len(chapters)-1:03d}_{safe_title}.md"
-                        filepath = os.path.join(self.output_dir, filename)
-                        # Write chapter content to file
-                        with open(filepath, 'w', encoding='utf-8') as f:
-                            f.write('\n\n'.join(current_chapter['paragraphs']))
-                    except Exception as e:
-                        print(f"Warning: Failed to save chapter {len(chapters)-1} as markdown: {e}")
+        if current_chapter['paragraphs']:
+            # Add the last chapter to chapters list
+            chapters.append(current_chapter)
+            # Save individual chapter file if output directory exists
+            if self.output_dir and os.path.exists(self.output_dir):
+                try:
+                    # Create a safe filename from the chapter title
+                    safe_title = re.sub(r'[^\w\-_\. ]', '_', current_chapter['title'])
+                    filename = f"{len(chapters)-1:03d}. {safe_title}.md"
+                    filepath = os.path.join(self.output_dir, filename)
+                    # Write chapter content to file
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        f.write('\n\n'.join(current_chapter['paragraphs'][1:]))  # Skip title in file
+                except Exception as e:
+                    print(f"Warning: Failed to save chapter {len(chapters)-1} as markdown: {e}")
         # Return the chapters array
         return chapters
 
