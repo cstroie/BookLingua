@@ -303,7 +303,31 @@ class BookTranslator:
         print(f"{self.sep1}")
         print(f"Extracting content from {self.book_path}...")
         book = epub.read_epub(self.book_path, options={'ignore_ncx': False})
-        chapters = self.book_extract_content(book, source_lang)
+        # List to hold chapter data
+        chapters = []
+        # Check if book is valid
+        if not book:
+            print("Warning: No book provided to extract text from.")
+            return chapters
+        # Extract metadata as first virtual chapter
+        metadata_chapter = self.book_extract_metadata(book, source_lang)
+        if metadata_chapter:
+            chapters.append(metadata_chapter)
+        # Get the chapters order and titles from ToC
+        toc = self.book_get_toc(book)
+        if not toc:
+            return chapters
+        # Process each item
+        for toc_item in toc:
+            item = book.get_item_with_href(toc_item.href)
+            if not item:
+                continue
+            item.title = toc_item.title
+            chapter_data = self.book_process_toc(item, source_lang)
+            if chapter_data:
+                chapters.append(chapter_data)
+        # Save all content to database
+        edition_number = self.book_insert_chapters(chapters, source_lang, target_lang, new_edition)
         print(f"Extraction completed. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
@@ -332,11 +356,7 @@ class BookTranslator:
             self.output_dir = output_dir
             os.makedirs(self.output_dir, exist_ok=True)
         # Extract content from EPUB
-        chapters = self.extract_epub(source_lang)
-        # Save all content to database
-        edition_number = self.book_insert_chapters(chapters, source_lang, target_lang, new_edition)
-        print(f"Import completed. Saved {len(chapters)} chapters to database.")
-        print(f"{self.sep1}")
+        edition_number = self.extract_epub(source_lang)
         # Return the edition number for reference
         return edition_number
 
@@ -457,55 +477,6 @@ class BookTranslator:
         print(f"{self.sep1}")
         print("Build phase completed!")
         print(f"{self.sep1}")
-
-    def book_extract_content(self, book, source_lang) -> List[dict]:
-        """Extract text content from an already opened EPUB book object.
-        
-        This method processes an already opened EPUB book object, extracts all 
-        document items (HTML content), converts them to Markdown format, and 
-        structures the data for translation.
-        
-        Args:
-            book: An opened EPUB book object
-            source_lang (str): Source language code for saving chapters
-            
-        Returns:
-            List[dict]: A list of chapter dictionaries, each containing:
-                - id (str): Chapter identifier from EPUB
-                - name (str): Chapter name/filename
-                - title (str): Chapter title
-                - paragraphs (List[str]): Individual paragraphs extracted from content
-        """
-        # List to hold chapter data
-        chapters = []
-        # Check if book is valid
-        if not book:
-            print("Warning: No book provided to extract text from.")
-            return chapters
-            
-        # Extract metadata as first virtual chapter
-        metadata_chapter = self.book_extract_metadata(book, source_lang)
-        if metadata_chapter:
-            chapters.append(metadata_chapter)
-            
-        # Get the chapters order and titles from ToC
-        toc = self.book_get_toc(book)
-        if not toc:
-            return chapters
-            
-        # Process each item
-        for toc_item in toc:
-            item = book.get_item_with_href(toc_item.href)
-            if not item:
-                continue
-            item.title = toc_item.title
-            
-            chapter_data = self.book_process_toc(item, source_lang)
-            if chapter_data:
-                chapters.append(chapter_data)
-                
-        # Return the list of chapter data
-        return chapters
 
     def book_extract_metadata(self, book, source_lang: str) -> Optional[dict]:
         """Extract metadata from EPUB book and create metadata chapter.
