@@ -471,6 +471,15 @@ class BookTranslator:
             return []
         # Convert HTML to Markdown using existing method
         markdown_content = self.html_to_markdown(soup)
+        # Save the complete markdown file if output directory exists
+        if self.output_dir and os.path.exists(self.output_dir):
+            try:
+                filename = "complete_content.md"
+                filepath = os.path.join(self.output_dir, filename)
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(markdown_content)
+            except Exception as e:
+                print(f"Warning: Failed to save complete markdown content: {e}")
         # Parse markdown content to extract chapters
         chapters = self.parse_markdown_content(markdown_content)
         print(f"Extraction completed. Found {len(chapters)} chapters.")
@@ -486,15 +495,6 @@ class BookTranslator:
         Returns:
             List[dict]: A list of chapter dictionaries containing extracted content
         """
-        # Save the complete markdown file if output directory exists
-        if self.output_dir and os.path.exists(self.output_dir):
-            try:
-                filename = "complete_content.md"
-                filepath = os.path.join(self.output_dir, filename)
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(markdown_content)
-            except Exception as e:
-                print(f"Warning: Failed to save complete markdown content: {e}")
         # Split content into paragraphs
         paragraphs = markdown_content.split('\n\n')
         # Create metadata chapter
