@@ -1022,34 +1022,6 @@ class BookTranslator:
         except Exception as e:
             print(f"Warning: Failed to remove script/style elements: {e}")
 
-    def html_is_empty_after_children_removal(self, element) -> bool:
-        """Check if element is empty after removing content of all first level children.
-        
-        Args:
-            element: BeautifulSoup element to check
-            
-        Returns:
-            bool: True if element is empty after children content removal, False otherwise
-        """
-        # Create a copy of the element to avoid modifying the original
-        element_copy = BeautifulSoup(str(element), 'html.parser')
-        if not element_copy:
-            return True
-            
-        # Get the first (and typically only) element from the copy
-        copied_element = element_copy.find()
-        if not copied_element:
-            return True
-            
-        # Remove all first level children
-        for child in list(copied_element.children):
-            if child.name:  # It's a tag
-                child.decompose()
-                
-        # Check if remaining text content is empty after stripping
-        remaining_text = copied_element.get_text(strip=True)
-        return len(remaining_text) == 0
-
     def html_process_blocks(self, soup) -> List[str]:
         """Process block elements and convert them to markdown lines.
         
@@ -1067,18 +1039,19 @@ class BookTranslator:
             # Process block elements
             for element in soup.find_all(block_elements, recursive=True):
                 try:
-                    # Skip if parent is also a block element to avoid duplication
-                    if element.parent.name in block_elements:
-                        continue
-                    # Skip if element is empty after removing children content
-                    if self.html_is_empty_after_children_removal(element):
+                    if element.name == 'br':
+                        print(element.parent.name, element.parent.contents)
+                    # Check if the element has significant text
+                    has_text = False
+                    for child in list(element.children):
+                        # Check only the texts
+                        if not child.name and child.string.strip():
+                            has_text = True
+                            break
+                    # If no significant text, move along
+                    if not has_text:
                         continue
                     markdown_line = self.html_convert_element(element)
-
-                    print(element.name)
-                    print(markdown_line)
-                    print()
-
                     if markdown_line is not None:
                         markdown_lines.append(markdown_line)
                 except Exception as e:
@@ -1086,7 +1059,7 @@ class BookTranslator:
                     continue
         except Exception as e:
             print(f"Warning: Failed to find elements in soup: {e}")
-            
+        # Return the markdown document
         return markdown_lines
 
     def html_convert_element(self, element) -> Optional[str]:
@@ -1103,13 +1076,13 @@ class BookTranslator:
             return '---'
         elif element.name == 'br':
             return '***'
-            
         # Process inline tags within the element
         processed_element = self.html_process_inlines(element)
         text = processed_element.get_text(separator=' ', strip=True)
+        text = text.replace('\n', '')
+        text = text.replace('---', '\n')
         if not text:
             return None
-            
         # Add appropriate Markdown formatting
         if element.name and element.name.startswith('h'):
             return self.html_format_header(element.name, text)
@@ -1175,45 +1148,40 @@ class BookTranslator:
         """
         if not element:
             return BeautifulSoup("", 'html.parser')
-            
         element_copy = BeautifulSoup(str(element), 'html.parser')
         if not element_copy:
             return BeautifulSoup("", 'html.parser')
-
         # Inline tags to process
-        inline_tags = ['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span', 'img']
-        
+        inline_tags = ['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span', 'img', 'br']
         try:
             # Process each inline tag
             for tag in element_copy.find_all(inline_tags):
                 try:
-                    self.html_process_single_inline(tag)
+                    self.html_replace_inline_tag(tag)
                 except Exception as e:
                     print(f"Warning: Error processing tag: {e}")
                     continue
         except Exception as e:
             print(f"Warning: Failed to find inline tags: {e}")
-
         # Return the modified element
         return element_copy
 
-    def html_process_single_inline(self, tag):
+    def html_replace_inline_tag(self, tag):
         """Process a single inline tag and convert it to markdown.
         
         Args:
             tag: BeautifulSoup tag to process
         """
         text = tag.get_text()
-        if not text and tag.name != 'img':
+        if not text and not(tag.name in ['img', 'br']):
             return
-            
         # Replace with appropriate Markdown formatting
-        replacement = self.html_replace_inline(tag, text)
+        replacement = self.html_get_replacement(tag, text)
         if replacement is not None:
             # Replace the tag with formatted text
             tag.replace_with(replacement)
 
-    def html_replace_inline(self, tag, text: str) -> str:
+    def html_get_replacement(self, tag, text: str) -> str:
         """Get the markdown replacement for a tag.
         
         Args:
@@ -1236,13 +1204,15 @@ class BookTranslator:
         elif tag.name == 'code':
             return f'`{text}`'
         elif tag.name == 'img':
-            return self.html_process_img(tag)
+            return self.html_get_replacement_img(tag)
+        elif tag.name in ['br',] and tag.parent.name in ['p', 'div']:
+            return f'---'
         elif tag.name == 'span':
-            return self.html_process_span(tag, text)
+            return self.html_get_replacement_span(tag, text)
         else:  # other tags
             return text
 
-    def html_process_img(self, tag) -> str:
+    def html_get_replacement_img(self, tag) -> str:
         """Format image tag to markdown syntax.
         
         Args:
@@ -1258,7 +1228,7 @@ class BookTranslator:
         else:
             return ''
 
-    def html_process_span(self, tag, text: str) -> str:
+    def html_get_replacement_span(self, tag, text: str) -> str:
         """Format span tag based on CSS styling.
         
         Args:
@@ -1276,7 +1246,6 @@ class BookTranslator:
                 css_class = ' '.join(css_class).lower() if css_class else ''
             else:
                 css_class = str(css_class).lower() if css_class else ''
-                
             # Check for bold styling
             if ('font-weight' in style and 'bold' in style) \
                 or any(cls in css_class for cls in ['bold', 'strong']):
