@@ -286,6 +286,28 @@ class BookTranslator:
         if self.conn:
             self.conn.close()
     
+    def extract_epub(self, source_lang: str = "English") -> List[dict]:
+        """Extract content from EPUB file.
+        
+        This method handles the extraction of text content from an EPUB file,
+        converting HTML content to Markdown format and structuring the data
+        for translation.
+        
+        Args:
+            source_lang (str, optional): Source language name. Defaults to "English".
+            
+        Returns:
+            List[dict]: A list of chapter dictionaries containing extracted content
+        """
+        # Load book and extract text
+        print(f"{self.sep1}")
+        print(f"Extracting content from {self.book_path}...")
+        book = epub.read_epub(self.book_path, options={'ignore_ncx': False})
+        chapters = self.book_extract_content(book, source_lang)
+        print(f"Extraction completed. Found {len(chapters)} chapters.")
+        print(f"{self.sep1}")
+        return chapters
+
     def phase_extract(self, output_dir: str = "output",
                      source_lang: str = "English", target_lang: str = "Romanian", new_edition: bool = False) -> int:
         """Import phase: Extract content from EPUB and save to database.
@@ -309,11 +331,8 @@ class BookTranslator:
         if output_dir:
             self.output_dir = output_dir
             os.makedirs(self.output_dir, exist_ok=True)
-        # Load book and extract text
-        print(f"{self.sep1}")
-        print(f"Importing content from {self.book_path}...")
-        book = epub.read_epub(self.book_path, options={'ignore_ncx': False})
-        chapters = self.book_extract_content(book, source_lang)
+        # Extract content from EPUB
+        chapters = self.extract_epub(source_lang)
         # Save all content to database
         edition_number = self.book_insert_chapters(chapters, source_lang, target_lang, new_edition)
         print(f"Import completed. Saved {len(chapters)} chapters to database.")
