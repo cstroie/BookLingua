@@ -474,7 +474,7 @@ class BookTranslator:
         # Save the complete markdown file if output directory exists
         if self.output_dir and os.path.exists(self.output_dir):
             try:
-                filename = "complete_content.md"
+                filename = os.path.splitext(os.path.basename(html_path))[0] + ".md"
                 filepath = os.path.join(self.output_dir, filename)
                 with open(filepath, 'w', encoding='utf-8') as f:
                     f.write(markdown_content)
