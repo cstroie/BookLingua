@@ -440,7 +440,7 @@ class BookTranslator:
         print("Build phase completed!")
         print(f"{self.sep1}")
 
-    def extract_html(self, html_path: str, source_lang: str = "English") -> List[dict]:
+    def extract_html(self, html_path: str, source_lang: str = "English", target_lang: str = "Romanian") -> List[dict]:
         """Extract content from HTML file, identifying book title and chapter headings.
         
         This method processes an HTML file and extracts content organized by headings,
@@ -449,6 +449,7 @@ class BookTranslator:
         Args:
             html_path (str): Path to the HTML file to extract
             source_lang (str, optional): Source language name. Defaults to "English".
+            target_lang (str, optional): Target language name. Defaults to "Romanian".
             
         Returns:
             List[dict]: A list of chapter dictionaries containing extracted content
