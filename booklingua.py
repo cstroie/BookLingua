@@ -314,7 +314,7 @@ class BookTranslator:
         if file_extension.lower() == '.epub':
             chapters = self.extract_epub(source_lang, target_lang)
         elif file_extension.lower() == '.html' or file_extension.lower() == '.htm':
-            chapters = self.extract_html(self.book_path, source_lang)
+            chapters = self.extract_html(self.book_path, source_lang, target_lang)
         else:
             raise ValueError(f"Unsupported file format: {file_extension}")
         # Save all content to database
