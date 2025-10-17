@@ -434,6 +434,108 @@ class BookTranslator:
         print("Build phase completed!")
         print(f"{self.sep1}")
 
+    def extract_html(self, html_path: str, source_lang: str = "English") -> List[dict]:
+        """Extract content from HTML file, identifying book title and chapter headings.
+        
+        This method processes an HTML file and extracts content organized by headings,
+        treating the top-level heading as the book title and subsequent headings as chapters.
+        
+        Args:
+            html_path (str): Path to the HTML file to extract
+            source_lang (str, optional): Source language name. Defaults to "English".
+            
+        Returns:
+            List[dict]: A list of chapter dictionaries containing extracted content
+        """
+        print(f"{self.sep1}")
+        print(f"Extracting content from {html_path}...")
+        
+        # Read HTML file
+        try:
+            with open(html_path, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+        except Exception as e:
+            print(f"Error reading HTML file: {e}")
+            return []
+        
+        # Parse HTML with BeautifulSoup
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+        except Exception as e:
+            print(f"Error parsing HTML content: {e}")
+            return []
+        
+        # Remove script and style elements
+        self.html_remove_script_style(soup)
+        
+        # Find all headings (h1-h6)
+        headings = soup.find_all(re.compile(r'^h[1-6]$'))
+        
+        if not headings:
+            print("Warning: No headings found in HTML file.")
+            return []
+        
+        # Identify book title (first heading)
+        title_heading = headings[0]
+        book_title = title_heading.get_text().strip()
+        
+        # Create metadata chapter
+        chapters = [{
+            'id': 'metadata',
+            'name': 'metadata',
+            'title': 'Metadata',
+            'paragraphs': ['Metadata', book_title]
+        }]
+        
+        # Process chapters based on heading hierarchy
+        current_chapter = None
+        chapter_content = []
+        
+        # Process all elements in order
+        for element in soup.find_all():
+            # Skip script and style elements
+            if element.name in ['script', 'style']:
+                continue
+                
+            # Check if this is a heading
+            if element.name and re.match(r'^h[1-6]$', element.name):
+                # If we have accumulated content, save it as a chapter
+                if current_chapter and chapter_content:
+                    # Join paragraphs with double newlines
+                    content_text = '\n\n'.join(chapter_content).strip()
+                    if content_text:
+                        paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
+                        current_chapter['paragraphs'] = paragraphs
+                        chapters.append(current_chapter)
+                
+                # Start new chapter (skip the first heading as it's the title)
+                if element != title_heading:
+                    current_chapter = {
+                        'id': f"chapter_{len(chapters)}",
+                        'name': f"chapter_{len(chapters)}",
+                        'title': element.get_text().strip(),
+                        'paragraphs': []
+                    }
+                    chapter_content = []
+            # Add content to current chapter
+            elif current_chapter and element.name in ['p', 'div', 'span', 'li', 'blockquote']:
+                # Convert element to markdown
+                markdown_line = self.html_convert_element(element)
+                if markdown_line:
+                    chapter_content.append(markdown_line)
+        
+        # Don't forget the last chapter
+        if current_chapter and chapter_content:
+            content_text = '\n\n'.join(chapter_content).strip()
+            if content_text:
+                paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
+                current_chapter['paragraphs'] = paragraphs
+                chapters.append(current_chapter)
+        
+        print(f"Extraction completed. Found {len(chapters)} chapters.")
+        print(f"{self.sep1}")
+        return chapters
+
     def extract_epub(self, source_lang: str = "English", target_lang: str = "Romanian") -> List[dict]:
         """Extract content from EPUB file.
         
