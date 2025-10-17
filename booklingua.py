@@ -480,8 +480,28 @@ class BookTranslator:
                     f.write(markdown_content)
             except Exception as e:
                 print(f"Warning: Failed to save complete markdown content: {e}")
+        # Extract author and title from filename
+        filename = os.path.splitext(os.path.basename(self.book_path))[0]
+        if ' - ' in filename:
+            author, title = filename.split(' - ', 1)
+        else:
+            author = "Unknown Author"
+            title = filename
+        # Create metadata chapter
+        metadata_chapter = {
+            'id': 'metadata',
+            'name': 'metadata',
+            'title': 'Metadata',
+            'paragraphs': [f"Title: {title}", f"Author: {author}"]
+        }
         # Parse markdown content to extract chapters
-        chapters = self.parse_markdown_content(markdown_content)
+        content_chapters = self.parse_markdown_content(markdown_content)
+        # Replace the default metadata chapter with our custom one
+        if content_chapters and content_chapters[0]['id'] == 'metadata':
+            content_chapters[0] = metadata_chapter
+        else:
+            content_chapters.insert(0, metadata_chapter)
+        chapters = content_chapters
         print(f"Extraction completed. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
