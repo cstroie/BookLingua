@@ -507,8 +507,8 @@ class BookTranslator:
         paragraphs = markdown_content.split('\n\n')
         # Create metadata chapter
         current_chapter = {
-            'id': f"chapter-{len(chapters):03d}",
-            'name': f"chapter-{len(chapters):03d}",
+            'id': f"{len(chapters):03d}",
+            'name': f"{len(chapters):03d}. {title}",
             'title': f"{title}",
             'paragraphs': [f"{title}", f"# {title}", f"{author}"]
         }
@@ -521,17 +521,7 @@ class BookTranslator:
                     # Add current chapter to chapters list
                     chapters.append(current_chapter)
                     # Save individual chapter file if output directory exists
-                    if self.output_dir and os.path.exists(self.output_dir):
-                        try:
-                            # Create a safe filename from the chapter title
-                            safe_title = re.sub(r'[^\w\-_\. ]', '_', current_chapter['title'])
-                            filename = f"{len(chapters)-1:03d}. {safe_title}.md"
-                            filepath = os.path.join(self.output_dir, filename)
-                            # Write chapter content to file
-                            with open(filepath, 'w', encoding='utf-8') as f:
-                                f.write('\n\n'.join(current_chapter['paragraphs'][1:]))  # Skip title in file
-                        except Exception as e:
-                            print(f"Warning: Failed to save chapter {len(chapters)-1} as markdown: {e}")
+                    self.save_chapter_as_markdown(current_chapter, source_lang="")
                 # Extract header level and text of the starting chapter
                 header_level = 0
                 header_text = paragraph
@@ -542,8 +532,8 @@ class BookTranslator:
                 # Start new chapter (skip the first heading as it's the title)
                 if header_level > 0:
                     current_chapter = {
-                        'id': f"chapter-{len(chapters):03d}",
-                        'name': f"chapter-{len(chapters):03d}",
+                        'id': f"{len(chapters):03d}",
+                        'name': f"{len(chapters):03d}. {title}",
                         'title': header_text,
                         'paragraphs': [header_text, paragraph]
                     }
@@ -555,17 +545,7 @@ class BookTranslator:
             # Add the last chapter to chapters list
             chapters.append(current_chapter)
             # Save individual chapter file if output directory exists
-            if self.output_dir and os.path.exists(self.output_dir):
-                try:
-                    # Create a safe filename from the chapter title
-                    safe_title = re.sub(r'[^\w\-_\. ]', '_', current_chapter['title'])
-                    filename = f"{len(chapters)-1:03d}. {safe_title}.md"
-                    filepath = os.path.join(self.output_dir, filename)
-                    # Write chapter content to file
-                    with open(filepath, 'w', encoding='utf-8') as f:
-                        f.write('\n\n'.join(current_chapter['paragraphs'][1:]))  # Skip title in file
-                except Exception as e:
-                    print(f"Warning: Failed to save chapter {len(chapters)-1} as markdown: {e}")
+            self.save_chapter_as_markdown(current_chapter, source_lang="")
         # Return the chapters array
         return chapters
 
@@ -729,15 +709,6 @@ class BookTranslator:
             except Exception as e:
                 print(f"Warning: Failed to convert HTML to Markdown for item {item.get_id()}: {e}")
                 markdown_content = ""
-            # Save the complete markdown file if output directory exists
-            if self.output_dir and os.path.exists(self.output_dir):
-                try:
-                    filename = os.path.splitext(os.path.basename(self.book_path))[0] + ".md"
-                    filepath = os.path.join(self.output_dir, filename)
-                    with open(filepath, 'w', encoding='utf-8') as f:
-                        f.write(markdown_content)
-                except Exception as e:
-                    print(f"Warning: Failed to save complete markdown content: {e}")
             # Extract paragraphs from Markdown
             try:
                 paragraphs = [p.strip() for p in markdown_content.split('\n\n') if p.strip()]
@@ -745,7 +716,8 @@ class BookTranslator:
                 print(f"Warning: Failed to extract paragraphs from item {item.get_id()}: {e}")
                 paragraphs = []
             # Only include non-empty chapters
-            if markdown_content.strip():
+            if paragraphs:
+                # Build chapter data dictionary
                 chapter_data = {
                     'id': item.get_id(),
                     'name': item.get_name(),
@@ -753,7 +725,7 @@ class BookTranslator:
                     'paragraphs': [item.title] + paragraphs
                 }
                 # Save chapter as markdown if output directory exists
-                self.save_chapter_as_markdown(item, markdown_content, source_lang)
+                self.save_chapter_as_markdown(chapter_data, source_lang)
                 return chapter_data
         except Exception as e:
             print(f"Warning: Error processing item: {e}")
@@ -977,12 +949,11 @@ class BookTranslator:
             except Exception as e:
                 print(f"Warning: Failed to save metadata as markdown: {e}")
 
-    def save_chapter_as_markdown(self, item, markdown_content: str, source_lang: str):
+    def save_chapter_as_markdown(self, chapter_data: dict, source_lang: str):
         """Save chapter content as markdown file.
         
         Args:
-            item: EPUB item containing chapter data
-            markdown_content (str): Markdown content to save
+            chapter_data (dict): Dictionary containing chapter data
             source_lang (str): Source language code for directory naming
         """
         if self.output_dir and os.path.exists(self.output_dir):
@@ -991,14 +962,14 @@ class BookTranslator:
                 source_lang_dir = os.path.join(self.output_dir, source_lang)
                 os.makedirs(source_lang_dir, exist_ok=True)
                 # Create a safe filename from the chapter name
-                safe_name = re.sub(r'[^\w\-_\. ]', '_', os.path.splitext(item.get_name())[0])
+                safe_name = re.sub(r'[^\w\-_\. ]', '_', os.path.splitext(chapter_data['name'])[0])
                 filename = f"{safe_name}.md"
                 filepath = os.path.join(source_lang_dir, filename)
                 # Write markdown content to file
                 with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(markdown_content)
+                    f.write("\n\n".join(chapter_data['paragraphs'][1:]))  # Skip title in file
             except Exception as e:
-                print(f"Warning: Failed to save chapter {item.get_id()} as markdown: {e}")
+                print(f"Warning: Failed to save chapter {chapter_data['name']} as markdown: {e}")
 
     def html_to_markdown(self, soup) -> str:
         """Convert HTML BeautifulSoup object to Markdown format.
