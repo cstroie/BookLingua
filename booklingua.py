@@ -1043,8 +1043,8 @@ class BookTranslator:
                     # Check if the element has significant text
                     has_text = False
                     for child in list(element.children):
-                        # Check only the texts
-                        if not child.name and child.string.strip():
+                        # Check the text has content or the child is not a block element
+                        if (not child.name and child.string.strip()) or (child.name not in block_elements):
                             has_text = True
                             break
                     # If no significant text, move along
