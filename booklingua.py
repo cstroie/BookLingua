@@ -495,7 +495,6 @@ class BookTranslator:
                     f.write(markdown_content)
             except Exception as e:
                 print(f"Warning: Failed to save complete markdown content: {e}")
-        
         # Split content into paragraphs
         paragraphs = markdown_content.split('\n\n')
         # Create metadata chapter
@@ -516,11 +515,9 @@ class BookTranslator:
                     # Clean up content
                     content_text = '\n\n'.join(current_content).strip()
                     if content_text:
-                        # Split into paragraphs
-                        chapter_paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
-                        current_chapter['paragraphs'] = chapter_paragraphs
+                        # Split into paragraphs again
+                        current_chapter['paragraphs'] = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
                         chapters.append(current_chapter)
-                        
                         # Save individual chapter file if output directory exists
                         if self.output_dir and os.path.exists(self.output_dir):
                             try:
@@ -530,7 +527,7 @@ class BookTranslator:
                                 filepath = os.path.join(self.output_dir, filename)
                                 # Write chapter content to file
                                 with open(filepath, 'w', encoding='utf-8') as f:
-                                    f.write(content_text)
+                                    f.write('\n\n'.join(current_chapter['paragraphs']))
                             except Exception as e:
                                 print(f"Warning: Failed to save chapter {len(chapters)-1} as markdown: {e}")
                 # Extract header level and text
@@ -556,10 +553,8 @@ class BookTranslator:
         if current_chapter and current_content:
             content_text = '\n\n'.join(current_content).strip()
             if content_text:
-                chapter_paragraphs = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
-                current_chapter['paragraphs'] = chapter_paragraphs
+                current_chapter['paragraphs'] = [current_chapter['title']] + [p.strip() for p in content_text.split('\n\n') if p.strip()]
                 chapters.append(current_chapter)
-                
                 # Save individual chapter file if output directory exists
                 if self.output_dir and os.path.exists(self.output_dir):
                     try:
@@ -569,7 +564,7 @@ class BookTranslator:
                         filepath = os.path.join(self.output_dir, filename)
                         # Write chapter content to file
                         with open(filepath, 'w', encoding='utf-8') as f:
-                            f.write(content_text)
+                            f.write('\n\n'.join(current_chapter['paragraphs']))
                     except Exception as e:
                         print(f"Warning: Failed to save chapter {len(chapters)-1} as markdown: {e}")
         # Return the chapters array
