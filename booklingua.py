@@ -401,8 +401,6 @@ class BookTranslator:
         # Load book and extract text
         print(f"{self.sep1}")
         print(f"Building translated EPUB from {source_lang} to {target_lang}")
-        # Load original book for template
-        book = epub.read_epub(self.book_path, options={'ignore_ncx': False})
         # Get chapter list
         chapter_list = self.db_get_chapters_list(source_lang, target_lang, edition_number, False)
         # If specific chapters requested, filter the list
@@ -416,7 +414,7 @@ class BookTranslator:
             print(f"Error: {e}")
             return
         # Prepare output book
-        translated_book = self.ebook_create_template(book, source_lang, target_lang)
+        translated_book = self.epub_create_template(source_lang, target_lang)
         translated_chapters = []
         for chapter_number in chapter_list:
             # Only include chapters that are fully translated
@@ -597,7 +595,15 @@ class BookTranslator:
 
     def extract_epub_metadata(self, book, source_lang: str) -> Optional[dict]:
         """Extract metadata from EPUB book and create metadata chapter.
-        
+
+        The metadata has the following structure:
+        0. Book ID
+        1. Title
+        2. Author(s)
+        3. Publisher
+        4. Date
+        5-. Description
+
         Args:
             book: An opened EPUB book object
             source_lang (str): Source language code for saving metadata
@@ -607,16 +613,41 @@ class BookTranslator:
         """
         try:
             metadata_parts = []
+            # Extract book ID
+            book_id_metadata = book.get_metadata('DC', 'identifier')
+            if book_id_metadata:
+                book_id = book_id_metadata[0][0]
+            else:
+                book_id = "Unknown"
+            metadata_parts.append(f"Book ID: {book_id}")
             # Extract title
             title_metadata = book.get_metadata('DC', 'title')
             if title_metadata:
                 title = title_metadata[0][0]
-                metadata_parts.append(f"{title}")
+            else:
+                title = "Unknown"
+            metadata_parts.append(f"Title: {title}")
             # Extract authors
             authors = book.get_metadata('DC', 'creator')
             if authors:
                 author_names = [author[0] for author in authors]
-                metadata_parts.append(', '.join(author_names))
+            else:
+                author_names = ["Unknown"]
+            metadata_parts.append(f"Author: {', '.join(author_names)}")
+            # Extract publisher
+            publishers = book.get_metadata('DC', 'publisher')
+            if publishers:
+                publisher = publishers[0][0]
+            else:
+                publisher = "Unknown"
+            metadata_parts.append(f"Publisher: {publisher}")
+            # Extract date
+            dates = book.get_metadata('DC', 'date')
+            if dates:
+                date = dates[0][0]
+            else:
+                date = "Unknown"
+            metadata_parts.append(f"Date: {date}")
             # Extract description
             descriptions = book.get_metadata('DC', 'description')
             if descriptions:
@@ -628,17 +659,12 @@ class BookTranslator:
                         description = self.html_to_markdown(desc_soup)
                     except Exception as e:
                         print(f"Warning: Failed to convert HTML description to Markdown: {e}")
-                metadata_parts.extend(description.split('\n\n'))
-            # Extract publisher
-            publishers = book.get_metadata('DC', 'publisher')
-            if publishers:
-                publisher = publishers[0][0]
-                metadata_parts.append(publisher)
-            # Extract date
-            dates = book.get_metadata('DC', 'date')
-            if dates:
-                date = dates[0][0]
-                metadata_parts.append(f"{date}")
+                else:
+                    description = description.strip()
+            else:
+                description = "Unknown"
+            metadata_parts.append(f"Description: {description}")
+            metadata_parts.extend(description.split('\n\n'))
             # Combine all metadata parts
             if metadata_parts:
                 # Save metadata as markdown if output directory exists
@@ -648,7 +674,7 @@ class BookTranslator:
                     'id': 'metadata',
                     'name': 'metadata',
                     'title': 'Metadata',
-                    'paragraphs': ['Metadata'] + metadata_parts
+                    'paragraphs': metadata_parts
                 }
         except Exception as e:
             print(f"Warning: Error processing metadata: {e}")
@@ -775,7 +801,7 @@ class BookTranslator:
         
         return edition_number
 
-    def ebook_create_template(self, original_book, source_lang: str, target_lang: str) -> epub.EpubBook:
+    def epub_create_template(self, source_lang: str, target_lang: str) -> epub.EpubBook:
         """Create a new EPUB book template with metadata copied from original book.
         
         This method creates a new EPUB book object and copies essential metadata
@@ -791,8 +817,8 @@ class BookTranslator:
             epub.EpubBook: A new EPUB book object with copied metadata
         """
         new_book = epub.EpubBook()
-        new_book.set_identifier(original_book.get_metadata('DC', 'identifier')[0][0])
-        original_title = original_book.get_metadata('DC', 'title')[0][0]
+        new_book.set_identifier(self.db_get_translations_book_id(source_lang, target_lang))
+        original_title = "Unknown"
         translated_title, _, _, _ = self.translate_text(original_title, source_lang, target_lang, True)
         new_book.set_title(f"{translated_title}")
         # Set language using helper function
@@ -830,7 +856,7 @@ class BookTranslator:
         # Return the title page chapter
         return titlepage
 
-    def ebook_create_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
+    def epub_create_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> epub.EpubHtml:
         """Create an EPUB chapter from translated texts in the database.
         
         This function retrieves all translated paragraphs for a chapter from the database,
@@ -884,7 +910,7 @@ class BookTranslator:
         # Return the reconstructed chapter
         return translated_chapter
     
-    def ebook_finalize(self, book, chapters):
+    def epub_finalize(self, book, chapters):
         """Add navigation elements and finalize EPUB book structure.
         
         This method completes the EPUB book by adding essential navigation components
@@ -1033,7 +1059,7 @@ class BookTranslator:
             List[str]: List of markdown formatted lines
         """
         # Block elements to process
-        block_elements = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'blockquote', 'br', 'hr']
+        block_elements = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'th', 'td', 'title', 'blockquote', 'br', 'hr']
         # Initialize list to hold markdown lines
         markdown_lines = []
         try:
@@ -1044,7 +1070,7 @@ class BookTranslator:
                     has_text = False
                     for child in list(element.children):
                         # Check the text has content or the child is not a block element
-                        if (not child.name and child.string.strip()) or (child.name not in block_elements):
+                        if (not child.name and child.string.strip()): # or (child.name not in block_elements):
                             has_text = True
                             break
                     # If no significant text, move along
@@ -1078,7 +1104,8 @@ class BookTranslator:
         # Process inline tags within the element
         processed_element = self.html_process_inlines(element)
         text = processed_element.get_text(separator=' ', strip=True)
-        text = text.replace('\n', '')
+        # Replace newlines with spaces
+        text = text.replace('\n', ' ')
         # Replace '\s*---\s*' with newline
         text = re.sub(r'\s*---\s*', '\n', text)
         if not text:
