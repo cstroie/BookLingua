@@ -1645,7 +1645,7 @@ class BookTranslator:
             '''
             
             # Execute the query and get results
-            result = self.db_execute_query(query, fetch_mode='all')
+            results = self.db_execute_query(query, fetch_mode='all')
             
             with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
                 writer = csv.writer(csvfile)
@@ -1657,7 +1657,7 @@ class BookTranslator:
                     'duration', 'fluency', 'model', 'created'
                 ])
                 # Write data
-                writer.writerows(result)
+                writer.writerows(results)
             
             print(f"Database exported to {csv_path}")
         except Exception as e:
