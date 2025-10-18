@@ -322,8 +322,8 @@ class BookTranslator:
         # Return the edition number for reference
         return edition_number
 
-    def _filter_chapters(self, source_lang: str, target_lang: str, chapter_numbers: str = None, 
-                        by_length: bool = False) -> tuple:
+    def filter_chapters(self, source_lang: str, target_lang: str, chapter_numbers: str = None, 
+                       by_length: bool = False) -> tuple:
         """Filter and process chapter list based on user input.
         
         Args:
@@ -378,7 +378,7 @@ class BookTranslator:
         print(f"Translating from {source_lang} to {target_lang}")
         
         # Get filtered chapter list
-        edition_number, chapter_list = self._filter_chapters(source_lang, target_lang, chapter_numbers, True)
+        edition_number, chapter_list = self.filter_chapters(source_lang, target_lang, chapter_numbers, True)
         
         if edition_number == 0:
             print("No content found in database. Please run extract phase first.")
@@ -431,7 +431,7 @@ class BookTranslator:
         print(f"Building translated EPUB from {source_lang} to {target_lang}")
         
         # Get filtered chapter list
-        edition_number, chapter_list = self._filter_chapters(source_lang, target_lang, chapter_numbers, False)
+        edition_number, chapter_list = self.filter_chapters(source_lang, target_lang, chapter_numbers, False)
         
         if edition_number == 0:
             print("No translations found in database. Please run translation phase first.")
