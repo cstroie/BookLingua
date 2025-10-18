@@ -283,6 +283,27 @@ class BookTranslator:
         if self.conn:
             self.conn.close()
     
+    def _handle_error(self, e, context="", default_return=None, raise_on_error=False):
+        """Unified error handling wrapper.
+        
+        Args:
+            e (Exception): The exception that occurred
+            context (str): Context information about where the error occurred
+            default_return: Default value to return on error
+            raise_on_error (bool): Whether to re-raise the exception
+            
+        Returns:
+            The default_return value or re-raises the exception
+        """
+        if self.verbose:
+            error_msg = f"Error{f' in {context}' if context else ''}: {e}"
+            print(error_msg)
+        
+        if raise_on_error:
+            raise e
+            
+        return default_return
+    
     def phase_extract(self, output_dir: str = "output",
                      source_lang: str = "English", target_lang: str = "Romanian", new_edition: bool = False) -> int:
         """Import phase: Extract content from book file and save to database.
@@ -1547,7 +1568,7 @@ class BookTranslator:
             ''')
             self.conn.commit()
         except Exception as e:
-            print(f"Warning: Could not initialize database: {e}")
+            self._handle_error(e, "database initialization", None)
             self.conn = None
     
     def db_export_csv(self, csv_path: str):
@@ -1586,8 +1607,7 @@ class BookTranslator:
             
             print(f"Database exported to {csv_path}")
         except Exception as e:
-            print(f"Failed to export database to CSV: {e}")
-            raise
+            self._handle_error(e, "CSV export", None, raise_on_error=True)
 
     def db_import_csv(self, csv_path: str):
         """Import translations from CSV format into the database.
@@ -1632,14 +1652,13 @@ class BookTranslator:
                         ))
                         imported_count += 1
                     except Exception as e:
-                        print(f"Warning: Failed to import row: {e}")
+                        self._handle_error(e, "CSV row import")
                         continue
             
             self.conn.commit()
             print(f"Imported {imported_count} translations from {csv_path}")
         except Exception as e:
-            print(f"Failed to import database from CSV: {e}")
-            raise
+            self._handle_error(e, "CSV import", None, raise_on_error=True)
     
     def db_get_translation(self, source: str, source_lang: str, target_lang: str) -> tuple:
         """Retrieve the best translation from the database if it exists.
@@ -1674,9 +1693,7 @@ class BookTranslator:
                 return (result[0], result[1], result[2], result[3])  # (target, duration, fluency, model)
             return (None,) * 4
         except Exception as e:
-            if self.verbose:
-                print(f"Database lookup failed: {e}")
-            raise
+            return self._handle_error(e, "database translation lookup", (None,) * 4, raise_on_error=True)
 
     def db_search(self, search_string: str, source_lang: str = None, target_lang: str = None) -> List[tuple]:
         """Search for translations containing specific words in the source text.
@@ -1722,9 +1739,7 @@ class BookTranslator:
             cursor.execute(query, params)
             return cursor.fetchall()
         except Exception as e:
-            if self.verbose:
-                print(f"Database search failed: {e}")
-            raise
+            return self._handle_error(e, "database search", [], raise_on_error=True)
 
     def db_get_translations(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> List[str]:
         """Get all translated texts in a chapter from the database.
@@ -1760,9 +1775,7 @@ class BookTranslator:
             # Return list of translated texts
             return [result[0] for result in results if result[0] is not None] if results else []
         except Exception as e:
-            if self.verbose:
-                print(f"Database lookup for chapter texts failed: {e}")
-            raise
+            return self._handle_error(e, "database chapter translations lookup", [], raise_on_error=True)
 
     def db_get_latest_edition(self, source_lang: str, target_lang: str) -> int:
         """Get the latest edition number from the database.
@@ -1791,9 +1804,7 @@ class BookTranslator:
             # Return the latest edition number or 0 if none found
             return result[0] if result and result[0] is not None else 0
         except Exception as e:
-            if self.verbose:
-                print(f"Database lookup for latest edition failed: {e}")
-            raise
+            return self._handle_error(e, "database latest edition lookup", 0, raise_on_error=True)
 
     def db_get_chapters_list(self, source_lang: str, target_lang: str, edition_number: int, by_length: bool = False) -> List[int]:
         """Retrieve all chapter numbers from the database, ordered ascending.
@@ -1836,9 +1847,7 @@ class BookTranslator:
             # Return list of chapter numbers
             return [result[0] for result in results if result[0] is not None] if results else []
         except Exception as e:
-            if self.verbose:
-                print(f"Database lookup for chapters failed: {e}")
-            raise
+            return self._handle_error(e, "database chapters list lookup", [], raise_on_error=True)
 
     def db_get_item(self, source_lang: str, target_lang: str, edition_number: int, chapter_number: int, paragraph_number: int) -> str:
         """Get a specific source and target text for a given edition, chapter, and paragraph.
@@ -1879,9 +1888,7 @@ class BookTranslator:
                 return target
             return None
         except Exception as e:
-            if self.verbose:
-                print(f"Database lookup for specific item failed: {e}")
-            raise
+            return self._handle_error(e, "database item lookup", None, raise_on_error=True)
 
     def db_get_next_paragraph(self, source_lang: str, target_lang: str, edition_number: int, chapter_number: int, paragraph_number: int) -> tuple:
         """Get the next paragraph in a chapter after the specified paragraph number.
@@ -1916,9 +1923,7 @@ class BookTranslator:
             # Return the result or None if not found
             return result if result else (None, None, None)
         except Exception as e:
-            if self.verbose:
-                print(f"Database lookup for next paragraph failed: {e}")
-            raise
+            return self._handle_error(e, "database next paragraph lookup", (None, None, None), raise_on_error=True)
 
     def db_count_total(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count total paragraphs in a chapter for a given edition.
@@ -1948,9 +1953,7 @@ class BookTranslator:
             result = cursor.fetchone()
             return result[0] if result else 0
         except Exception as e:
-            if self.verbose:
-                print(f"Database count for chapter paragraphs failed: {e}")
-            raise
+            return self._handle_error(e, "database total count", 0, raise_on_error=True)
 
     def db_count_untranslated(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count the number of untranslated paragraphs in a chapter.
@@ -1983,9 +1986,7 @@ class BookTranslator:
             # Return the count of untranslated paragraphs
             return empty_paragraphs
         except Exception as e:
-            if self.verbose:
-                print(f"Database check for untranslated paragraphs failed: {e}")
-            raise
+            return self._handle_error(e, "database untranslated count", 0, raise_on_error=True)
 
     def db_chapter_stats(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> tuple:
         """Get chapter translation statistics for a given edition.
@@ -2035,9 +2036,7 @@ class BookTranslator:
                 # No data found, return default values
                 return (0.0, 0.0, 0.0)
         except Exception as e:
-            if self.verbose:
-                print(f"Database chapter stats query failed: {e}")
-            raise
+            return self._handle_error(e, "database chapter stats", (0.0, 0.0, 0.0), raise_on_error=True)
     
     def db_insert_translation(self, text: str, translation: str, source_lang: str, target_lang: str, 
                               edition_number: int = None, chapter_number: int = None, paragraph_number: int = None, 
@@ -2082,9 +2081,7 @@ class BookTranslator:
             
             self.conn.commit()
         except Exception as e:
-            if self.verbose:
-                print(f"Database save failed: {e}")
-            raise
+            self._handle_error(e, "database translation insert", None, raise_on_error=True)
 
     def db_cleanup_empty(self, source_lang: str, target_lang: str):
         """Delete all entries with empty translations for this language pair.
@@ -2105,8 +2102,7 @@ class BookTranslator:
             if self.verbose:
                 print(f"Deleted {len(deleted_rows)} existing entries with empty translations")
         except Exception as e:
-            if self.verbose:
-                print(f"Warning: Failed to delete empty translations: {e}")
+            self._handle_error(e, "database cleanup empty translations")
 
     def db_insert_all_chapters(self, chapters: List[dict], source_lang: str, target_lang: str, edition_number: int):
         """Save all chapters content to the database.
@@ -2139,9 +2135,7 @@ class BookTranslator:
             self.conn.commit()
             print(f"... with {total_paragraphs} paragraphs from all chapters.")
         except Exception as e:
-            if self.verbose:
-                print(f"Failed to save chapters to database: {e}")
-            raise
+            self._handle_error(e, "database insert all chapters", None, raise_on_error=True)
 
     def translate_paragraph(self, text: str, source_lang: str, target_lang: str) -> tuple:
         """Process a paragraph text and determine its translation data.
