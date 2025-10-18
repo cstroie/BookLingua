@@ -3296,13 +3296,12 @@ def get_ai_provider_config(args):
         model = model or "openai/gpt-4o"
         if not api_key:
             api_key = os.environ.get('OPENROUTER_API_KEY')
-    
     # Set defaults if still not specified
     if not base_url:
         base_url = "http://localhost:11434/v1"
     if not model:
         model = "gemma3n:e4b"
-        
+    # Return the configuration
     return api_key, base_url, model
 
 def main():
