@@ -1635,14 +1635,14 @@ class BookTranslator:
             raise Exception("Database connection not available")
         
         try:
-            cursor = self.conn.cursor()
-            cursor.execute('''
+            # Use db_execute_query to get the data
+            data = self.db_execute_query('''
                 SELECT id, edition, chapter, paragraph, 
                        source_lang, source, target_lang, target, 
                        duration, fluency, model, created 
                 FROM translations
                 ORDER BY source_lang, target_lang, edition, chapter, paragraph
-            ''')
+            ''', fetch_mode='all')
             
             with open(csv_path, 'w', newline='', encoding='utf-8') as csvfile:
                 writer = csv.writer(csvfile)
@@ -1654,7 +1654,7 @@ class BookTranslator:
                     'duration', 'fluency', 'model', 'created'
                 ])
                 # Write data
-                writer.writerows(cursor.fetchall())
+                writer.writerows(data)
             
             print(f"Database exported to {csv_path}")
         except Exception as e:
