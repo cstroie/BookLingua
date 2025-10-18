@@ -322,39 +322,6 @@ class BookTranslator:
         # Return the edition number for reference
         return edition_number
 
-    def filter_chapters(self, source_lang: str, target_lang: str, chapter_numbers: str = None, 
-                       by_length: bool = False) -> tuple:
-        """Filter and process chapter list based on user input.
-        
-        Args:
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-            chapter_numbers (str, optional): Comma-separated list of chapter numbers or ranges
-            by_length (bool): Whether to sort by paragraph count (True) or chapter number (False)
-            
-        Returns:
-            tuple: (edition_number, chapter_list) or (0, []) if no chapters found
-        """
-        # Get the latest edition number
-        edition_number = self.db_get_latest_edition(source_lang, target_lang)
-        if edition_number == 0:
-            return 0, []
-        
-        # Get chapter list
-        chapter_list = self.db_get_chapters_list(source_lang, target_lang, edition_number, by_length)
-        
-        # If specific chapters requested, filter the list
-        if chapter_numbers is not None:
-            try:
-                chapter_list = self.parse_chapter_numbers(chapter_numbers, chapter_list)
-                if chapter_numbers is not None and not chapter_list:
-                    return edition_number, []  # No valid chapters to process
-            except ValueError as e:
-                print(f"Error: {e}")
-                return edition_number, []
-        
-        return edition_number, chapter_list
-
     def phase_translate(self, source_lang: str = "English", target_lang: str = "Romanian",
                        chapter_numbers: str = None):
         """Translate phase: Translate content from database using AI.
@@ -3028,6 +2995,39 @@ Return only a single integer number between 0 and 100."""
         report['overall_score'] = int(avg_fluency * 0.4 + avg_adequacy * 0.4 + report['consistency_score'] * 0.2)
         
         return report
+
+    def filter_chapters(self, source_lang: str, target_lang: str, chapter_numbers: str = None, 
+                       by_length: bool = False) -> tuple:
+        """Filter and process chapter list based on user input.
+        
+        Args:
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            chapter_numbers (str, optional): Comma-separated list of chapter numbers or ranges
+            by_length (bool): Whether to sort by paragraph count (True) or chapter number (False)
+            
+        Returns:
+            tuple: (edition_number, chapter_list) or (0, []) if no chapters found
+        """
+        # Get the latest edition number
+        edition_number = self.db_get_latest_edition(source_lang, target_lang)
+        if edition_number == 0:
+            return 0, []
+        
+        # Get chapter list
+        chapter_list = self.db_get_chapters_list(source_lang, target_lang, edition_number, by_length)
+        
+        # If specific chapters requested, filter the list
+        if chapter_numbers is not None:
+            try:
+                chapter_list = self.parse_chapter_numbers(chapter_numbers, chapter_list)
+                if chapter_numbers is not None and not chapter_list:
+                    return edition_number, []  # No valid chapters to process
+            except ValueError as e:
+                print(f"Error: {e}")
+                return edition_number, []
+        
+        return edition_number, chapter_list
 
     def set_console_width(self, width: int):
         """Set the console width for side-by-side display.
