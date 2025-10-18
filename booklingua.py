@@ -867,7 +867,10 @@ class BookTranslator:
         """
         # Get the title
         title = self.db_get_item(source_lang, target_lang, edition_number, 0, 1)
-        if ':' in title:
+        # Handle None title with fallback
+        if title is None:
+            title = "Untitled"
+        elif ':' in title:
             title = title.split(':', 1)[1].strip()
         # Create simple XHTML content with title
         xhtml = f'<article id="titlepage">\n<title>{title}</title>\n</article>'
