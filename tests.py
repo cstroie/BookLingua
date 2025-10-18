@@ -717,18 +717,18 @@ class TestBookTranslator(unittest.TestCase):
         result = self.translator.html_get_replacement(tag, "text")
         self.assertEqual(result, "text")  # Should return text as-is
 
-    def test_html_process_span_with_css_class(self):
+    def test_html_get_replacement_span_with_css_class(self):
         """Test processing span tags with CSS classes."""
         # Test span with bold class
         html = '<span class="bold">text</span>'
         tag = BeautifulSoup(html, 'html.parser').span
-        result = self.translator.html_process_span(tag, "text")
+        result = self.translator.html_get_replacement_span(tag, "text")
         self.assertEqual(result, "**text**")
         
         # Test span with italic class
         html = '<span class="italic">text</span>'
         tag = BeautifulSoup(html, 'html.parser').span
-        result = self.translator.html_process_span(tag, "text")
+        result = self.translator.html_get_replacement_span(tag, "text")
         self.assertEqual(result, "*text*")
 
     def test_markdown_to_html_headers(self):
