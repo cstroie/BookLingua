@@ -259,9 +259,6 @@ class BookTranslator:
 
         # Console
         self.console_width = 80
-        self.sep1 = '=' * self.console_width
-        self.sep2 = '-' * self.console_width
-        self.sep3 = '~' * self.console_width
         # Auto-detect console width if possible
         self.set_console_width(shutil.get_terminal_size().columns)
         
