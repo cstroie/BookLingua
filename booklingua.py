@@ -1549,7 +1549,7 @@ class BookTranslator:
             return
         try:
             self.conn = sqlite3.connect(self.db_path)
-            self.conn.execute('''
+            self.db_execute_query('''
                 CREATE TABLE IF NOT EXISTS translations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     edition INTEGER DEFAULT -1,
@@ -1565,8 +1565,7 @@ class BookTranslator:
                     created TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(source_lang, target_lang, edition, chapter, paragraph)
                 )
-            ''')
-            self.conn.commit()
+            ''', fetch_mode='none')
         except Exception as e:
             self.handle_error(e, "database initialization", None)
             self.conn = None
