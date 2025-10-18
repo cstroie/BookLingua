@@ -710,11 +710,11 @@ class TestBookTranslator(unittest.TestCase):
         self.translator.html_process_single_inline(tag)
         # Should not raise an exception
 
-    def test_html_replace_inline(self):
-        """Test replacing inline tags."""
+    def test_html_get_replacement(self):
+        """Test getting replacement for inline tags."""
         # Test with unknown tag
         tag = BeautifulSoup('<unknown>text</unknown>', 'html.parser').unknown
-        result = self.translator.html_replace_inline(tag, "text")
+        result = self.translator.html_get_replacement(tag, "text")
         self.assertEqual(result, "text")  # Should return text as-is
 
     def test_html_process_span_with_css_class(self):
