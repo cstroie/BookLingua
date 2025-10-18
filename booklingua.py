@@ -2096,14 +2096,13 @@ class BookTranslator:
                         target, duration, fluency, model = translation_data
                         
                         # Insert with translation if not already there
-                        cursor = self.conn.cursor()
-                        cursor.execute('''
+                        query = '''
                             INSERT OR IGNORE INTO translations 
                             (edition, chapter, paragraph, source_lang, source, target_lang, target, duration, fluency, model)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (edition_number, ch, par, source_lang, text, target_lang, target, duration, fluency, model))
+                        '''
+                        self.db_execute_query(query, (edition_number, ch, par, source_lang, text, target_lang, target, duration, fluency, model), fetch_mode='none')
                         total_paragraphs += 1
-            self.conn.commit()
             print(f"... with {total_paragraphs} paragraphs from all chapters.")
         except Exception as e:
             self.handle_error(e, "database insert all chapters", None, raise_on_error=True)
