@@ -1676,21 +1676,23 @@ class BookTranslator:
             raise Exception("Database connection not available")
         
         try:
-            cursor = self.conn.cursor()
-            
             with open(csv_path, 'r', encoding='utf-8') as csvfile:
                 reader = csv.DictReader(csvfile)
                 imported_count = 0
                 
                 for row in reader:
                     try:
-                        cursor.execute('''
+                        # Create the query string
+                        query = '''
                             INSERT OR REPLACE INTO translations 
                             (id, edition, chapter, paragraph,
                              source_lang, source, target_lang, target,
                              duration, fluency, model, created)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        ''', (
+                        '''
+                        
+                        # Execute the query with parameters
+                        params = (
                             int(row['id']) if row['id'] else None,
                             int(row['edition']) if row['edition'] else -1,
                             int(row['chapter']) if row['chapter'] else -1,
@@ -1703,13 +1705,14 @@ class BookTranslator:
                             int(row['fluency']) if row['fluency'] else 1,
                             row['model'],
                             row['created'] if row['created'] else None
-                        ))
+                        )
+                        
+                        self.db_execute_query(query, params, fetch_mode='none')
                         imported_count += 1
                     except Exception as e:
                         self.handle_error(e, "CSV row import")
                         continue
             
-            self.conn.commit()
             print(f"Imported {imported_count} translations from {csv_path}")
         except Exception as e:
             self.handle_error(e, "CSV import", None, raise_on_error=True)
