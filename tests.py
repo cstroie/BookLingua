@@ -703,11 +703,11 @@ class TestBookTranslator(unittest.TestCase):
         self.assertEqual(source, "Second")
         self.assertEqual(target, "Deuxième")
 
-    def test_html_process_single_inline(self):
+    def test_html_replace_inline_tag(self):
         """Test processing single inline tags."""
         # Test with empty tag
         tag = BeautifulSoup("", 'html.parser')
-        self.translator.html_process_single_inline(tag)
+        self.translator.html_replace_inline_tag(tag)
         # Should not raise an exception
 
     def test_html_get_replacement(self):
