@@ -148,14 +148,14 @@ class TestBookTranslator(unittest.TestCase):
         self.assertEqual(self.translator.context[0], ("Hello", "Bonjour"))
 
     @patch('ebooklib.epub.read_epub')
-    def test_book_extract_metadata(self, mock_read_epub):
+    def test_extract_epub_metadata(self, mock_read_epub):
         """Test metadata extraction from EPUB."""
         # Create a mock book with metadata
         mock_book = Mock()
         mock_book.get_metadata.return_value = [[('Test Title', {})], [('Test Author', {})]]
         
-        # Test the translator's book_extract_metadata method
-        result = self.translator.book_extract_metadata(mock_book, "English")
+        # Test the translator's extract_epub_metadata method
+        result = self.translator.extract_epub_metadata(mock_book, "English")
         if result:  # Only check if metadata was extracted
             self.assertEqual(result['id'], 'metadata')
             self.assertIn('Test Title', result['paragraphs'])
@@ -478,19 +478,26 @@ class TestBookTranslator(unittest.TestCase):
         self.assertIn('overall_score', report)
         self.assertIsInstance(report['overall_score'], int)
 
-    def test_book_create_template(self):
+    def test_epub_create_template(self):
         """Test EPUB template creation."""
-        # Create a mock original book
-        original_book = MagicMock()
-        original_book.get_metadata.return_value = [('test-id', {})], [('Test Title', {})], [('Test Author', {})]
+        # Add some test data first
+        self.translator.db_insert_translation(
+            "Book ID: test-id", "Book ID: test-id", "English", "French", 1, 0, 0, 1000, 95, "test-model"
+        )
+        self.translator.db_insert_translation(
+            "Title: Test Title", "Title: Test Title", "English", "French", 1, 0, 1, 1000, 95, "test-model"
+        )
+        self.translator.db_insert_translation(
+            "Author: Test Author", "Author: Test Author", "English", "French", 1, 0, 2, 1000, 95, "test-model"
+        )
         
         with patch.object(self.translator, 'translate_text', return_value=("Test Title", -1, -1, "test-model")):
-            new_book = self.translator.book_create_template(original_book, "English", "French")
+            new_book = self.translator.epub_create_template(1, "English", "French")
             
         self.assertIsNotNone(new_book)
         self.assertEqual(new_book.language, "fr")
 
-    def test_book_create_chapter(self):
+    def test_epub_create_chapter(self):
         """Test EPUB chapter creation."""
         # Add some test translations
         self.translator.db_insert_translation(
@@ -500,11 +507,11 @@ class TestBookTranslator(unittest.TestCase):
             "Hello world", "Bonjour le monde", "English", "French", 1, 1, 1, 1000, 95, "test-model"
         )
         
-        chapter = self.translator.book_create_chapter(1, 1, "English", "French")
+        chapter = self.translator.epub_create_chapter(1, 1, "English", "French")
         self.assertIsNotNone(chapter)
         self.assertIn("Titre du Chapitre", chapter.title)
 
-    def test_book_finalize(self):
+    def test_epub_finalize(self):
         """Test EPUB finalization."""
         # Create a mock book
         book = MagicMock()
@@ -516,9 +523,9 @@ class TestBookTranslator(unittest.TestCase):
         
         # This should not raise an exception
         try:
-            self.translator.book_finalize(book, chapters)
+            self.translator.epub_finalize(book, 1, chapters, "English", "French")
         except Exception as e:
-            self.fail(f"book_finalize raised an exception: {e}")
+            self.fail(f"epub_finalize raised an exception: {e}")
 
     def test_remove_xml_tags_edge_cases(self):
         """Test edge cases for XML tag removal."""
