@@ -304,58 +304,6 @@ class BookTranslator:
             
         return default_return
     
-    def _db_execute_query(self, query: str, params: tuple = (), fetch_mode: str = 'all') -> Optional[list]:
-        """Execute a database query and return results.
-        
-        Args:
-            query (str): SQL query to execute
-            params (tuple): Query parameters
-            fetch_mode (str): 'all', 'one', or 'none' for fetchall(), fetchone(), or no fetch
-            
-        Returns:
-            Query results based on fetch_mode, or None on error
-        """
-        if not self.conn:
-            raise Exception("Database connection not available")
-            
-        try:
-            cursor = self.conn.cursor()
-            cursor.execute(query, params)
-            
-            if fetch_mode == 'all':
-                return cursor.fetchall()
-            elif fetch_mode == 'one':
-                return cursor.fetchone()
-            elif fetch_mode == 'none':
-                self.conn.commit()
-                return cursor.rowcount
-        except Exception as e:
-            return self.handle_error(e, "database query execution", None, raise_on_error=True)
-    
-    def _db_execute_with_retry(self, query: str, params: tuple = (), max_retries: int = 3) -> Optional[int]:
-        """Execute a database query with retry logic.
-        
-        Args:
-            query (str): SQL query to execute
-            params (tuple): Query parameters
-            max_retries (int): Maximum number of retry attempts
-            
-        Returns:
-            Number of affected rows or None on error
-        """
-        for attempt in range(max_retries):
-            try:
-                cursor = self.conn.cursor()
-                cursor.execute(query, params)
-                self.conn.commit()
-                return cursor.rowcount
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    time.sleep(0.1 * (2 ** attempt))  # Exponential backoff
-                    continue
-                return self.handle_error(e, "database query with retry", None, raise_on_error=True)
-        return None
-    
     def phase_extract(self, output_dir: str = "output",
                      source_lang: str = "English", target_lang: str = "Romanian", new_edition: bool = False) -> int:
         """Import phase: Extract content from book file and save to database.
@@ -1623,6 +1571,58 @@ class BookTranslator:
             self.handle_error(e, "database initialization", None)
             self.conn = None
     
+    def db_execute_query(self, query: str, params: tuple = (), fetch_mode: str = 'all') -> Optional[list]:
+        """Execute a database query and return results.
+        
+        Args:
+            query (str): SQL query to execute
+            params (tuple): Query parameters
+            fetch_mode (str): 'all', 'one', or 'none' for fetchall(), fetchone(), or no fetch
+            
+        Returns:
+            Query results based on fetch_mode, or None on error
+        """
+        if not self.conn:
+            raise Exception("Database connection not available")
+            
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(query, params)
+            
+            if fetch_mode == 'all':
+                return cursor.fetchall()
+            elif fetch_mode == 'one':
+                return cursor.fetchone()
+            elif fetch_mode == 'none':
+                self.conn.commit()
+                return cursor.rowcount
+        except Exception as e:
+            return self.handle_error(e, "database query execution", None, raise_on_error=True)
+    
+    def db_execute_query_retry(self, query: str, params: tuple = (), max_retries: int = 3) -> Optional[int]:
+        """Execute a database query with retry logic.
+        
+        Args:
+            query (str): SQL query to execute
+            params (tuple): Query parameters
+            max_retries (int): Maximum number of retry attempts
+            
+        Returns:
+            Number of affected rows or None on error
+        """
+        for attempt in range(max_retries):
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute(query, params)
+                self.conn.commit()
+                return cursor.rowcount
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    time.sleep(0.1 * (2 ** attempt))  # Exponential backoff
+                    continue
+                return self.handle_error(e, "database query with retry", None, raise_on_error=True)
+        return None
+
     def db_export_csv(self, csv_path: str):
         """Export the database to CSV format.
         
@@ -1735,7 +1735,7 @@ class BookTranslator:
             WHERE source_lang = ? AND target_lang = ? AND source = ? AND target != ''
             ORDER BY fluency DESC
         '''
-        result = self._db_execute_query(query, (source_lang, target_lang, source), 'one')
+        result = self.db_execute_query(query, (source_lang, target_lang, source), 'one')
         if result:
             return (result[0], result[1], result[2], result[3])  # (target, duration, fluency, model)
         return (None,) * 4
@@ -1778,7 +1778,7 @@ class BookTranslator:
         # Order by fluency descending
         query += " ORDER BY fluency DESC LIMIT 3"
         
-        return self._db_execute_query(query, tuple(params), 'all') or []
+        return self.db_execute_query(query, tuple(params), 'all') or []
 
     def db_get_translations(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> List[str]:
         """Get all translated texts in a chapter from the database.
@@ -1804,7 +1804,7 @@ class BookTranslator:
                   AND source_lang = ? AND target_lang = ?
             ORDER BY paragraph ASC
         '''
-        results = self._db_execute_query(query, (edition_number, chapter_number, source_lang, target_lang), 'all')
+        results = self.db_execute_query(query, (edition_number, chapter_number, source_lang, target_lang), 'all')
         # Return list of translated texts
         return [result[0] for result in results if result[0] is not None] if results else []
 
@@ -1825,7 +1825,7 @@ class BookTranslator:
             SELECT MAX(edition) FROM translations 
             WHERE source_lang = ? AND target_lang = ?
         '''
-        result = self._db_execute_query(query, (source_lang, target_lang), 'one')
+        result = self.db_execute_query(query, (source_lang, target_lang), 'one')
         # Return the latest edition number or 0 if none found
         return result[0] if result and result[0] is not None else 0
 
@@ -1861,7 +1861,7 @@ class BookTranslator:
             GROUP BY chapter
             ORDER BY {order}
         '''
-        results = self._db_execute_query(query, (source_lang, target_lang, edition_number), 'all')
+        results = self.db_execute_query(query, (source_lang, target_lang, edition_number), 'all')
         # Return list of chapter numbers
         return [result[0] for result in results if result[0] is not None] if results else []
 
@@ -1888,7 +1888,7 @@ class BookTranslator:
             WHERE edition = ? AND chapter = ? AND paragraph = ?
             AND source_lang = ? AND target_lang = ?
         '''
-        result = self._db_execute_query(query, (edition_number, chapter_number, paragraph_number, source_lang, target_lang), 'one')
+        result = self.db_execute_query(query, (edition_number, chapter_number, paragraph_number, source_lang, target_lang), 'one')
         # Return the result, source if not translated, or None if not found
         if result:
             source, target = result
@@ -1921,7 +1921,7 @@ class BookTranslator:
             AND source_lang = ? AND target_lang = ? 
             ORDER BY paragraph ASC LIMIT 1
         '''
-        result = self._db_execute_query(query, (edition_number, chapter_number, paragraph_number, source_lang, target_lang), 'one')
+        result = self.db_execute_query(query, (edition_number, chapter_number, paragraph_number, source_lang, target_lang), 'one')
         # Return the result or None if not found
         return result if result else (None, None, None)
 
@@ -1944,7 +1944,7 @@ class BookTranslator:
             SELECT COUNT(*) FROM translations 
             WHERE edition = ? AND chapter = ? AND source_lang = ? AND target_lang = ?
         '''
-        result = self._db_execute_query(query, (edition_number, chapter_number, source_lang, target_lang), 'one')
+        result = self.db_execute_query(query, (edition_number, chapter_number, source_lang, target_lang), 'one')
         return result[0] if result else 0
 
     def db_count_untranslated(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> int:
@@ -1967,7 +1967,7 @@ class BookTranslator:
             WHERE edition = ? AND chapter = ? AND source_lang = ? AND target_lang = ? 
             AND (target IS NULL OR target = '')
         '''
-        empty_result = self._db_execute_query(query, (edition_number, chapter_number, source_lang, target_lang), 'one')
+        empty_result = self.db_execute_query(query, (edition_number, chapter_number, source_lang, target_lang), 'one')
         empty_paragraphs = empty_result[0] if empty_result else 0
         # Return the count of untranslated paragraphs
         return empty_paragraphs
@@ -2000,7 +2000,7 @@ class BookTranslator:
             AND target IS NOT NULL AND target != ''
             AND duration IS NOT NULL AND duration > 0
         '''
-        result = self._db_execute_query(query, (edition_number, chapter_number, source_lang, target_lang), 'one')
+        result = self.db_execute_query(query, (edition_number, chapter_number, source_lang, target_lang), 'one')
         # Calculate
         if result:
             avg_time = result[0] if result[0] else 0.0
@@ -2045,7 +2045,7 @@ class BookTranslator:
         '''
         update_params = (translation, model, duration, fluency, source_lang, target_lang, edition_number, chapter_number, paragraph_number)
         
-        rowcount = self._db_execute_with_retry(update_query, update_params)
+        rowcount = self.db_execute_query_retry(update_query, update_params)
         
         # If no rows were updated, insert a new record
         if rowcount == 0:
@@ -2055,7 +2055,7 @@ class BookTranslator:
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             '''
             insert_params = (source_lang, target_lang, text, translation, self.model, edition_number, chapter_number, paragraph_number, duration, fluency)
-            self._db_execute_with_retry(insert_query, insert_params)
+            self.db_execute_query_retry(insert_query, insert_params)
 
     def db_cleanup_empty(self, source_lang: str, target_lang: str):
         """Delete all entries with empty translations for this language pair.
@@ -2070,7 +2070,7 @@ class BookTranslator:
             RETURNING id
         '''
         try:
-            deleted_rows = self._db_execute_query(query, (source_lang, target_lang), 'all')
+            deleted_rows = self.db_execute_query(query, (source_lang, target_lang), 'all')
             if self.verbose:
                 print(f"Deleted {len(deleted_rows)} existing entries with empty translations")
         except Exception as e:
