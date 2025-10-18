@@ -322,6 +322,39 @@ class BookTranslator:
         # Return the edition number for reference
         return edition_number
 
+    def _filter_chapters(self, source_lang: str, target_lang: str, chapter_numbers: str = None, 
+                        by_length: bool = False) -> tuple:
+        """Filter and process chapter list based on user input.
+        
+        Args:
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            chapter_numbers (str, optional): Comma-separated list of chapter numbers or ranges
+            by_length (bool): Whether to sort by paragraph count (True) or chapter number (False)
+            
+        Returns:
+            tuple: (edition_number, chapter_list) or (0, []) if no chapters found
+        """
+        # Get the latest edition number
+        edition_number = self.db_get_latest_edition(source_lang, target_lang)
+        if edition_number == 0:
+            return 0, []
+        
+        # Get chapter list
+        chapter_list = self.db_get_chapters_list(source_lang, target_lang, edition_number, by_length)
+        
+        # If specific chapters requested, filter the list
+        if chapter_numbers is not None:
+            try:
+                chapter_list = self.parse_chapter_numbers(chapter_numbers, chapter_list)
+                if chapter_numbers is not None and not chapter_list:
+                    return edition_number, []  # No valid chapters to process
+            except ValueError as e:
+                print(f"Error: {e}")
+                return edition_number, []
+        
+        return edition_number, chapter_list
+
     def phase_translate(self, source_lang: str = "English", target_lang: str = "Romanian",
                        chapter_numbers: str = None):
         """Translate phase: Translate content from database using AI.
@@ -340,25 +373,24 @@ class BookTranslator:
         # We need the database connection
         if not self.conn:
             raise Exception("Database connection not available")
-        # Get the latest edition number, always translate the latest edition
-        edition_number = self.db_get_latest_edition(source_lang, target_lang)
+        
+        print(f"{self.sep1}")
+        print(f"Translating from {source_lang} to {target_lang}")
+        
+        # Get filtered chapter list
+        edition_number, chapter_list = self._filter_chapters(source_lang, target_lang, chapter_numbers, True)
+        
         if edition_number == 0:
             print("No content found in database. Please run extract phase first.")
             return
-        print(f"{self.sep1}")
-        print(f"Translating edition {edition_number} from {source_lang} to {target_lang}")
-        # Get chapter list first, ordered by number of paragraphs
-        chapter_list = self.db_get_chapters_list(source_lang, target_lang, edition_number, True)
-        # If specific chapters requested, filter the list
-        try:
-            chapter_list = self.parse_chapter_numbers(chapter_numbers, chapter_list)
-            if chapter_numbers is not None and chapter_list:
-                print(f"Translating chapters: {', '.join(map(str, chapter_list))}")
-            elif chapter_numbers is not None and not chapter_list:
-                return  # No valid chapters to translate
-        except ValueError as e:
-            print(f"Error: {e}")
+            
+        if not chapter_list:
+            print("No chapters found to translate.")
             return
+        
+        if chapter_numbers is not None:
+            print(f"Translating chapters: {', '.join(map(str, chapter_list))}")
+        
         # Process each chapter
         for chapter_num in chapter_list:
             self.translate_chapter(edition_number, chapter_num, source_lang, target_lang, len(chapter_list))
@@ -393,26 +425,25 @@ class BookTranslator:
         # We need the database connection           
         if not self.conn:
             raise Exception("Database connection not available")
-        # Get the latest edition number. We always build the latest edition
-        edition_number = self.db_get_latest_edition(source_lang, target_lang)
-        if edition_number == 0:
-            print("No translations found in database. Please run translation phase first.")
-            return
+        
         # Load book and extract text
         print(f"{self.sep1}")
         print(f"Building translated EPUB from {source_lang} to {target_lang}")
-        # Get chapter list
-        chapter_list = self.db_get_chapters_list(source_lang, target_lang, edition_number, False)
-        # If specific chapters requested, filter the list
-        try:
-            chapter_list = self.parse_chapter_numbers(chapter_numbers, chapter_list)
-            if chapter_numbers is not None and chapter_list:
-                print(f"Building chapters: {', '.join(map(str, chapter_list))}")
-            elif chapter_numbers is not None and not chapter_list:
-                return  # No valid chapters to build
-        except ValueError as e:
-            print(f"Error: {e}")
+        
+        # Get filtered chapter list
+        edition_number, chapter_list = self._filter_chapters(source_lang, target_lang, chapter_numbers, False)
+        
+        if edition_number == 0:
+            print("No translations found in database. Please run translation phase first.")
             return
+            
+        if not chapter_list:
+            print("No chapters found to build.")
+            return
+        
+        if chapter_numbers is not None:
+            print(f"Building chapters: {', '.join(map(str, chapter_list))}")
+        
         # Prepare output book
         translated_book = self.epub_create_template(edition_number, source_lang, target_lang)
         translated_chapters = []
