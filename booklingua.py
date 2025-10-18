@@ -3253,6 +3253,58 @@ Return only a single integer number between 0 and 100."""
         except ValueError:
             raise ValueError("Chapter numbers must be comma-separated integers or ranges (e.g., '1,3,5' or '3-7')")
 
+def get_ai_provider_config(args):
+    """Get AI provider configuration based on command line arguments.
+    
+    Args:
+        args: Parsed command line arguments
+        
+    Returns:
+        tuple: (api_key, base_url, model)
+    """
+    api_key = args.api_key
+    base_url = args.base_url
+    model = args.model
+    
+    # Handle preset configurations
+    if args.openai:
+        base_url = base_url or "https://api.openai.com/v1"
+        model = model or "gpt-4o"
+    elif args.ollama:
+        base_url = base_url or "http://localhost:11434/v1"
+        model = model or "gemma3n:e4b"
+    elif args.mistral:
+        base_url = base_url or "https://api.mistral.ai/v1"
+        model = model or "mistral-large-latest"
+        if not api_key:
+            api_key = os.environ.get('MISTRAL_API_KEY')
+    elif args.deepseek:
+        base_url = base_url or "https://api.deepseek.com/v1"
+        model = model or "deepseek-chat"
+        if not api_key:
+            api_key = os.environ.get('DEEPSEEK_API_KEY')
+    elif args.lmstudio:
+        base_url = base_url or "http://localhost:1234/v1"
+        model = model or "qwen2.5-72b"
+    elif args.together:
+        base_url = base_url or "https://api.together.xyz/v1"
+        model = model or "openai/gpt-oss-20b"
+        if not api_key:
+            api_key = os.environ.get('TOGETHER_API_KEY')
+    elif args.openrouter:
+        base_url = base_url or "https://openrouter.ai/api/v1"
+        model = model or "openai/gpt-4o"
+        if not api_key:
+            api_key = os.environ.get('OPENROUTER_API_KEY')
+    
+    # Set defaults if still not specified
+    if not base_url:
+        base_url = "http://localhost:11434/v1"
+    if not model:
+        model = "gemma3n:e4b"
+        
+    return api_key, base_url, model
+
 def main():
     """Command-line interface for BookLingua EPUB translation tool.
     
@@ -3381,45 +3433,9 @@ def main():
     parser.add_argument("--openrouter", action="store_true", help="Use OpenRouter AI API")
     # Parse arguments
     args = parser.parse_args()
-    # Determine API configuration
-    api_key = args.api_key
-    base_url = args.base_url
-    model = args.model
-    # Handle preset configurations
-    if args.openai:
-        base_url = base_url or "https://api.openai.com/v1"
-        model = model or "gpt-4o"
-    elif args.ollama:
-        base_url = base_url or "http://localhost:11434/v1"
-        model = model or "gemma3n:e4b"
-    elif args.mistral:
-        base_url = base_url or "https://api.mistral.ai/v1"
-        model = model or "mistral-large-latest"
-        if not api_key:
-            api_key = os.environ.get('MISTRAL_API_KEY')
-    elif args.deepseek:
-        base_url = base_url or "https://api.deepseek.com/v1"
-        model = model or "deepseek-chat"
-        if not api_key:
-            api_key = os.environ.get('DEEPSEEK_API_KEY')
-    elif args.lmstudio:
-        base_url = base_url or "http://localhost:1234/v1"
-        model = model or "qwen2.5-72b"
-    elif args.together:
-        base_url = base_url or "https://api.together.xyz/v1"
-        model = model or "openai/gpt-oss-20b"
-        if not api_key:
-            api_key = os.environ.get('TOGETHER_API_KEY')
-    elif args.openrouter:
-        base_url = base_url or "https://openrouter.ai/api/v1"
-        model = model or "openai/gpt-4o"
-        if not api_key:
-            api_key = os.environ.get('OPENROUTER_API_KEY')
-    # Set defaults if still not specified
-    if not base_url:
-        base_url =  "http://localhost:11434/v1"
-    if not model:
-        model = "gemma3n:e4b"
+    
+    # Get AI provider configuration
+    api_key, base_url, model = get_ai_provider_config(args)
     # Set default output directory to filename without extension if not specified
     output_dir = args.output
     if output_dir is None:
