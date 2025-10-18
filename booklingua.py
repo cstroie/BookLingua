@@ -2180,8 +2180,8 @@ class BookTranslator:
         if not stripped_text.strip():
             return text, 0, 100, 'copy'
             
-        # No cached translation, call the API with retry logic
-        translation_result = self.translate_with_retry(stripped_text, source_lang, target_lang)
+        # No cached translation, call the API with retry logic and context bleeding detection
+        translation_result = self.translate_with_bleeding_detection(stripped_text, source_lang, target_lang)
         
         if not translation_result:
             return ""
@@ -2219,8 +2219,8 @@ class BookTranslator:
                 print(f"Cache check failed: {e}")
         return None
 
-    def translate_with_retry(self, stripped_text: str, source_lang: str, target_lang: str) -> tuple:
-        """Translate text with retry logic.
+    def translate_with_bleeding_detection(self, stripped_text: str, source_lang: str, target_lang: str) -> tuple:
+        """Translate text with context bleeding detection and retry logic.
         
         Args:
             stripped_text (str): Text to translate (without markdown)
@@ -2234,8 +2234,34 @@ class BookTranslator:
         for attempt in range(max_retries):
             try:
                 translation = self.translate_api_call(stripped_text, source_lang, target_lang)
+                
+                # Check for context bleeding on longer texts
+                if self.detect_context_bleeding(stripped_text, translation):
+                    if attempt < max_retries - 1:  # Don't retry on the last attempt
+                        print(f"Context bleeding detected (attempt {attempt + 1}/{max_retries}), retrying with reduced context...")
+                        # Temporarily reduce context for retry
+                        original_context = self.context.copy()
+                        self.context = self.context[-2:] if len(self.context) > 2 else []
+                        continue
+                    else:
+                        print("Warning: Context bleeding detected in final translation attempt")
+                
+                # Restore full context if it was reduced
+                if hasattr(self, '_temp_context_reduced') and self._temp_context_reduced:
+                    if hasattr(self, '_original_context'):
+                        self.context = self._original_context
+                    delattr(self, '_temp_context_reduced')
+                    delattr(self, '_original_context')
+                
                 return translation, self.model
             except Exception as e:
+                # Restore context if it was reduced
+                if hasattr(self, '_temp_context_reduced') and self._temp_context_reduced:
+                    if hasattr(self, '_original_context'):
+                        self.context = self._original_context
+                    delattr(self, '_temp_context_reduced')
+                    delattr(self, '_original_context')
+                
                 if attempt < max_retries - 1:  # Don't sleep on the last attempt
                     wait_time = 2 ** (attempt + 1)  # 2, 4, 8, 16, 32 seconds
                     print(f"API call failed (attempt {attempt + 1}/{max_retries}): {e}")
@@ -2791,6 +2817,14 @@ class BookTranslator:
             source (str): The original text
             target (str): The translated text
         """
+        # Don't add very short examples that might cause confusion
+        if len(source.split()) < 5 or len(target.split()) < 3:
+            return
+        
+        # Don't add if source/target are too similar (might be meta-text)
+        if self.text_similarity(source, target) > 0.9:
+            return
+            
         if clean:
             # Strip markdown formatting from both source and target before adding to context
             clean_source, _, _ = self.strip_markdown_formatting(source)
@@ -2894,6 +2928,55 @@ Return only a single integer number between 0 and 100."""
         
         consistency = 1.0 - (inconsistencies / total_terms) if total_terms > 0 else 1.0
         return max(0, min(100, int(consistency * 100)))
+
+    def detect_context_bleeding(self, source: str, translation: str) -> bool:
+        """Detect if translation shows signs of context bleeding.
+        
+        Args:
+            source (str): Original source text
+            translation (str): Translated text
+            
+        Returns:
+            bool: True if context bleeding is detected
+        """
+        source_words = len(source.split())
+        translation_words = len(translation.split())
+        
+        # If source is long but translation is very short, likely context bleeding
+        if source_words > 50 and translation_words < source_words * 0.3:
+            return True
+            
+        # Check if translation closely matches context examples
+        # but source is very different from context sources
+        for context_source, context_translation in self.context:
+            # If translation is very similar to a context translation
+            # but source is very different from context source
+            if self.text_similarity(translation, context_translation) > 0.8 and \
+               self.text_similarity(source, context_source) < 0.3:
+                return True
+                
+        return False
+
+    def text_similarity(self, text1: str, text2: str) -> float:
+        """Calculate simple similarity between two texts based on common words.
+        
+        Args:
+            text1 (str): First text
+            text2 (str): Second text
+            
+        Returns:
+            float: Similarity score between 0 and 1
+        """
+        if not text1 or not text2:
+            return 0.0
+            
+        words1 = set(text1.lower().split())
+        words2 = set(text2.lower().split())
+        
+        if not words1 or not words2:
+            return 0.0
+            
+        return len(words1 & words2) / len(words1 | words2)
 
     def detect_translation_errors(self, original: str, translated: str, source_lang: str) -> Dict[str, int]:
         """Detect common translation errors.
