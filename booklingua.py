@@ -2699,17 +2699,18 @@ class BookTranslator:
         # Try to prefill from database with prioritized search
         if self.conn:
             try:
-                cursor = self.conn.cursor()
                 needed_count = max(DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context), 0)
                 # Priority 1: Try to get existing translations
                 if needed_count > 0:
-                    cursor.execute('''
+                    # Create the query string
+                    query = '''
                         SELECT source, target FROM translations
                         WHERE source_lang = ? AND target_lang = ? AND target != '' AND chapter = ?
                         AND length(source) > 50 AND length(source) < 200 AND source != target
                         ORDER BY id DESC LIMIT ?
-                    ''', (source_lang, target_lang, chapter_number, needed_count))
-                    translated_results = cursor.fetchall()
+                    '''
+                    # Execute the query and get results
+                    translated_results = self.db_execute_query(query, (source_lang, target_lang, chapter_number, needed_count), 'all')
                     # Add to context in chronological order (oldest first)
                     for source, target in reversed(translated_results):
                         self.context.append((source, target))
@@ -2717,13 +2718,15 @@ class BookTranslator:
                     needed_count = max(DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context), 0)
                 # Priority 2: Try to get existing translations from other chapters
                 if needed_count > 0:
-                    cursor.execute('''
+                    # Create the query string
+                    query = '''
                         SELECT source, target FROM translations
                         WHERE source_lang = ? AND target_lang = ? AND target != ''
                         AND length(source) > 50 AND length(source) < 200 AND source != target
                         ORDER BY RANDOM() LIMIT ?
-                    ''', (source_lang, target_lang, needed_count))
-                    translated_results = cursor.fetchall()
+                    '''
+                    # Execute the query and get results
+                    translated_results = self.db_execute_query(query, (source_lang, target_lang, needed_count), 'all')
                     # Add to context
                     for source, target in translated_results:
                         self.context.append((source, target))
@@ -2731,13 +2734,15 @@ class BookTranslator:
                     needed_count = max(DEFAULT_PREFILL_CONTEXT_SIZE - len(self.context), 0)
                 # Priority 3: Get untranslated paragraphs (only if we need more)
                 if needed_count > 0:
-                    cursor.execute('''
+                    # Create the query string
+                    query = '''
                         SELECT source FROM translations 
                         WHERE source_lang = ? AND target_lang = ? AND target = ''
                         AND length(source) > 50 AND length(source) < 200 AND source GLOB '[A-Za-z]*'
                         ORDER BY RANDOM() LIMIT ?
-                    ''', (source_lang, target_lang, needed_count))
-                    untranslated_results = cursor.fetchall()
+                    '''
+                    # Execute the query and get results
+                    untranslated_results = self.db_execute_query(query, (source_lang, target_lang, needed_count), 'all')
                     # Get the texts and translate them
                     selected_texts = [row[0] for row in untranslated_results]
                     if selected_texts:
