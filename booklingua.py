@@ -333,6 +333,8 @@ class BookTranslator:
             chapters = self.extract_epub(source_lang, target_lang)
         elif file_extension.lower() == '.html' or file_extension.lower() == '.htm':
             chapters = self.extract_html(source_lang, target_lang)
+        elif file_extension.lower() == '.md' or file_extension.lower() == '.markdown':
+            chapters = self.extract_markdown(source_lang, target_lang)
         else:
             raise ValueError(f"Unsupported file format: {file_extension}")
         # Save all content to database
@@ -461,7 +463,6 @@ class BookTranslator:
         treating the top-level heading as the book title and subsequent headings as chapters.
         
         Args:
-            html_path (str): Path to the HTML file to extract
             source_lang (str, optional): Source language name. Defaults to "English".
             target_lang (str, optional): Target language name. Defaults to "Romanian".
             
@@ -485,6 +486,43 @@ class BookTranslator:
             return []
         # Convert HTML to Markdown using existing method
         markdown_content = self.html_to_markdown(soup)
+        # Save the complete markdown file if output directory exists
+        if self.output_dir and os.path.exists(self.output_dir):
+            try:
+                filename = os.path.splitext(os.path.basename(self.book_path))[0] + ".md"
+                filepath = os.path.join(self.output_dir, filename)
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(markdown_content)
+            except Exception as e:
+                print(f"Warning: Failed to save complete markdown content: {e}")
+        # Parse markdown content to extract chapters
+        chapters = self.parse_markdown_content(markdown_content, source_lang)
+        print(f"Extraction completed. Found {len(chapters)} chapters.")
+        print(f"{self.sep1}")
+        return chapters
+
+    def extract_markdown(self, source_lang: str = "English", target_lang: str = "Romanian") -> List[dict]:
+        """Extract content from Markdown file, identifying book title and chapter headings.
+        
+        This method processes a Markdown file and extracts content organized by headings,
+        treating the top-level heading as the book title and subsequent headings as chapters.
+        
+        Args:
+            source_lang (str, optional): Source language name. Defaults to "English".
+            target_lang (str, optional): Target language name. Defaults to "Romanian".
+            
+        Returns:
+            List[dict]: A list of chapter dictionaries containing extracted content
+        """
+        print(f"{self.sep1}")
+        print(f"Extracting content from {self.book_path}...")
+        # Read Markdown file
+        try:
+            with open(self.book_path, 'r', encoding='utf-8') as f:
+                markdown_content = f.read()
+        except Exception as e:
+            print(f"Error reading Markdown file: {e}")
+            return []
         # Save the complete markdown file if output directory exists
         if self.output_dir and os.path.exists(self.output_dir):
             try:
