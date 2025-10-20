@@ -2590,7 +2590,11 @@ class BookTranslator:
         
         # Time the translation
         start_time = datetime.now()
-        target, _, _, model = self.translate_text(source, source_lang, target_lang)
+        translation_result = self.translate_text(source, source_lang, target_lang)
+        if not translation_result or len(translation_result) < 4:
+            print("Error: Translation failed, skipping paragraph.")
+            return
+        target, _, _, model = translation_result
         if not target:
             print("Error: Translation failed, skipping paragraph.")
             return
