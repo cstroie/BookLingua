@@ -2862,12 +2862,16 @@ class BookTranslator:
             source (str): The original text
             target (str): The translated text
         """
+        # Handle None or empty inputs
+        if not source or not target:
+            return
+            
         # Don't add very short examples that might cause confusion
-        if len(source.split()) < 5 or len(target.split()) < 3:
+        if len(source.split()) < 3 or len(target.split()) < 3:
             return
         
         # Don't add if source/target are too similar (might be meta-text)
-        if self.text_similarity(source, target) > 0.9:
+        if self.text_similarity(source, target) > 0.95:
             return
             
         if clean:
@@ -3142,7 +3146,7 @@ class BookTranslator:
         common_words = ['the', 'and', 'or', 'but', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by']
         translated_lower = translated.lower()
         for word in common_words:
-            if translated_lower.count(word) > len(translated_words) * 0.3:  # More than 30% of words
+            if translated_lower.count(word) > translated_words * 0.3:  # More than 30% of words
                 mistranslations += 1
                 break
                 
