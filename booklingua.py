@@ -2867,7 +2867,7 @@ class BookTranslator:
             return
             
         # Don't add very short examples that might cause confusion
-        if len(source.split()) < 3 or len(target.split()) < 3:
+        if len(source.split()) < 2 or len(target.split()) < 2:
             return
         
         # Don't add if source/target are too similar (might be meta-text)
