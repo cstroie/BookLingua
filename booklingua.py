@@ -636,8 +636,9 @@ class BookTranslator:
         spine_items = book.spine
         if not spine_items:
             return chapters
-            
-        chapter_index = 0
+
+        # Chapter zero is reserved for metadata
+        chapter_index = 1
         # Process each item in the spine
         for spine_item in spine_items:
             # Get the actual item from the book
@@ -651,12 +652,12 @@ class BookTranslator:
                 
             # Set a default title if none exists
             if not hasattr(item, 'title') or not item.title:
-                item.title = f"Chapter {chapter_index + 1}"
+                item.title = f"----"
                 
             chapter_data = self.extract_epub_content(item, source_lang)
             if chapter_data:
                 # Update chapter ID and name to be sequential
-                chapter_data['id'] = f"{chapter_index:03d}"
+                chapter_data['id'] = f"{spine_item[0]}"
                 chapter_data['name'] = f"{chapter_index:03d}. {item.title}"
                 chapters.append(chapter_data)
                 chapter_index += 1
