@@ -632,19 +632,35 @@ class BookTranslator:
         metadata_chapter = self.extract_epub_metadata(book, source_lang)
         if metadata_chapter:
             chapters.append(metadata_chapter)
-        # Get the chapters order and titles from ToC
-        toc = self.extract_epub_toc(book)
-        if not toc:
+        # Get the chapters from the book spine
+        spine_items = book.spine
+        if not spine_items:
             return chapters
-        # Process each item
-        for toc_item in toc:
-            item = book.get_item_with_href(toc_item.href)
+            
+        chapter_index = 0
+        # Process each item in the spine
+        for spine_item in spine_items:
+            # Get the actual item from the book
+            item = book.get_item_with_id(spine_item[0])
             if not item:
                 continue
-            item.title = toc_item.title
+                
+            # Only process document items
+            if item.get_type() != ebooklib.ITEM_DOCUMENT:
+                continue
+                
+            # Set a default title if none exists
+            if not hasattr(item, 'title') or not item.title:
+                item.title = f"Chapter {chapter_index + 1}"
+                
             chapter_data = self.extract_epub_content(item, source_lang)
             if chapter_data:
+                # Update chapter ID and name to be sequential
+                chapter_data['id'] = f"{chapter_index:03d}"
+                chapter_data['name'] = f"{chapter_index:03d}. {item.title}"
                 chapters.append(chapter_data)
+                chapter_index += 1
+                
         print(f"Extraction completed. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
