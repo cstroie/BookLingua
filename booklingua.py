@@ -2505,7 +2505,23 @@ class BookTranslator:
             if self.verbose:
                 print(f"Warning: Search failed: {e}")
         # Add context from previous translations for this language pair
-        for user_msg, assistant_msg in self.context:
+        # Limit context based on word count to avoid exceeding token limits
+        context_word_limit = 1000  # Approximate token limit
+        context_word_count = 0
+        limited_context = []
+        
+        # Start from the end (most recent) and work backwards
+        for user_msg, assistant_msg in reversed(self.context):
+            # Estimate word count for this context pair
+            pair_word_count = len(user_msg.split()) + len(assistant_msg.split())
+            if context_word_count + pair_word_count <= context_word_limit:
+                context_word_count += pair_word_count
+                limited_context.append((user_msg, assistant_msg))
+            else:
+                break
+        
+        # Add the limited context in chronological order
+        for user_msg, assistant_msg in reversed(limited_context):
             messages.append({"role": "user", "content": f"<{source_lang.lower()}>{user_msg}</{source_lang.lower()}>"})
             messages.append({"role": "assistant", "content": f"<{target_lang.lower()}>{assistant_msg}</{target_lang.lower()}>"})
         # Add current text to translate
