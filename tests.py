@@ -439,11 +439,28 @@ class TestBookTranslator(unittest.TestCase):
 
     def test_calculate_adequacy_score(self):
         """Test adequacy score calculation."""
-        # This uses the translation API, so we'll mock it
-        with patch.object(self.translator, 'translate_text', return_value=("85", -1, -1, "test-model")):
-            score = self.translator.calculate_adequacy_score("Hello world", "Bonjour le monde", "English", "French")
-            self.assertIsInstance(score, int)
-            self.assertEqual(score, 85)
+        # Test with identical texts (perfect adequacy)
+        score = self.translator.calculate_adequacy_score("Hello world", "Hello world", "English", "English")
+        self.assertIsInstance(score, int)
+        self.assertEqual(score, 100)
+        
+        # Test with similar texts
+        score = self.translator.calculate_adequacy_score("Hello world", "Hello world test", "English", "English")
+        self.assertIsInstance(score, int)
+        self.assertGreater(score, 0)
+        self.assertLessEqual(score, 100)
+        
+        # Test with completely different texts
+        score = self.translator.calculate_adequacy_score("Hello world", "Completely different", "English", "English")
+        self.assertIsInstance(score, int)
+        
+        # Test with empty texts
+        score = self.translator.calculate_adequacy_score("", "", "English", "English")
+        self.assertEqual(score, 0)
+        
+        # Test with one empty text
+        score = self.translator.calculate_adequacy_score("Hello", "", "English", "English")
+        self.assertEqual(score, 0)
 
     def test_calculate_consistency_score(self):
         """Test consistency score calculation."""
@@ -465,6 +482,33 @@ class TestBookTranslator(unittest.TestCase):
         )
         self.assertIsInstance(errors, dict)
         self.assertIn('untranslated_segments', errors)
+        
+        # Test with repeated phrases
+        errors = self.translator.detect_translation_errors(
+            "Original text",
+            "This is repeated. This is repeated.",  # Repeated phrases
+            "English"
+        )
+        self.assertIsInstance(errors, dict)
+        self.assertIn('repeated_phrases', errors)
+        
+        # Test with formatting issues (mismatched markdown)
+        errors = self.translator.detect_translation_errors(
+            "Original text",
+            "This has **bold text without closing",  # Unclosed bold
+            "English"
+        )
+        self.assertIsInstance(errors, dict)
+        self.assertIn('formatting_issues', errors)
+        
+        # Test with potential mistranslations (very short translation of long text)
+        errors = self.translator.detect_translation_errors(
+            "This is a very long original text with many words that should translate to something longer",
+            "Short",  # Very short translation
+            "English"
+        )
+        self.assertIsInstance(errors, dict)
+        self.assertIn('potential_mistranslations', errors)
 
     def test_generate_quality_report(self):
         """Test quality report generation."""
@@ -477,6 +521,32 @@ class TestBookTranslator(unittest.TestCase):
         self.assertIn('fluency_scores', report)
         self.assertIn('overall_score', report)
         self.assertIsInstance(report['overall_score'], int)
+        
+    def test_detect_context_bleeding(self):
+        """Test context bleeding detection."""
+        # Add some context first
+        self.translator.context_add("Previous source text", "Previous target translation")
+        
+        # Test with context bleeding (short translation of long source)
+        result = self.translator.detect_context_bleeding(
+            "This is a very long source text that should have a long translation",
+            "Short translation"  # Much shorter than source
+        )
+        self.assertIsInstance(result, bool)
+        
+        # Test with normal translation (no bleeding)
+        result = self.translator.detect_context_bleeding(
+            "Source text",
+            "Target translation"
+        )
+        self.assertIsInstance(result, bool)
+        
+        # Test with very similar translation to context but different source
+        result = self.translator.detect_context_bleeding(
+            "Completely different source",
+            "Previous target translation"  # Very similar to context target
+        )
+        self.assertIsInstance(result, bool)
 
     def test_epub_create_template(self):
         """Test EPUB template creation."""
