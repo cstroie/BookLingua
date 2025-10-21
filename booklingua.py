@@ -2610,6 +2610,9 @@ class BookTranslator:
         # Calculate fluency score
         fluency = self.calculate_fluency_score(target)
         
+        # Calculate adequacy score
+        adequacy = self.calculate_adequacy_score(source, target, source_lang, target_lang)
+        
         # Save to database with timing and fluency info
         self.db_insert_translation(source, target, source_lang, target_lang,
                                  edition_number, chapter_number, par, elapsed, fluency, model)
@@ -2617,8 +2620,8 @@ class BookTranslator:
         # Calculate statistics for current chapter only
         avg_time, elapsed_time, remaining_time = self.db_chapter_stats(edition_number, chapter_number, source_lang, target_lang)
         if self.verbose:
-            # Show fluency score and timing stats
-            print(f"Fluency: {fluency}% | Time: {elapsed/1000:.2f}s | Avg: {avg_time/1000:.2f}s | Remaining: {remaining_time/1000:.2f}s")
+            # Show fluency score, adequacy score and timing stats
+            print(f"Fluency: {fluency}% | Adequacy: {adequacy}% | Time: {elapsed/1000:.2f}s | Avg: {avg_time/1000:.2f}s | Remaining: {remaining_time/1000:.2f}s")
 
     def display_chapter_checks(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str):
         """Run quality checks at the end of chapter translation.
