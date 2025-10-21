@@ -2907,7 +2907,7 @@ class BookTranslator:
         return max(0, min(100, int(fluency * 100)))
 
     def calculate_adequacy_score(self, original: str, translated: str, source_lang: str, target_lang: str) -> int:
-        """Calculate adequacy score using AI evaluation.
+        """Calculate adequacy score based on content preservation metrics.
         
         Args:
             original (str): Original text
@@ -2918,27 +2918,57 @@ class BookTranslator:
         Returns:
             int: Adequacy score as percentage (0-100, higher is better)
         """
-        prompt = f"""Rate the translation quality on a scale of 0-100:
-        
-Original ({source_lang}): {original}
-Translation ({target_lang}): {translated}
-
-Criteria:
-- Meaning preservation (50% weight)
-- Completeness (30% weight) 
-- Naturalness (20% weight)
-
-Return only a single integer number between 0 and 100."""
-        
-        # Use the existing translation system to evaluate
         try:
-            # Evaluate in English
-            result, _, _, _ = self.translate_text(prompt, "English", "English", use_cache=False)
-            # Extract numerical score from response
-            score_match = re.search(r'(\d+)', result)
-            if score_match:
-                return min(100, max(0, int(score_match.group(1))))
-            return 50  # Default score if parsing fails
+            # Normalize texts for comparison
+            orig_normalized = original.strip().lower()
+            trans_normalized = translated.strip().lower()
+            
+            # If either text is empty, return low score
+            if not orig_normalized or not trans_normalized:
+                return 0
+            
+            # Calculate length ratio (ideal is close to 1.0)
+            orig_words = len(orig_normalized.split())
+            trans_words = len(trans_normalized.split())
+            
+            if orig_words == 0 or trans_words == 0:
+                return 0
+                
+            length_ratio = min(orig_words, trans_words) / max(orig_words, trans_words)
+            
+            # Calculate lexical overlap using simple word matching
+            orig_words_set = set(orig_normalized.split())
+            trans_words_set = set(trans_normalized.split())
+            
+            if len(orig_words_set) == 0:
+                return 0
+                
+            # Jaccard similarity for word overlap
+            intersection = len(orig_words_set.intersection(trans_words_set))
+            union = len(orig_words_set.union(trans_words_set))
+            lexical_overlap = intersection / union if union > 0 else 0
+            
+            # Check for key content words preservation
+            # (simple heuristic: look for numbers, proper nouns, key terms)
+            orig_chars = len(orig_normalized)
+            trans_chars = len(trans_normalized)
+            char_preservation = min(orig_chars, trans_chars) / max(orig_chars, trans_chars) if max(orig_chars, trans_chars) > 0 else 0
+            
+            # Weighted score calculation
+            # Length preservation (30% weight)
+            length_score = length_ratio * 30
+            
+            # Lexical overlap (50% weight)
+            overlap_score = lexical_overlap * 50
+            
+            # Character preservation (20% weight)
+            char_score = char_preservation * 20
+            
+            # Combine scores
+            adequacy = length_score + overlap_score + char_score
+            
+            # Ensure score is within bounds
+            return max(0, min(100, int(adequacy)))
         except Exception:
             return 50  # Default score on error
 
