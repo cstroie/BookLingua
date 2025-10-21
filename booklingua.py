@@ -2861,6 +2861,7 @@ class BookTranslator:
         Args:
             source (str): The original text
             target (str): The translated text
+            clean (bool): Whether to clean markdown formatting before adding
         """
         # Handle None or empty inputs
         if not source or not target:
