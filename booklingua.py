@@ -3039,18 +3039,81 @@ Return only a single integer number between 0 and 100."""
         }
         
         # Check for untranslated segments (source language words in target translation)
-        # This is a simplified check - in practice would need language-specific detection
         if source_lang.lower() == 'english':
             # Simple check for English words in non-English translation
             english_words = re.findall(r'\b[a-zA-Z]{4,}\b', translated)
             errors['untranslated_segments'] = len(english_words)
+        elif source_lang.lower() == 'french':
+            # Simple check for French words in non-French translation
+            french_words = re.findall(r'\b[a-zA-ZàâäéèêëïîôöùûüÿçÀÂÄÉÈÊËÏÎÔÖÙÛÜŸÇ]{4,}\b', translated)
+            errors['untranslated_segments'] = len(french_words)
+        elif source_lang.lower() == 'german':
+            # Simple check for German words in non-German translation
+            german_words = re.findall(r'\b[a-zA-ZäöüßÄÖÜ]{4,}\b', translated)
+            errors['untranslated_segments'] = len(german_words)
+        elif source_lang.lower() == 'spanish':
+            # Simple check for Spanish words in non-Spanish translation
+            spanish_words = re.findall(r'\b[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]{4,}\b', translated)
+            errors['untranslated_segments'] = len(spanish_words)
+        else:
+            # Generic check for any source language words
+            source_words = re.findall(r'\b\w{4,}\b', translated)
+            errors['untranslated_segments'] = len(source_words) // 2  # Heuristic estimate
         
-        # Check for repeated phrases
-        phrases = [p.strip() for p in translated.split('.') if p.strip()]
-        for i in range(len(phrases)-1):
-            for j in range(i+1, min(i+3, len(phrases))):
-                if phrases[i] == phrases[j]:
-                    errors['repeated_phrases'] += 1
+        # Check for repeated phrases (more robust detection)
+        sentences = [s.strip() for s in re.split(r'[.!?]+', translated) if s.strip()]
+        repeated_count = 0
+        for i in range(len(sentences)):
+            for j in range(i + 1, len(sentences)):
+                # Check if sentences are very similar (likely repetition)
+                if self.text_similarity(sentences[i], sentences[j]) > 0.8:
+                    repeated_count += 1
+        errors['repeated_phrases'] = repeated_count
+        
+        # Check for formatting issues (mismatched markdown/HTML tags)
+        # Count opening and closing markdown/HTML tags
+        markdown_tags = ['**', '*', '__', '~~', '`']
+        formatting_issues = 0
+        
+        for tag in markdown_tags:
+            open_count = translated.count(tag)
+            if open_count % 2 != 0:  # Odd number means unclosed tag
+                formatting_issues += 1
+        
+        # Check for HTML tags
+        html_tags = re.findall(r'<[^>]+>', translated)
+        tag_names = [tag.strip('<>/') for tag in html_tags if not tag.startswith('</')]
+        closing_tags = [tag.strip('</>') for tag in html_tags if tag.startswith('</')]
+        
+        for tag in tag_names:
+            if tag not in closing_tags:
+                formatting_issues += 1
+        
+        errors['formatting_issues'] = formatting_issues
+        
+        # Check for potential mistranslations (basic heuristics)
+        mistranslations = 0
+        
+        # Check for very short translations of long original text
+        original_words = len(original.split())
+        translated_words = len(translated.split())
+        
+        if original_words > 10 and translated_words < original_words * 0.3:
+            mistranslations += 1
+            
+        # Check for very long translations of short original text
+        if original_words < 5 and translated_words > original_words * 5:
+            mistranslations += 1
+            
+        # Check for excessive repetition of common words
+        common_words = ['the', 'and', 'or', 'but', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by']
+        translated_lower = translated.lower()
+        for word in common_words:
+            if translated_lower.count(word) > len(translated_words) * 0.3:  # More than 30% of words
+                mistranslations += 1
+                break
+                
+        errors['potential_mistranslations'] = mistranslations
         
         return errors
 
