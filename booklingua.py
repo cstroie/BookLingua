@@ -16,23 +16,26 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """
-BookLingua - Advanced EPUB Book Translation Tool
+BookLingua - Advanced Book Translation Tool
 
-A comprehensive command-line tool for translating EPUB books using various AI models
-and translation services. BookLingua preserves document structure, formatting, and
-provides both direct and pivot translation methods with quality assessment features.
+A comprehensive command-line tool for translating books using various AI models
+and translation services. BookLingua supports EPUB, HTML, and Markdown files,
+preserves document structure and formatting, and provides quality assessment features.
 
 Features:
 - Multi-provider AI support (OpenAI, Ollama, Mistral, DeepSeek, LM Studio, Together AI, OpenRouter)
-- EPUB structure preservation and formatting maintenance
+- Document structure preservation and formatting maintenance for EPUB, HTML, and Markdown
 - Database caching for reliability and resume capability
 - Quality assessment with fluency, adequacy, and consistency scoring
 - Progress tracking and verbose output options
 - CSV export/import for translation data
 - Chapter-level translation control
+- Three-phase workflow (extract → translate → build)
 
 Usage:
     python booklingua.py input.epub [options]
+    python booklingua.py input.html [options]
+    python booklingua.py input.md [options]
 
 Examples:
     # Basic translation
@@ -46,6 +49,12 @@ Examples:
     
     # Export translations to CSV
     python booklingua.py book.epub --export-csv translations.csv
+    
+    # Translate HTML file
+    python booklingua.py document.html
+    
+    # Translate Markdown file
+    python booklingua.py document.md
 """
 
 import warnings
@@ -308,11 +317,11 @@ class BookTranslator:
     
     def phase_extract(self, output_dir: str = "output",
                      source_lang: str = "English", target_lang: str = "Romanian", new_edition: bool = False) -> int:
-        """Import phase: Extract content from book file and save to database.
+        """Import phase: Extract content from document file and save to database.
         
         This method handles the extract/import phase of the translation workflow, which includes:
-        1. Reading the book file (EPUB or HTML)
-        2. Extracting text content from all chapters
+        1. Reading the document file (EPUB, HTML, or Markdown)
+        2. Extracting text content from all chapters/sections
         3. Saving the content to the database for later translation
         
         Args:
@@ -389,12 +398,12 @@ class BookTranslator:
     def phase_build(self, output_dir: str = "output", 
                    source_lang: str = "English", target_lang: str = "Romanian",
                    chapter_numbers: str = None):
-        """Build phase: Create translated EPUB from database translations.
+        """Build phase: Create translated document from database translations.
         
         This method handles the build phase of the workflow, which includes:
         1. Loading translated content from the database
-        2. Creating a new EPUB with the translated content
-        3. Saving the final EPUB file
+        2. Creating a new document with the translated content
+        3. Saving the final document file
         
         Args:
             output_dir (str, optional): Directory for output files. Defaults to "output".
@@ -459,10 +468,10 @@ class BookTranslator:
         print(f"{self.sep1}")
 
     def extract_html(self, source_lang: str = "English", target_lang: str = "Romanian") -> List[dict]:
-        """Extract content from HTML file, identifying book title and chapter headings.
+        """Extract content from HTML file, identifying document title and section headings.
         
         This method processes an HTML file and extracts content organized by headings,
-        treating the top-level heading as the book title and subsequent headings as chapters.
+        treating the top-level heading as the document title and subsequent headings as sections.
         
         Args:
             source_lang (str, optional): Source language name. Defaults to "English".
@@ -504,10 +513,10 @@ class BookTranslator:
         return chapters
 
     def extract_markdown(self, source_lang: str = "English", target_lang: str = "Romanian") -> List[dict]:
-        """Extract content from Markdown file, identifying book title and chapter headings.
+        """Extract content from Markdown file, identifying document title and section headings.
         
         This method processes a Markdown file and extracts content organized by headings,
-        treating the top-level heading as the book title and subsequent headings as chapters.
+        treating the top-level heading as the document title and subsequent headings as sections.
         
         Args:
             source_lang (str, optional): Source language name. Defaults to "English".
@@ -2697,10 +2706,10 @@ class BookTranslator:
     def translate_epub(self, output_dir: str = "output", 
                       source_lang: str = "English", target_lang: str = "Romanian",
                       chapter_numbers: str = None):
-        """Translate EPUB books using direct translation method with comprehensive workflow.
+        """Translate documents using direct translation method with comprehensive workflow.
         
-        This method provides a complete translation workflow for EPUB books, supporting
-        direct translation from source to target language. It processes each chapter
+        This method provides a complete translation workflow for documents, supporting
+        direct translation from source to target language. It processes each chapter/section
         individually while preserving document structure, formatting, and maintaining
         translation consistency across the entire document.
         
