@@ -667,23 +667,18 @@ class BookTranslator:
         # Save all chapters to a single markdown file
         if self.output_dir and os.path.exists(self.output_dir):
             try:
-                # Collect all paragraphs from all chapters
-                all_paragraphs = []
-                for chapter in chapters:
-                    all_paragraphs.extend(chapter.get('paragraphs', []))
-                
-                # Join all paragraphs with double newlines
-                complete_content = '\n\n'.join(all_paragraphs)
-                
                 # Save to file
                 filename = os.path.splitext(os.path.basename(self.book_path))[0] + ".md"
                 filepath = os.path.join(self.output_dir, filename)
                 with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(complete_content)
+                    for chapter in chapters:
+                        # Join all paragraphs with double newlines
+                        content = '\n\n'.join(chapter.get('paragraphs', []))
+                        f.write(content)                
                 print(f"Complete content saved to: {filepath}")
             except Exception as e:
                 print(f"Warning: Failed to save complete markdown content: {e}")
-
+        # Return the chapters array
         return chapters
 
     def extract_epub_metadata(self, book, source_lang: str) -> Optional[dict]:
