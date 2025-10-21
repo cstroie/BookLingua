@@ -2143,7 +2143,7 @@ class BookTranslator:
                 print(f"{(ch):>3}: {(len(texts)):>5} {chapter_id[:20]:<20} {chapter_title[:20]:<20} {chapter_name[:25]:<25}")
                 for par, text in enumerate(texts):
                     # Only save non-empty texts
-                    if text.strip():
+                    if text and text.strip():
                         translation_data = self.translate_paragraph(text, source_lang, target_lang)
                         target, duration, fluency, model = translation_data
                         
