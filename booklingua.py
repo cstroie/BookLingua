@@ -2506,7 +2506,7 @@ class BookTranslator:
                 print(f"Warning: Search failed: {e}")
         # Add context from previous translations for this language pair
         # Limit context based on word count to avoid exceeding token limits
-        context_word_limit = 1000  # Approximate token limit
+        context_word_limit = DEFAULT_MAX_TOKENS / 4  # Approximate token limit
         context_word_count = 0
         limited_context = []
         
