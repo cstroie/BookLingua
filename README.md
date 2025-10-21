@@ -2,7 +2,7 @@
 
 **Translate EPUB books using AI models with database caching and context preservation.**
 
-A Python tool for translating EPUB books using various AI models through their API endpoints. The tool focuses on direct translation with advanced features like database caching, context management, and quality assessment.
+A Python tool for translating EPUB books using various AI models through their API endpoints. The tool uses a three-phase workflow (extract → translate → build) with advanced features like database caching, context management, and quality assessment.
 
 ## Features
 
@@ -16,6 +16,9 @@ A Python tool for translating EPUB books using various AI models through their A
 - Quality assessment with fluency scoring
 - Progress tracking with timing statistics
 - Chapter-level translation control with selective chapter processing
+- HTML and Markdown file support in addition to EPUB
+- Side-by-side translation display in verbose mode
+- Throttling control for API rate limiting
 
 ## Installation
 
@@ -45,6 +48,10 @@ python booklingua.py input.epub --verbose
 python booklingua.py input.epub --extract
 python booklingua.py input.epub --translate
 python booklingua.py input.epub --build
+
+# Translate HTML or Markdown files
+python booklingua.py input.html
+python booklingua.py input.md
 ```
 
 ## Usage
@@ -65,6 +72,10 @@ python booklingua.py input.epub --verbose
 python booklingua.py input.epub --extract
 python booklingua.py input.epub --translate
 python booklingua.py input.epub --build
+
+# Translate HTML or Markdown files
+python booklingua.py input.html
+python booklingua.py input.md
 ```
 
 ### Language Configuration
@@ -74,6 +85,11 @@ python booklingua.py input.epub --build
 python booklingua.py input.epub \
   --source-lang English \
   --target-lang Romanian
+
+# Use language codes with first letter uppercase
+python booklingua.py input.epub \
+  --source-lang French \
+  --target-lang German
 ```
 
 ### API Services
@@ -108,6 +124,9 @@ python booklingua.py input.epub \
   --base-url https://api.openai.com/v1 \
   --api-key YOUR_KEY \
   --model gpt-4o
+
+# With custom throttling (minimum time between requests)
+python booklingua.py input.epub --throttle 1.0
 ```
 
 ## Supported Services
@@ -116,16 +135,16 @@ python booklingua.py input.epub \
 |--------------|-------------|-----------------------------------|---------------------------------|
 | OpenAI       | `--openai`  | `gpt-4o`                          | https://api.openai.com/v1       |
 | Ollama       | `--ollama`  | `gemma3n:e4b`                     | http://localhost:11434/v1       |
-| Mistral AI   | `--mistral` | `mistral-large-latest`           | https://api.mistral.ai/v1       |
-| DeepSeek     | `--deepseek`| `deepseek-chat`                  | https://api.deepseek.com/v1     |
-| Together AI  | `--together`| `Qwen/Qwen2.5-72B-Instruct-Turbo`| https://api.together.xyz/v1     |
+| Mistral AI   | `--mistral` | `mistral-large-latest`            | https://api.mistral.ai/v1       |
+| DeepSeek     | `--deepseek`| `deepseek-chat`                   | https://api.deepseek.com/v1     |
+| Together AI  | `--together`| `Qwen/Qwen2.5-72B-Instruct-Turbo` | https://api.together.xyz/v1     |
 | LM Studio    | `--lmstudio`| `qwen2.5-72b`                     | http://localhost:1234/v1        |
 | OpenRouter   | `--openrouter`| `openai/gpt-4o`                 | https://openrouter.ai/api/v1    |
 
 ## Output Files
 
-- `{original_name} {target_lang}.epub` - The translated book
-- `{original_name}.db` - SQLite database with cached translations (same name as input EPUB)
+- `{original_name} {target_lang}.epub` - The translated book (for EPUB input)
+- `{original_name}.db` - SQLite database with cached translations (same name as input file)
 - `{source_lang}/` - Directory with source chapters as markdown files
 - `{target_lang}/` - Directory with translated chapters as markdown and xhtml files
 
@@ -137,17 +156,17 @@ python booklingua.py input.epub \
 
 ### Three-Phase Workflow
 
-BookLingua now uses a three-phase workflow that allows for better control and resume capability:
+BookLingua uses a three-phase workflow that allows for better control and resume capability:
 
-1. **Extract Phase** (`--extract`): Extracts text content from the EPUB and saves it to the database
+1. **Extract Phase** (`--extract`): Extracts text content from the input file and saves it to the database
 2. **Translate Phase** (`--translate`): Translates chapters using the AI model and saves translations to the database
-3. **Build Phase** (`--build`): Creates the final translated EPUB file from database translations
+3. **Build Phase** (`--build`): Creates the final translated file from database translations
 
 This workflow allows you to:
 - Run phases separately for better control
 - Resume interrupted translations
 - Translate specific chapters only
-- Rebuild the EPUB without re-translating
+- Rebuild the output file without re-translating
 
 ## Customization
 
@@ -159,14 +178,14 @@ Adjust parameters in the code:
 
 BookLingua uses SQLite database caching to improve reliability and performance:
 
-- **Database Location**: Creates a `.db` file with the same name as your input EPUB (e.g., `book.epub` → `book.db`)
+- **Database Location**: Creates a `.db` file with the same name as your input file (e.g., `book.epub` → `book.db`)
 - **Caching Strategy**: Stores all translations with source language, target language, and source text as unique keys
 - **Benefits**: 
   - Resume interrupted translations
   - Avoid re-translating identical content
   - Faster subsequent translations of the same content
   - Track translation progress and statistics
-- **Automatic**: Enabled by default when an EPUB path is provided
+- **Automatic**: Enabled by default when a file path is provided
 - **Persistence**: Database remains after translation for future use
 
 ### Context Management
@@ -186,6 +205,8 @@ The tool manages translation context to maintain consistency:
 The tool includes built-in quality assessment features:
 
 - **Fluency Scoring**: Evaluates translation quality based on linguistic patterns
+- **Adequacy Scoring**: Measures content preservation between original and translated text
+- **Consistency Scoring**: Checks terminology consistency across chapters
 - **Progress Tracking**: Shows real-time statistics and estimated completion times
 - **Error Detection**: Identifies common translation issues
 
@@ -221,6 +242,15 @@ This will create:
 - `book.db` - SQLite database with cached translations
 - `English/` - Directory with source chapters as markdown files
 - `Romanian/` - Directory with translated chapters as markdown and xhtml files
+
+#### HTML/Markdown Translation
+
+Translate HTML or Markdown files:
+
+```bash
+python booklingua.py document.html
+python booklingua.py document.md
+```
 
 ### Advanced Usage
 
@@ -276,6 +306,9 @@ python booklingua.py book.epub --translate
 
 # Build final EPUB
 python booklingua.py book.epub --build
+
+# Create a new edition instead of using existing translations
+python booklingua.py book.epub --new-edition --extract
 ```
 
 #### New Edition
@@ -439,15 +472,20 @@ Verify your internet connection and API endpoint URL.
 **Permission Errors**
 Ensure you have write permissions for the output directory.
 
+**Rate Limiting**
+Use the `--throttle` option to add delays between API requests.
+
 #### Quality Issues
 
 **Poor Translation Quality**
 - Try different models using `-m` option
 - Enable verbose mode with `-v` to see intermediate results
+- Check that source and target languages are correctly specified
 
 **Slow Translation**
 - Reduce verbose output
 - Use a faster model or local server
+- Add throttling with `--throttle` to avoid rate limits
 
 #### Error Messages
 
@@ -460,13 +498,18 @@ Ensure you have write permissions for the output directory.
 - Verify input file path
 - Check file permissions
 
+**"Database locked"**
+- Close any other instances of BookLingua
+- Check file permissions on the database file
+
 ### Best Practices
 
-1. **Always backup your original EPUB files** before translation
+1. **Always backup your original files** before translation
 2. **Use verbose mode** (`-v`) for the first translation to monitor progress
 3. **Test with small sections** first before translating entire books
 4. **Use appropriate models** for your content type (technical vs. literary)
 5. **Set environment variables** for API keys to avoid exposing them in command history
+6. **Use throttling** (`--throttle`) to avoid rate limiting with API providers
 
 ### Integration Examples
 
