@@ -2660,6 +2660,29 @@ class BookTranslator:
         if not target:
             print("Error: Translation failed, skipping paragraph.")
             return
+            
+        # Calculate adequacy score
+        adequacy = self.calculate_adequacy_score(source, target, source_lang, target_lang)
+        
+        # If adequacy is too low, try translating again
+        if adequacy < 25:
+            print(f"Low adequacy score ({adequacy}%), retrying translation...")
+            # Remove the low-quality translation from context to avoid influencing the retry
+            if self.context and self.context[-1][0] == source:
+                self.context.pop()
+                
+            # Retry translation
+            retry_result = self.translate_text(source, source_lang, target_lang)
+            if retry_result and len(retry_result) >= 4:
+                retry_target, _, _, retry_model = retry_result
+                if retry_target:
+                    # Check if retry translation is better
+                    retry_adequacy = self.calculate_adequacy_score(source, retry_target, source_lang, target_lang)
+                    if retry_adequacy > adequacy:
+                        print(f"Retry improved adequacy from {adequacy}% to {retry_adequacy}%")
+                        target, model = retry_target, retry_model
+                        adequacy = retry_adequacy
+        
         end_time = datetime.now()
         
         print(f"{self.sep3}")
@@ -2671,9 +2694,6 @@ class BookTranslator:
         
         # Calculate fluency score
         fluency = self.calculate_fluency_score(target)
-        
-        # Calculate adequacy score
-        adequacy = self.calculate_adequacy_score(source, target, source_lang, target_lang)
         
         # Save to database with timing and fluency info
         self.db_insert_translation(source, target, source_lang, target_lang,
