@@ -2137,7 +2137,10 @@ class BookTranslator:
             total_paragraphs = 0
             for ch, chapter in enumerate(chapters):
                 texts = chapter.get('paragraphs', [])
-                print(f"{(ch):>3}: {(len(texts)):>5} {chapter['id'][:20]:<20} {chapter['title'][:20]:<20} {chapter.get('name', 'Untitled Chapter')[:25]:<25}")
+                chapter_id = chapter.get('id', 'Unknown') or 'Unknown'
+                chapter_title = chapter.get('title', 'Untitled') or 'Untitled'
+                chapter_name = chapter.get('name', 'Untitled Chapter') or 'Untitled Chapter'
+                print(f"{(ch):>3}: {(len(texts)):>5} {chapter_id[:20]:<20} {chapter_title[:20]:<20} {chapter_name[:25]:<25}")
                 for par, text in enumerate(texts):
                     # Only save non-empty texts
                     if text.strip():
