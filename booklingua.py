@@ -49,7 +49,9 @@ Examples:
 """
 
 import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+warnings.simplefilter(action='ignore', category=FutureWarning)                                                         
+warnings.simplefilter(action='ignore', category=UserWarning)                                                         
+
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
@@ -68,8 +70,8 @@ from datetime import datetime
 # Constants for configurable values
 DEFAULT_TEMPERATURE = 0.2
 DEFAULT_MAX_TOKENS = 4 * 1024
-DEFAULT_CONTEXT_SIZE = 8
-DEFAULT_PREFILL_CONTEXT_SIZE = 5
+DEFAULT_CONTEXT_SIZE = 5
+DEFAULT_PREFILL_CONTEXT_SIZE = 3
 DEFAULT_KEEP_ALIVE = "30m"
 
 # System prompt template - will be formatted with actual languages when used
@@ -619,7 +621,7 @@ class BookTranslator:
         # Load book and extract text
         print(f"{self.sep1}")
         print(f"Extracting content from {self.book_path}...")
-        book = epub.read_epub(self.book_path, options={'ignore_ncx': False})
+        book = epub.read_epub(self.book_path, options={'ignore_ncx': True})
         # List to hold chapter data
         chapters = []
         # Check if book is valid
