@@ -475,7 +475,19 @@ class BookTranslator:
                 print(f"Warning: Failed to save complete markdown content: {e}")
         # Parse markdown content to extract chapters
         chapters = self.parse_markdown_content(markdown_content, source_lang)
-        print(f"Extraction completed. Found {len(chapters)} chapters.")
+        # Extract book title and author from metadata
+        title = "Unknown Title"
+        author = "Unknown Author"
+        if chapters and chapters[0]['paragraphs']:
+            # Metadata is in the first chapter
+            metadata = chapters[0]['paragraphs']
+            for item in metadata:
+                if item.startswith("Title:"):
+                    title = item[7:].strip()
+                elif item.startswith("Author:"):
+                    author = item[8:].strip()
+        
+        print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
 
@@ -638,7 +650,19 @@ class BookTranslator:
                 chapters.append(chapter_data)
                 chapter_index += 1
 
-        print(f"Extraction completed. Found {len(chapters)} chapters.")
+        # Extract book title and author from metadata
+        title = "Unknown Title"
+        author = "Unknown Author"
+        if chapters and chapters[0]['paragraphs']:
+            # Metadata is in the first chapter
+            metadata = chapters[0]['paragraphs']
+            for item in metadata:
+                if item.startswith("Title:"):
+                    title = item[7:].strip()
+                elif item.startswith("Author:"):
+                    author = item[8:].strip()
+        
+        print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         # Save all chapters to a single markdown file
         if self.output_dir and os.path.exists(self.output_dir):
