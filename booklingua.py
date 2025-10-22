@@ -93,7 +93,6 @@ body {
   margin: 1em;
   text-align: justify;
 }
-
 h1, h2, h3, h4, h5, h6 {
   font-family: Arial, sans-serif;
   font-weight: bold;
@@ -101,44 +100,35 @@ h1, h2, h3, h4, h5, h6 {
   margin: 1.5em 0 0.5em 0;
   page-break-after: avoid;
 }
-
 h1 { font-size: 1.8em; }
 h2 { font-size: 1.6em; }
 h3 { font-size: 1.4em; }
 h4 { font-size: 1.3em; }
 h5, h6 { font-size: 1.2em; }
-
 p {
   margin: 0 0 1em 0;
   text-indent: 1em;
 }
-
-/* No indent for first paragraph after headings */
 h1 + p, h2 + p, h3 + p, h4 + p, h5 + p, h6 + p {
   text-indent: 0;
 }
-
 blockquote {
   margin: 1em 2em;
   font-style: italic;
 }
-
 ul, ol {
   margin: 1em 0;
   padding-left: 2em;
 }
-
 li {
   margin: 0.3em 0;
 }
-
 hr {
   border: none;
   border-top: 1px solid #999;
   margin: 1.5em auto;
   width: 50%;
 }
-
 pre {
   font-family: "Courier New", Courier, monospace;
   background-color: #f5f5f5;
@@ -146,49 +136,42 @@ pre {
   overflow-x: auto;
   page-break-inside: avoid;
 }
-
 code {
   font-family: "Courier New", Courier, monospace;
   background-color: #f5f5f5;
   padding: 0.1em 0.3em;
 }
-
 @media print {
   body {
     font-size: 12pt;
     line-height: 1.5;
   }
-  
   h1, h2, h3, h4, h5, h6 {
     page-break-after: avoid;
   }
-  
   p, blockquote, ul, ol, table, pre {
     page-break-inside: avoid;
   }
 }
-
 #titlepage {
   text-align: center;
   page-break-after: always;
 }
-
 #titlepage title {
   font-size: 2em;
   margin: 3em 0 1em 0;
   display: block;
   font-weight: bold;
 }
-
 #titlepage p {
   font-size: 1.5em;
   margin: 1em 0;
   display: block;
 }
-
 article {
   page-break-before: always;
-}"""
+}
+"""
 
 # Block elements to process
 BLOCK_ELEMENTS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'th', 'td', 'title', 'blockquote', 'cite', 'br', 'hr']
