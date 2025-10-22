@@ -475,19 +475,10 @@ class BookTranslator:
                 print(f"Warning: Failed to save complete markdown content: {e}")
         # Parse markdown content to extract chapters
         chapters = self.parse_markdown_content(markdown_content, source_lang)
-        # Extract book title and author from metadata
-        title = "Unknown Title"
-        author = "Unknown Author"
-        if chapters and chapters[0]['paragraphs']:
-            # Metadata is in the first chapter
-            metadata = chapters[0]['paragraphs']
-            for item in metadata:
-                if item.startswith("Title:"):
-                    title = item[7:].strip()
-                elif item.startswith("Author:"):
-                    author = item[8:].strip()
 
         # Get book title and author from database (chapter 0, paragraphs 1 and 2)
+        title = "Unknown Title"
+        author = "Unknown Author"
         try:
             title_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 1)
             author_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 2)
@@ -536,17 +527,20 @@ class BookTranslator:
                 print(f"Warning: Failed to save complete markdown content: {e}")
         # Parse markdown content to extract chapters
         chapters = self.parse_markdown_content(markdown_content, source_lang)
-        # Extract book title and author from metadata
+
+        # Get book title and author from database (chapter 0, paragraphs 1 and 2)
         title = "Unknown Title"
         author = "Unknown Author"
-        if chapters and chapters[0]['paragraphs']:
-            # Metadata is in the first chapter
-            metadata = chapters[0]['paragraphs']
-            for item in metadata:
-                if item.startswith("Title:"):
-                    title = item[7:].strip()
-                elif item.startswith("Author:"):
-                    author = item[8:].strip()
+        try:
+            title_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 1)
+            author_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 2)
+            if title_result:
+                title = title_result
+            if author_result:
+                author = author_result
+        except Exception as e:
+            if self.verbose:
+                print(f"Warning: Could not retrieve title/author from database: {e}")
 
         print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
@@ -674,44 +668,6 @@ class BookTranslator:
                 chapters.append(chapter_data)
                 chapter_index += 1
 
-        # Extract book title and author from metadata
-        title = "Unknown Title"
-        author = "Unknown Author"
-        if chapters and chapters[0]['paragraphs']:
-            # Metadata is in the first chapter
-            metadata = chapters[0]['paragraphs']
-            for item in metadata:
-                if item.startswith("Title:"):
-                    title = item[7:].strip()
-                elif item.startswith("Author:"):
-                    author = item[8:].strip()
-
-        # Get book title and author from database (chapter 0, paragraphs 1 and 2)
-        try:
-            title_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 1)
-            author_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 2)
-            if title_result:
-                title = title_result
-            if author_result:
-                author = author_result
-        except Exception as e:
-            if self.verbose:
-                print(f"Warning: Could not retrieve title/author from database: {e}")
-
-        # Get book title and author from database (chapter 0, paragraphs 1 and 2)
-        try:
-            title_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 1)
-            author_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 2)
-            if title_result:
-                title = title_result
-            if author_result:
-                author = author_result
-        except Exception as e:
-            if self.verbose:
-                print(f"Warning: Could not retrieve title/author from database: {e}")
-
-        print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
-        print(f"{self.sep1}")
         # Save all chapters to a single markdown file
         if self.output_dir and os.path.exists(self.output_dir):
             try:
@@ -726,6 +682,23 @@ class BookTranslator:
                 print(f"Complete content saved to: {filepath}")
             except Exception as e:
                 print(f"Warning: Failed to save complete markdown content: {e}")
+
+        # Get book title and author from database (chapter 0, paragraphs 1 and 2)
+        title = "Unknown Title"
+        author = "Unknown Author"
+        try:
+            title_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 1)
+            author_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 2)
+            if title_result:
+                title = title_result
+            if author_result:
+                author = author_result
+        except Exception as e:
+            if self.verbose:
+                print(f"Warning: Could not retrieve title/author from database: {e}")
+
+        print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
+        print(f"{self.sep1}")
         # Return the chapters array
         return chapters
 
