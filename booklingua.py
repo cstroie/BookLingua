@@ -480,8 +480,8 @@ class BookTranslator:
         title = "Unknown Title"
         author = "Unknown Author"
         try:
-            title_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 1)
-            author_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 2)
+            title_result = chapters[0]['paragraphs'][1]
+            author_result = chapters[0]['paragraphs'][2]
             if title_result:
                 title = title_result
             if author_result:
@@ -490,7 +490,7 @@ class BookTranslator:
             if self.verbose:
                 print(f"Warning: Could not retrieve title/author from database: {e}")
 
-        print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
+        print(f"Extraction completed of '{title}' by {author}. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
 
@@ -532,8 +532,8 @@ class BookTranslator:
         title = "Unknown Title"
         author = "Unknown Author"
         try:
-            title_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 1)
-            author_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 2)
+            title_result = chapters[0]['paragraphs'][1]
+            author_result = chapters[0]['paragraphs'][2]
             if title_result:
                 title = title_result
             if author_result:
@@ -542,7 +542,7 @@ class BookTranslator:
             if self.verbose:
                 print(f"Warning: Could not retrieve title/author from database: {e}")
 
-        print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
+        print(f"Extraction completed of '{title}' by {author}. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
 
@@ -687,8 +687,8 @@ class BookTranslator:
         title = "Unknown Title"
         author = "Unknown Author"
         try:
-            title_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 1)
-            author_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 2)
+            title_result = chapters[0]['paragraphs'][1]
+            author_result = chapters[0]['paragraphs'][2]
             if title_result:
                 title = title_result
             if author_result:
@@ -697,7 +697,7 @@ class BookTranslator:
             if self.verbose:
                 print(f"Warning: Could not retrieve title/author from database: {e}")
 
-        print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
+        print(f"Extraction completed of '{title}' by {author}. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         # Return the chapters array
         return chapters
@@ -722,6 +722,7 @@ class BookTranslator:
         """
         try:
             metadata_parts = []
+
             # Extract book ID
             book_id_metadata = book.get_metadata('DC', 'identifier')
             if book_id_metadata:
@@ -729,6 +730,7 @@ class BookTranslator:
             else:
                 book_id = "Unknown"
             metadata_parts.append(f"{book_id}")
+
             # Extract title
             title_metadata = book.get_metadata('DC', 'title')
             if title_metadata:
@@ -736,6 +738,7 @@ class BookTranslator:
             else:
                 title = "Unknown"
             metadata_parts.append(f"{title}")
+
             # Extract authors
             authors = book.get_metadata('DC', 'creator')
             if authors:
@@ -743,6 +746,7 @@ class BookTranslator:
             else:
                 author_names = ["Unknown"]
             metadata_parts.append(f"{', '.join(author_names)}")
+
             # Extract publisher
             publishers = book.get_metadata('DC', 'publisher')
             if publishers:
@@ -750,6 +754,7 @@ class BookTranslator:
             else:
                 publisher = "Unknown"
             metadata_parts.append(f"{publisher}")
+
             # Extract date
             dates = book.get_metadata('DC', 'date')
             if dates:
@@ -757,6 +762,7 @@ class BookTranslator:
             else:
                 date = "Unknown"
             metadata_parts.append(f"{date}")
+
             # Extract description
             descriptions = book.get_metadata('DC', 'description')
             if descriptions:
@@ -824,6 +830,7 @@ class BookTranslator:
         try:
             if item.get_type() != ebooklib.ITEM_DOCUMENT:
                 return None
+
             # Extract HTML content
             try:
                 html_content = item.get_content()
@@ -832,24 +839,28 @@ class BookTranslator:
                 return None
             if not html_content:
                 return None
+
             # Parse HTML with BeautifulSoup
             try:
                 soup = BeautifulSoup(html_content, 'html.parser')
             except Exception as e:
                 print(f"Warning: Failed to parse HTML content from item {item.get_id()}: {e}")
                 return None
+
             # Convert HTML to Markdown
             try:
                 markdown_content = self.html_to_markdown(soup)
             except Exception as e:
                 print(f"Warning: Failed to convert HTML to Markdown for item {item.get_id()}: {e}")
                 markdown_content = ""
+
             # Extract paragraphs from Markdown
             try:
                 paragraphs = [p.strip() for p in markdown_content.split('\n\n') if p.strip()]
             except Exception as e:
                 print(f"Warning: Failed to extract paragraphs from item {item.get_id()}: {e}")
                 paragraphs = []
+
             # Only include non-empty chapters
             if paragraphs:
                 # Build chapter data dictionary
