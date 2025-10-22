@@ -20,45 +20,58 @@ body {
 h1, h2, h3, h4, h5, h6 {
   font-family: "Helvetica Neue", Arial, sans-serif;
   font-weight: bold;
-  line-height: 1.2;
-  margin: 1.5em 0 0.75em 0;
-  text-align: left;
+  line-height: 2.0;
+  margin: 2em 0 0.75em 0;
+  text-align: center;
   page-break-after: avoid;
   color: #111;
 }
 
 h1 {
   font-size: 2.2em;
-  margin: 1.2em 0 0.6em 0;
+  margin: 2.5em 0 0.6em 0;
+  line-height: 2.5;
 }
 
 h2 {
   font-size: 1.8em;
-  margin: 1.3em 0 0.6em 0;
+  margin: 2.2em 0 0.6em 0;
+  line-height: 2.2;
 }
 
 h3 {
   font-size: 1.5em;
-  margin: 1.2em 0 0.5em 0;
+  margin: 2em 0 0.5em 0;
 }
 
 h4 {
   font-size: 1.3em;
-  margin: 1.1em 0 0.5em 0;
+  margin: 1.8em 0 0.5em 0;
 }
 
 h5, h6 {
   font-size: 1.1em;
-  margin: 1em 0 0.5em 0;
+  margin: 1.5em 0 0.5em 0;
 }
 
 /* Special Page Titles */
-title {
+#titlepage title {
   display: block;
   font-size: 2.5em;
   line-height: 1.2;
-  margin: 2em 0 0.8em 0;
+  margin: 4em 0 0.8em 0;
   text-align: center;
+  font-weight: bold;
+  page-break-after: avoid;
+}
+
+#titlepage p {
+  display: block;
+  font-size: 1.5em;
+  line-height: 1.2;
+  margin: 3em 0 0.8em 0;
+  text-align: center;
+  text-indent: 0;
   font-weight: bold;
   page-break-after: avoid;
 }
@@ -291,27 +304,27 @@ abbr {
     padding: 0;
     max-width: none;
   }
-  
+
   a {
     color: #000;
     text-decoration: none;
     border: none;
   }
-  
+
   h1, h2, h3, h4, h5, h6 {
     page-break-after: avoid;
     color: #000;
   }
-  
+
   p, blockquote, ul, ol, figure, table, pre {
     page-break-inside: avoid;
   }
-  
+
   img {
     max-width: 100% !important;
     height: auto !important;
   }
-  
+
   pre {
     white-space: pre-wrap;
     word-wrap: break-word;
