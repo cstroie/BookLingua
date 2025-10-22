@@ -594,7 +594,7 @@ class BookTranslator:
                 if header_level > 0:
                     current_chapter = {
                         'id': f"{len(chapters):03d}",
-                        'name': f"{len(chapters):03d}. {title}",
+                        'name': f"{len(chapters):03d}. {header_text}",
                         'title': header_text,
                         'paragraphs': [header_text, paragraph]
                     }
@@ -935,7 +935,7 @@ class BookTranslator:
         self.db_cleanup_empty(source_lang, target_lang)
 
         # Summary of chapters found
-        print(f"Found {len(chapters)} chapters to translate ...")
+        print(f"Found {len(chapters)} chapters to import in database ...")
 
         # Save all chapters content to the database
         try:
@@ -949,6 +949,7 @@ class BookTranslator:
                 for par, text in enumerate(texts):
                     # Only save non-empty texts
                     if text and text.strip():
+                        # Get an existing translation
                         translation_data = self.translate_paragraph(text, source_lang, target_lang)
                         target, duration, fluency, model = translation_data
 
@@ -957,9 +958,12 @@ class BookTranslator:
                             INSERT OR IGNORE INTO translations
                             (edition, chapter, paragraph, source_lang, source, target_lang, target, duration, fluency, model)
                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            RETURNING id
                         '''
-                        self.db_execute_query(query, (edition_number, ch, par, source_lang, text, target_lang, target, duration, fluency, model), fetch_mode='none')
+                        self.db_execute_query(query, (edition_number, ch, par, source_lang, text, target_lang, target, duration, fluency, model), fetch_mode='one')
                         total_paragraphs += 1
+                # Commit periodically
+                self.conn.commit()
             print(f"... with {total_paragraphs} paragraphs from all chapters.")
         except Exception as e:
             self.handle_error(e, "database insert all chapters", None, raise_on_error=True)
@@ -1867,12 +1871,12 @@ class BookTranslator:
                             row['created'] if row['created'] else None
                         )
 
-                        self.db_execute_query(query, params, fetch_mode='none')
+                        self.db_execute_query(query, params, fetch_mode='one')
                         imported_count += 1
                     except Exception as e:
                         self.handle_error(e, "CSV row import")
                         continue
-
+                self.conn.commit()
             print(f"Imported {imported_count} translations from {csv_path}")
         except Exception as e:
             self.handle_error(e, "CSV import", None, raise_on_error=True)
