@@ -487,6 +487,18 @@ class BookTranslator:
                 elif item.startswith("Author:"):
                     author = item[8:].strip()
 
+        # Get book title and author from database (chapter 0, paragraphs 1 and 2)
+        try:
+            title_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 1)
+            author_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 2)
+            if title_result:
+                title = title_result
+            if author_result:
+                author = author_result
+        except Exception as e:
+            if self.verbose:
+                print(f"Warning: Could not retrieve title/author from database: {e}")
+
         print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
@@ -673,6 +685,18 @@ class BookTranslator:
                     title = item[7:].strip()
                 elif item.startswith("Author:"):
                     author = item[8:].strip()
+
+        # Get book title and author from database (chapter 0, paragraphs 1 and 2)
+        try:
+            title_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 1)
+            author_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 2)
+            if title_result:
+                title = title_result
+            if author_result:
+                author = author_result
+        except Exception as e:
+            if self.verbose:
+                print(f"Warning: Could not retrieve title/author from database: {e}")
 
         print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
