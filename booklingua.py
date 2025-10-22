@@ -83,6 +83,11 @@ DEFAULT_CONTEXT_SIZE = 5
 DEFAULT_PREFILL_CONTEXT_SIZE = 3
 DEFAULT_KEEP_ALIVE = "30m"
 
+# Block elements to process
+BLOCK_ELEMENTS = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'th', 'td', 'title', 'blockquote', 'cite', 'br', 'hr']
+# Inline tags to process
+INLINE_ELEMENTS = ['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span', 'img', 'br']
+
 # System prompt template - will be formatted with actual languages when used
 SYSTEM_PROMPT = """<translation_system>
   <metadata>
@@ -1241,11 +1246,18 @@ class BookTranslator:
             print(f"Warning: Failed to remove script/style elements: {e}")
 
     def html_check_has_text(self, element) -> bool:
-        """ Check if the element has significant text """
+        """ Check if an HTML element has significant text content.
+
+        Args:
+            element: BeautifulSoup element to check
+        
+        Returns:
+            bool: True if element has significant text, False otherwise
+        """
         has_text = False
         for child in list(element.children):
-            # Check the text element has content
-            if ((not child.name) and child.string.strip()):
+            # Check the text element has content or is an inline element
+            if ((not child.name) and child.string.strip()) or (child.name in INLINE_ELEMENTS):
                 has_text = True
                 break
         return has_text
@@ -1259,20 +1271,18 @@ class BookTranslator:
         Returns:
             List[str]: List of markdown formatted lines
         """
-        # Block elements to process
-        block_elements = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'div', 'th', 'td', 'title', 'blockquote', 'br', 'hr']
         # Initialize list to hold markdown lines
         markdown_lines = []
         try:
             # Process block elements
-            for element in soup.find_all(block_elements, recursive=True):
+            for element in soup.find_all(BLOCK_ELEMENTS, recursive=True):
                 try:
                     if element.name in ['hr', 'br']:
                         # Check if the parent has text
                         if self.html_check_has_text(element.parent):
                             continue
                     else:
-                        # Check if thid element has significant text
+                        # Check if this element has significant text
                         if not self.html_check_has_text(element):
                             continue
                     markdown_line = self.html_convert_element(element)
@@ -1377,11 +1387,9 @@ class BookTranslator:
         element_copy = BeautifulSoup(str(element), 'html.parser')
         if not element_copy:
             return BeautifulSoup("", 'html.parser')
-        # Inline tags to process
-        inline_tags = ['i', 'em', 'b', 'strong', 'u', 'ins', 's', 'del', 'code', 'span', 'img', 'br']
         try:
             # Process each inline tag
-            for tag in element_copy.find_all(inline_tags):
+            for tag in element_copy.find_all(INLINE_ELEMENTS):
                 try:
                     self.html_replace_inline_tag(tag)
                 except Exception as e:
@@ -2557,7 +2565,23 @@ class BookTranslator:
             if self.verbose:
                 print(f"Warning: Search failed: {e}")
         # Add context from previous translations for this language pair
-        for user_msg, assistant_msg in self.context:
+        # Limit context based on word count to avoid exceeding token limits
+        context_word_limit = DEFAULT_MAX_TOKENS / 4  # Approximate token limit
+        context_word_count = 0
+        limited_context = []
+        
+        # Start from the end (most recent) and work backwards
+        for user_msg, assistant_msg in reversed(self.context):
+            # Estimate word count for this context pair
+            pair_word_count = len(user_msg.split()) + len(assistant_msg.split())
+            if context_word_count + pair_word_count <= context_word_limit:
+                context_word_count += pair_word_count
+                limited_context.append((user_msg, assistant_msg))
+            else:
+                break
+        
+        # Add the limited context in chronological order
+        for user_msg, assistant_msg in reversed(limited_context):
             messages.append({"role": "user", "content": f"<{source_lang.lower()}>{user_msg}</{source_lang.lower()}>"})
             messages.append({"role": "assistant", "content": f"<{target_lang.lower()}>{assistant_msg}</{target_lang.lower()}>"})
         # Add current text to translate
@@ -2696,6 +2720,29 @@ class BookTranslator:
         if not target:
             print("Error: Translation failed, skipping paragraph.")
             return
+            
+        # Calculate adequacy score
+        adequacy = self.calculate_adequacy_score(source, target, source_lang, target_lang)
+        
+        # If adequacy is too low, try translating again
+        if adequacy < 25:
+            print(f"Low adequacy score ({adequacy}%), retrying translation...")
+            # Remove the low-quality translation from context to avoid influencing the retry
+            if self.context and self.context[-1][0] == source:
+                self.context.pop()
+                
+            # Retry translation
+            retry_result = self.translate_text(source, source_lang, target_lang)
+            if retry_result and len(retry_result) >= 4:
+                retry_target, _, _, retry_model = retry_result
+                if retry_target:
+                    # Check if retry translation is better
+                    retry_adequacy = self.calculate_adequacy_score(source, retry_target, source_lang, target_lang)
+                    if retry_adequacy > adequacy:
+                        print(f"Retry improved adequacy from {adequacy}% to {retry_adequacy}%")
+                        target, model = retry_target, retry_model
+                        adequacy = retry_adequacy
+        
         end_time = datetime.now()
 
         print(f"{self.sep3}")
