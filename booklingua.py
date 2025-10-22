@@ -3521,7 +3521,7 @@ class BookTranslator:
 
         # Handle empty string
         if chapter_numbers.strip() == "":
-            return []
+            return available_chapters
 
         try:
             # Parse comma-separated list of chapter numbers and ranges
