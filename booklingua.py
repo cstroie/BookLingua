@@ -84,15 +84,14 @@ DEFAULT_PREFILL_CONTEXT_SIZE = 3
 DEFAULT_KEEP_ALIVE = "30m"
 
 # Embedded CSS for EPUB styling
-EPUB_CSS = """/* Minimal EPUB Styles */
-
+EPUB_CSS = """
 body {
   font-family: Georgia, "Times New Roman", serif;
   font-size: 1em;
   line-height: 1.6;
   color: #000;
   margin: 1em;
-  text-align: left;
+  text-align: justify;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -152,24 +151,6 @@ code {
   font-family: "Courier New", Courier, monospace;
   background-color: #f5f5f5;
   padding: 0.1em 0.3em;
-}
-
-table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 1em 0;
-  page-break-inside: avoid;
-}
-
-th, td {
-  border: 1px solid #999;
-  padding: 0.3em;
-  text-align: left;
-}
-
-th {
-  background-color: #f0f0f0;
-  font-weight: bold;
 }
 
 @media print {
