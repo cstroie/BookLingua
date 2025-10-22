@@ -464,6 +464,8 @@ class BookTranslator:
             return []
         # Convert HTML to Markdown using existing method
         markdown_content = self.html_to_markdown(soup)
+        # Parse markdown content to extract chapters
+        chapters = self.parse_markdown_content(markdown_content, source_lang)
         # Save the complete markdown file if output directory exists
         if self.output_dir and os.path.exists(self.output_dir):
             try:
@@ -473,8 +475,6 @@ class BookTranslator:
                     f.write(markdown_content)
             except Exception as e:
                 print(f"Warning: Failed to save complete markdown content: {e}")
-        # Parse markdown content to extract chapters
-        chapters = self.parse_markdown_content(markdown_content, source_lang)
 
         # Get book title and author from database (chapter 0, paragraphs 1 and 2)
         title = "Unknown Title"
@@ -656,11 +656,12 @@ class BookTranslator:
             if item.get_type() != ebooklib.ITEM_DOCUMENT:
                 continue
 
+            # Extract the content
+            chapter_data = self.extract_epub_content(item, source_lang)
             # Set a default title if none exists
             if not hasattr(item, 'title') or not item.title:
-                item.title = f"----"
+                item.title = f"NO_TITLE"
 
-            chapter_data = self.extract_epub_content(item, source_lang)
             if chapter_data:
                 # Update chapter ID and name to be sequential
                 chapter_data['id'] = f"{spine_item[0]}"
@@ -675,9 +676,9 @@ class BookTranslator:
                 filename = os.path.splitext(os.path.basename(self.book_path))[0] + ".md"
                 filepath = os.path.join(self.output_dir, filename)
                 with open(filepath, 'w', encoding='utf-8') as f:
-                    for chapter in chapters:
+                    for chapter in chapters[1:]:
                         # Join all paragraphs with double newlines
-                        content = '\n\n'.join(chapter.get('paragraphs', []))
+                        content = '\n\n'.join(chapter.get('paragraphs', [])[1:])
                         f.write(content)
                 print(f"Complete content saved to: {filepath}")
             except Exception as e:
@@ -861,6 +862,21 @@ class BookTranslator:
                 print(f"Warning: Failed to extract paragraphs from item {item.get_id()}: {e}")
                 paragraphs = []
 
+            # Extract header level and header text of this chapter
+            header_text = None
+            for paragraph in paragraphs:
+                print("PAR: ", paragraph)
+                # Check for headers
+                if paragraph.startswith('#') and header_text is None:
+                    # Extract header level and text of this chapter
+                    header_level = 0
+                    header_text = paragraph
+                    while header_text.startswith('#') and header_level < 6:
+                        header_level += 1
+                        header_text = header_text[1:]
+                    item.title = header_text.strip()
+                    break
+
             # Only include non-empty chapters
             if paragraphs:
                 # Build chapter data dictionary
@@ -868,7 +884,7 @@ class BookTranslator:
                     'id': item.get_id(),
                     'name': item.get_name(),
                     'title': item.title,
-                    'paragraphs': [item.title] + paragraphs
+                    'paragraphs': [item.title if item.title else item.get_id()] + paragraphs
                 }
                 # Save chapter as markdown if output directory exists
                 self.save_chapter_as_markdown(chapter_data, source_lang)
@@ -1168,9 +1184,9 @@ class BookTranslator:
         # Remove script and style elements
         self.html_remove_script_style(soup)
         # Process block elements
-        markdown_lines = self.html_process_blocks(soup)
+        paragraphs = self.html_process_blocks(soup)
         # Join with double newlines for paragraph separation
-        return "\n\n".join(markdown_lines)
+        return "\n\n".join(paragraphs)
 
     def html_remove_script_style(self, soup):
         """Remove script and style elements from the soup.
@@ -1235,14 +1251,14 @@ class BookTranslator:
         if element.name == 'hr':
             return '---'
         elif element.name == 'br':
-            return '***'
+            return '~~~'
         # Process inline tags within the element
         processed_element = self.html_process_inlines(element)
         text = processed_element.get_text(separator=' ', strip=True)
         # Replace newlines with spaces
         text = text.replace('\n', ' ')
-        # Replace '\s*---\s*' with newline
-        text = re.sub(r'\s*---\s*', '\n', text)
+        # Replace '\s***\s*' with newline
+        text = re.sub(r'\s*~~~\s*', '\n', text)
         if not text:
             return None
         # Add appropriate Markdown formatting
@@ -1368,7 +1384,7 @@ class BookTranslator:
         elif tag.name == 'img':
             return self.html_get_replacement_img(tag)
         elif tag.name in ['br',] and tag.parent.name in ['p', 'div']:
-            return f'---'
+            return f'~~~'
         elif tag.name == 'span':
             return self.html_get_replacement_span(tag, text)
         else:  # other tags
@@ -2200,9 +2216,9 @@ class BookTranslator:
             total_paragraphs = 0
             for ch, chapter in enumerate(chapters):
                 texts = chapter.get('paragraphs', [])
-                chapter_id = chapter.get('id', 'Unknown') or 'Unknown'
-                chapter_title = chapter.get('title', 'Untitled') or 'Untitled'
-                chapter_name = chapter.get('name', 'Untitled Chapter') or 'Untitled Chapter'
+                chapter_id = chapter.get('id', 'Unknown')
+                chapter_title = chapter.get('title', 'Untitled')
+                chapter_name = chapter.get('name', 'Untitled Chapter')
                 print(f"{(ch):>3}: {(len(texts)):>5} {chapter_id[:20]:<20} {chapter_title[:20]:<20} {chapter_name[:25]:<25}")
                 for par, text in enumerate(texts):
                     # Only save non-empty texts
