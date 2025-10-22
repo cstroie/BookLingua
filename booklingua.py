@@ -937,8 +937,32 @@ class BookTranslator:
         # Summary of chapters found
         print(f"Found {len(chapters)} chapters to translate ...")
 
-        # Save all texts
-        self.db_insert_all_chapters(chapters, source_lang, target_lang, edition_number)
+        # Save all chapters content to the database
+        try:
+            total_paragraphs = 0
+            for ch, chapter in enumerate(chapters):
+                texts = chapter.get('paragraphs', [])
+                chapter_id = chapter.get('id', 'Unknown')
+                chapter_title = chapter.get('title', 'Untitled')
+                chapter_name = chapter.get('name', 'Untitled Chapter')
+                print(f"{(ch):>3}: {(len(texts)):>5} {chapter_id[:20]:<20} {chapter_title[:20]:<20} {chapter_name[:25]:<25}")
+                for par, text in enumerate(texts):
+                    # Only save non-empty texts
+                    if text and text.strip():
+                        translation_data = self.translate_paragraph(text, source_lang, target_lang)
+                        target, duration, fluency, model = translation_data
+
+                        # Insert with translation if not already there
+                        query = '''
+                            INSERT OR IGNORE INTO translations
+                            (edition, chapter, paragraph, source_lang, source, target_lang, target, duration, fluency, model)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        '''
+                        self.db_execute_query(query, (edition_number, ch, par, source_lang, text, target_lang, target, duration, fluency, model), fetch_mode='none')
+                        total_paragraphs += 1
+            print(f"... with {total_paragraphs} paragraphs from all chapters.")
+        except Exception as e:
+            self.handle_error(e, "database insert all chapters", None, raise_on_error=True)
 
         return edition_number
 
@@ -2216,41 +2240,6 @@ class BookTranslator:
                 print(f"Deleted {len(deleted_rows)} existing entries with empty translations")
         except Exception as e:
             self.handle_error(e, "database cleanup empty translations")
-
-    def db_insert_all_chapters(self, chapters: List[dict], source_lang: str, target_lang: str, edition_number: int):
-        """Save all chapters content to the database.
-
-        Args:
-            chapters (List[dict]): List of chapter dictionaries containing paragraphs
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-            edition_number (int): Edition number to use
-        """
-        try:
-            total_paragraphs = 0
-            for ch, chapter in enumerate(chapters):
-                texts = chapter.get('paragraphs', [])
-                chapter_id = chapter.get('id', 'Unknown')
-                chapter_title = chapter.get('title', 'Untitled')
-                chapter_name = chapter.get('name', 'Untitled Chapter')
-                print(f"{(ch):>3}: {(len(texts)):>5} {chapter_id[:20]:<20} {chapter_title[:20]:<20} {chapter_name[:25]:<25}")
-                for par, text in enumerate(texts):
-                    # Only save non-empty texts
-                    if text and text.strip():
-                        translation_data = self.translate_paragraph(text, source_lang, target_lang)
-                        target, duration, fluency, model = translation_data
-
-                        # Insert with translation if not already there
-                        query = '''
-                            INSERT OR IGNORE INTO translations
-                            (edition, chapter, paragraph, source_lang, source, target_lang, target, duration, fluency, model)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        '''
-                        self.db_execute_query(query, (edition_number, ch, par, source_lang, text, target_lang, target, duration, fluency, model), fetch_mode='none')
-                        total_paragraphs += 1
-            print(f"... with {total_paragraphs} paragraphs from all chapters.")
-        except Exception as e:
-            self.handle_error(e, "database insert all chapters", None, raise_on_error=True)
 
     def translate_paragraph(self, text: str, source_lang: str, target_lang: str) -> tuple:
         """Process a paragraph text and determine its translation data.
