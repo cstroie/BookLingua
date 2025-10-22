@@ -486,7 +486,7 @@ class BookTranslator:
                     title = item[7:].strip()
                 elif item.startswith("Author:"):
                     author = item[8:].strip()
-        
+
         print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
@@ -535,7 +535,7 @@ class BookTranslator:
                     title = item[7:].strip()
                 elif item.startswith("Author:"):
                     author = item[8:].strip()
-        
+
         print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         return chapters
@@ -673,7 +673,7 @@ class BookTranslator:
                     title = item[7:].strip()
                 elif item.startswith("Author:"):
                     author = item[8:].strip()
-        
+
         print(f"Extraction completed. Book: '{title}' by {author}. Found {len(chapters)} chapters.")
         print(f"{self.sep1}")
         # Save all chapters to a single markdown file
@@ -696,13 +696,13 @@ class BookTranslator:
     def extract_epub_metadata(self, book, source_lang: str) -> Optional[dict]:
         """Extract metadata from EPUB book and create metadata chapter.
 
-        The metadata has the following structure:
-        0. Book ID
-        1. Title
-        2. Author(s)
-        3. Publisher
-        4. Date
-        5-. Description
+        The metadata paragraphs are the following:
+          0. Book ID
+          1. Title
+          2. Author(s)
+          3. Publisher
+          4. Date
+          5-. Description
 
         Args:
             book: An opened EPUB book object
@@ -719,35 +719,35 @@ class BookTranslator:
                 book_id = book_id_metadata[0][0]
             else:
                 book_id = "Unknown"
-            metadata_parts.append(f"Book ID: {book_id}")
+            metadata_parts.append(f"{book_id}")
             # Extract title
             title_metadata = book.get_metadata('DC', 'title')
             if title_metadata:
                 title = title_metadata[0][0]
             else:
                 title = "Unknown"
-            metadata_parts.append(f"Title: {title}")
+            metadata_parts.append(f"{title}")
             # Extract authors
             authors = book.get_metadata('DC', 'creator')
             if authors:
                 author_names = [author[0] for author in authors]
             else:
                 author_names = ["Unknown"]
-            metadata_parts.append(f"Author: {', '.join(author_names)}")
+            metadata_parts.append(f"{', '.join(author_names)}")
             # Extract publisher
             publishers = book.get_metadata('DC', 'publisher')
             if publishers:
                 publisher = publishers[0][0]
             else:
                 publisher = "Unknown"
-            metadata_parts.append(f"Publisher: {publisher}")
+            metadata_parts.append(f"{publisher}")
             # Extract date
             dates = book.get_metadata('DC', 'date')
             if dates:
                 date = dates[0][0]
             else:
                 date = "Unknown"
-            metadata_parts.append(f"Date: {date}")
+            metadata_parts.append(f"{date}")
             # Extract description
             descriptions = book.get_metadata('DC', 'description')
             if descriptions:
@@ -763,7 +763,6 @@ class BookTranslator:
                     description = description.strip()
             else:
                 description = "Unknown"
-            metadata_parts.append(f"Description: {description}")
             metadata_parts.extend(description.split('\n\n'))
             # Combine all metadata parts
             if metadata_parts:
