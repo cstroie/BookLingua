@@ -678,8 +678,10 @@ class BookTranslator:
                 with open(filepath, 'w', encoding='utf-8') as f:
                     for chapter in chapters[1:]:
                         # Join all paragraphs with double newlines
-                        content = '\n\n'.join(chapter.get('paragraphs', [])[1:])
-                        f.write(content)
+                        paragraphs = chapter.get('paragraphs', [])
+                        if paragraphs:
+                            content = '\n\n'.join(paragraphs[1:] + [''])
+                            f.write(content)
                 print(f"Complete content saved to: {filepath}")
             except Exception as e:
                 print(f"Warning: Failed to save complete markdown content: {e}")
@@ -865,7 +867,6 @@ class BookTranslator:
             # Extract header level and header text of this chapter
             header_text = None
             for paragraph in paragraphs:
-                print("PAR: ", paragraph)
                 # Check for headers
                 if paragraph.startswith('#') and header_text is None:
                     # Extract header level and text of this chapter
@@ -876,6 +877,11 @@ class BookTranslator:
                         header_text = header_text[1:]
                     item.title = header_text.strip()
                     break
+            # Check for other heading-like lines if not found
+            if header_text is None:
+                first_line, _, _ = self.strip_markdown_formatting(paragraphs[0])
+                if len(first_line.split()) < 10:
+                    item.title = first_line
 
             # Only include non-empty chapters
             if paragraphs:
@@ -1200,6 +1206,16 @@ class BookTranslator:
         except Exception as e:
             print(f"Warning: Failed to remove script/style elements: {e}")
 
+    def html_check_has_text(self, element) -> bool:
+        """ Check if the element has significant text """
+        has_text = False
+        for child in list(element.children):
+            # Check the text element has content
+            if ((not child.name) and child.string.strip()):
+                has_text = True
+                break
+        return has_text
+
     def html_process_blocks(self, soup) -> List[str]:
         """Process block elements and convert them to markdown lines.
 
@@ -1217,16 +1233,14 @@ class BookTranslator:
             # Process block elements
             for element in soup.find_all(block_elements, recursive=True):
                 try:
-                    # Check if the element has significant text
-                    has_text = False
-                    for child in list(element.children):
-                        # Check the text has content or the child is not a block element
-                        if (not child.name and child.string.strip()): # or (child.name not in block_elements):
-                            has_text = True
-                            break
-                    # If no significant text, move along
-                    if not has_text:
-                        continue
+                    if element.name in ['hr', 'br']:
+                        # Check if the parent has text
+                        if self.html_check_has_text(element.parent):
+                            continue
+                    else:
+                        # Check if thid element has significant text
+                        if not self.html_check_has_text(element):
+                            continue
                     markdown_line = self.html_convert_element(element)
                     if markdown_line is not None:
                         markdown_lines.append(markdown_line)
