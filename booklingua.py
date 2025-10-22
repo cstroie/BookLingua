@@ -2429,11 +2429,12 @@ class BookTranslator:
         match = re.search(pattern, translation, re.DOTALL)
         
         if not match:
-            # If no XML tags found, add instruction and retry
-            messages.append({"role": "assistant", "content": translation})
-            messages.append({"role": "user", "content": f"Please wrap your translation in XML tags with the target language name in lowercase, like this <{target_lang_lower}>...</{target_lang_lower}>."})
+            # If no XML tags found, reduce context by one and retry with same paragraph
+            if len(self.context) > 0:
+                self.context = self.context[:-1]  # Remove last context entry
             
-            # Retry the API call
+            # Retry the API call with reduced context
+            messages = self.translate_api_prepare_chat(stripped_text, source_lang, target_lang)
             payload["messages"] = messages
             translation = self.make_api_request(headers, payload)
             
