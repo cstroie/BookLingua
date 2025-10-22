@@ -1032,7 +1032,7 @@ class BookTranslator:
         elif ':' in author:
             author = author.split(':', 1)[1].strip()
         # Create XHTML content with title and author
-        xhtml = f'<article id="titlepage">\n<h1>{title}</h1>\n<p>{author}</p>\n</article>'
+        xhtml = f'<article id="titlepage">\n<title>{title}</title>\n<p>{author}</p>\n</article>'
         # Create the title page chapter
         titlepage = epub.EpubHtml(
             title='Title Page',
