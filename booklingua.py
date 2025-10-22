@@ -493,6 +493,12 @@ class BookTranslator:
             author_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 2)
             if title_result:
                 title = title_result
+        # Get book title and author from database (chapter 0, paragraphs 1 and 2)
+        try:
+            title_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 1)
+            author_result = self.db_get_item(source_lang, target_lang, self.db_get_latest_edition(source_lang, target_lang), 0, 2)
+            if title_result:
+                title = title_result
             if author_result:
                 author = author_result
         except Exception as e:
