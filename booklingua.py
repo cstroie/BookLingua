@@ -3322,26 +3322,22 @@ class BookTranslator:
         }
 
         # Check for untranslated segments (source language words in target translation)
-        if source_lang.lower() == 'english':
-            # Simple check for English words in non-English translation
-            english_words = re.findall(r'\b[a-zA-Z]{4,}\b', translated)
-            errors['untranslated_segments'] = len(english_words)
-        elif source_lang.lower() == 'french':
-            # Simple check for French words in non-French translation
-            french_words = re.findall(r'\b[a-zA-ZàâäéèêëïîôöùûüÿçÀÂÄÉÈÊËÏÎÔÖÙÛÜŸÇ]{4,}\b', translated)
-            errors['untranslated_segments'] = len(french_words)
-        elif source_lang.lower() == 'german':
-            # Simple check for German words in non-German translation
-            german_words = re.findall(r'\b[a-zA-ZäöüßÄÖÜ]{4,}\b', translated)
-            errors['untranslated_segments'] = len(german_words)
-        elif source_lang.lower() == 'spanish':
-            # Simple check for Spanish words in non-Spanish translation
-            spanish_words = re.findall(r'\b[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]{4,}\b', translated)
-            errors['untranslated_segments'] = len(spanish_words)
-        else:
-            # Generic check for any source language words
-            source_words = re.findall(r'\b\w{4,}\b', translated)
-            errors['untranslated_segments'] = len(source_words) // 2  # Heuristic estimate
+        # Only check for actual untranslated source text, not all words that match character patterns
+        untranslated_count = 0
+        
+        # Extract significant words from original text (longer than 3 characters)
+        original_words = [word.lower().strip('.,!?;:"()[]{}') for word in original.split() if len(word) > 3]
+        
+        # For each significant word in original, check if it appears in translated text
+        # This indicates it wasn't translated
+        for word in original_words:
+            # Escape special regex characters in the word
+            escaped_word = re.escape(word)
+            # Look for the word as a whole word in the translated text
+            if re.search(r'\b' + escaped_word + r'\b', translated, re.IGNORECASE):
+                untranslated_count += 1
+                
+        errors['untranslated_segments'] = untranslated_count
 
         # Check for repeated phrases (more robust detection)
         sentences = [s.strip() for s in re.split(r'[.!?]+', translated) if s.strip()]
