@@ -2569,7 +2569,7 @@ class BookTranslator:
         messages = [
             {
                 "role": "system",
-                "content": SYSTEM_PROMPT.format(
+                "content": self.strip_spaces_between_tags(SYSTEM_PROMPT).format(
                     source_lang=source_lang,
                     target_lang=target_lang
                 )
@@ -3529,6 +3529,24 @@ class BookTranslator:
         text = re.sub(pattern_self_closing, '', text, flags=re.IGNORECASE)
         # Return cleaned text
         return text
+
+    def strip_spaces_between_tags(self, xml_text: str) -> str:
+        """
+        Remove all spaces and newlines between the end of an XML tag and the beginning of the next one.
+
+        Args:
+            xml_text (str): The input XML text
+
+        Returns:
+            str: XML text with spaces and newlines removed between tags
+        """
+        # Pattern explanation:
+        # (>)(\s+)(<) - Captures:
+        #   > - The end of a tag
+        #   \s+ - One or more whitespace characters (including newlines)
+        #   < - The start of the next tag
+        # Replacement: $1$3 - Keeps only the closing > and opening < tags
+        return re.sub(r'(>)(\s+)(<)', r'\1\3', xml_text)
 
     def strip_markdown_formatting(self, text: str) -> tuple:
         """Strip markdown formatting and return clean text with prefix/suffix.
