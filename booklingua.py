@@ -1979,7 +1979,7 @@ class BookTranslator:
             query += " AND source LIKE ?"
             params.append(f"%{word}%")
         # Order by fluency descending
-        query += " ORDER BY fluency DESC LIMIT 3"
+        query += " ORDER BY fluency DESC LIMIT 1"
 
         return self.db_execute_query(query, tuple(params), 'all') or []
 
@@ -2586,7 +2586,7 @@ class BookTranslator:
                 print(f"Warning: Search failed: {e}")
         # Add context from previous translations for this language pair
         # Limit context based on word count to avoid exceeding token limits
-        context_word_limit = DEFAULT_MAX_TOKENS / 4  # Approximate token limit
+        context_word_limit = DEFAULT_MAX_TOKENS / 8  # Approximate token limit
         context_word_count = 0
         limited_context = []
         
