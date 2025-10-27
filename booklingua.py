@@ -375,8 +375,8 @@ class BookTranslator:
         print(f"{self.sep1}")
         print(f"Translating from {source_lang} to {target_lang}")
 
-        # Get filtered chapter list
-        edition_number, chapter_list = self.filter_chapters(source_lang, target_lang, chapter_numbers, True)
+        # Get filtered chapter list including metadata
+        edition_number, chapter_list = self.filter_chapters(source_lang, target_lang, chapter_numbers, True, with_metadata=True)
 
         if edition_number == 0:
             print("No content found in database. Please run extract phase first.")
@@ -428,8 +428,8 @@ class BookTranslator:
         print(f"{self.sep1}")
         print(f"Building translated EPUB from {source_lang} to {target_lang}")
 
-        # Get filtered chapter list
-        edition_number, chapter_list = self.filter_chapters(source_lang, target_lang, chapter_numbers, False)
+        # Get filtered chapter list (without metadata)
+        edition_number, chapter_list = self.filter_chapters(source_lang, target_lang, chapter_numbers, False, with_metadata=False)
 
         if edition_number == 0:
             print("No translations found in database. Please run translation phase first.")
@@ -3360,7 +3360,7 @@ class BookTranslator:
         return report
 
     def filter_chapters(self, source_lang: str, target_lang: str, chapter_numbers: str = None,
-                       by_length: bool = False) -> tuple:
+                       by_length: bool = False, with_metadata: bool = False) -> tuple:
         """Filter and process chapter list based on user input.
 
         Args:
@@ -3368,6 +3368,7 @@ class BookTranslator:
             target_lang (str): Target language code
             chapter_numbers (str, optional): Comma-separated list of chapter numbers or ranges
             by_length (bool): Whether to sort by paragraph count (True) or chapter number (False)
+            with_metadata (bool): Whether to include chapter 0 (metadata) in the list
 
         Returns:
             tuple: (edition_number, chapter_list) or (0, []) if no chapters found
@@ -3379,6 +3380,10 @@ class BookTranslator:
 
         # Get chapter list
         chapter_list = self.db_get_chapters_list(source_lang, target_lang, edition_number, by_length)
+
+        # Include metadata chapter (0) if requested
+        if with_metadata and 0 not in chapter_list:
+            chapter_list = [0] + chapter_list
 
         # If specific chapters requested, filter the list
         if chapter_numbers is not None:
