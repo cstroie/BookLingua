@@ -4376,7 +4376,7 @@ def main():
             target_lang=target_lang,
             chapter_numbers=args.chapters
         )
-    if args.phase_proofread or all_phases:
+    if args.phase_proofread:
         translator.phase_proofread(
             source_lang=source_lang,
             target_lang=target_lang,
