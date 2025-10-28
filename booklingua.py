@@ -3352,9 +3352,8 @@ class BookTranslator:
             # Creates: translations/book Romanian.epub with only chapters 3, 5, and 7
             # Also creates: translations/English/ and translations/Romanian/ directories
         """
-        # Run all three phases in sequence
+        # Run all phases in sequence (proofread is optional)
         self.phase_translate(source_lang, target_lang, chapter_numbers)
-        self.phase_proofread(source_lang=source_lang, target_lang=target_lang, chapter_numbers=chapter_numbers)
         self.phase_build(output_dir, source_lang, target_lang, chapter_numbers)
 
     def translate_context(self, texts: List[str], source_lang: str, target_lang: str):
@@ -4369,7 +4368,7 @@ def main():
     print(f"Running phases: "
           f"{'extract ' if args.phase_extract or all_phases else ''}"
           f"{'translate ' if args.phase_translate or all_phases else ''}"
-          f"{'proofread ' if args.phase_proofread or all_phases else ''}"
+          f"{'proofread ' if args.phase_proofread else ''}"
           f"{'build' if args.phase_build or all_phases else ''}")
     # Run specific phases
     if args.phase_extract or all_phases:
