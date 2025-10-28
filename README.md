@@ -2,13 +2,13 @@
 
 **Translate EPUB books using AI models with database caching and context preservation.**
 
-A Python tool for translating EPUB books using various AI models through their API endpoints. The tool uses a three-phase workflow (extract → translate → build) with advanced features like database caching, context management, and quality assessment.
+A Python tool for translating EPUB books using various AI models through their API endpoints. The tool uses a four-phase workflow (extract → translate → proofread → build) with advanced features like database caching, context management, and quality assessment.
 
 ## Features
 
 - Translate EPUB books between any languages using various AI models
 - Support for multiple translation services (OpenAI, Ollama, Mistral, DeepSeek, Together AI, LM Studio, OpenRouter)
-- Three-phase workflow: extract → translate → build
+- Four-phase workflow: extract → translate → proofread → build
 - Direct translation method (Source → Target)
 - Preserves original formatting and structure
 - Database caching for reliability and resume capability
@@ -35,7 +35,7 @@ export OPENAI_API_KEY=your_api_key_here
 ## Quick Start
 
 ```bash
-# Basic translation (runs all three phases)
+# Basic translation (runs all phases, proofread is optional)
 python booklingua.py input.epub
 
 # Custom languages
@@ -47,6 +47,7 @@ python booklingua.py input.epub --verbose
 # Run specific phases
 python booklingua.py input.epub --extract
 python booklingua.py input.epub --translate
+python booklingua.py input.epub --proofread
 python booklingua.py input.epub --build
 
 # Translate HTML or Markdown files
@@ -59,7 +60,7 @@ python booklingua.py input.md
 ### Basic Translation
 
 ```bash
-# Direct translation with default settings (runs all three phases)
+# Direct translation with default settings (runs all phases, proofread is optional)
 python booklingua.py input.epub
 
 # Custom languages
@@ -71,6 +72,7 @@ python booklingua.py input.epub --verbose
 # Run specific phases
 python booklingua.py input.epub --extract
 python booklingua.py input.epub --translate
+python booklingua.py input.epub --proofread
 python booklingua.py input.epub --build
 
 # Translate HTML or Markdown files
@@ -152,21 +154,24 @@ python booklingua.py input.epub --throttle 1.0
 
 1. **Extract** text content from EPUB chapters and save to database
 2. **Translate** chapters using AI models with context management
-3. **Build** translated EPUB file from database translations
+3. **Proofread** translated chapters to improve fluency and correctness (optional)
+4. **Build** translated EPUB file from database translations
 
-### Three-Phase Workflow
+### Four-Phase Workflow
 
-BookLingua uses a three-phase workflow that allows for better control and resume capability:
+BookLingua uses a four-phase workflow that allows for better control and resume capability:
 
 1. **Extract Phase** (`--extract`): Extracts text content from the input file and saves it to the database
 2. **Translate Phase** (`--translate`): Translates chapters using the AI model and saves translations to the database
-3. **Build Phase** (`--build`): Creates the final translated file from database translations
+3. **Proofread Phase** (`--proofread`): Proofreads translated chapters to improve fluency and correctness (optional)
+4. **Build Phase** (`--build`): Creates the final translated file from database translations
 
 This workflow allows you to:
 - Run phases separately for better control
 - Resume interrupted translations
 - Translate specific chapters only
 - Rebuild the output file without re-translating
+- Proofread translations for improved quality (optional)
 
 ## Customization
 
@@ -293,7 +298,7 @@ python booklingua.py book.epub -c "3-7"
 python booklingua.py book.epub -c "1,3-5,8-10"
 ```
 
-#### Three-Phase Workflow
+#### Four-Phase Workflow
 
 Run phases separately for better control:
 
@@ -303,6 +308,9 @@ python booklingua.py book.epub --extract
 
 # Translate chapters
 python booklingua.py book.epub --translate
+
+# Proofread translated chapters (optional)
+python booklingua.py book.epub --proofread
 
 # Build final EPUB
 python booklingua.py book.epub --build
@@ -429,7 +437,7 @@ translator = BookTranslator(
     book_path="book.epub"
 )
 
-# Translate EPUB (runs all three phases)
+# Translate EPUB (runs all phases, proofread is optional)
 translator.translate_epub(
     output_dir="output",
     source_lang="English",
@@ -447,12 +455,13 @@ translator.translate_epub(
 )
 ```
 
-#### Three-Phase Workflow
+#### Four-Phase Workflow
 
 ```python
 # Run phases separately
 translator.phase_extract(output_dir="output", source_lang="English", target_lang="Spanish")
 translator.phase_translate(source_lang="English", target_lang="Spanish")
+translator.phase_proofread(source_lang="English", target_lang="Spanish")  # Optional
 translator.phase_build(output_dir="output", source_lang="English", target_lang="Spanish")
 ```
 
