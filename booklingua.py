@@ -619,7 +619,7 @@ class BookTranslator:
 
         if self.verbose:
             # Show fluency score and timing stats
-            print(f"Fluency: {fluency}% | Time: {elapsed/1000:.2f}s", " | Skipped" if not proofread_text)
+            print(f"Fluency: {fluency}% | Time: {elapsed/1000:.2f}s" + (" | Skipped" if not proofread_text else ""))
 
     def phase_build(self, output_dir: str = "output",
                    source_lang: str = "English", target_lang: str = "Romanian",
