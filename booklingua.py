@@ -2578,7 +2578,7 @@ class BookTranslator:
         result, model = response
         # Return early if no result
         if not result:
-            return result, -1, -1, model
+            return "", -1, -1, ""
 
         # Update translation context for this language pair, already stripped of markdown
         self.context_add(stripped_text, result, False)
@@ -3072,9 +3072,6 @@ class BookTranslator:
         # Time the translation
         start_time = datetime.now()
         translation_result = self.translate_text(source, source_lang, target_lang)
-        if not translation_result or len(translation_result) < 4:
-            print("Error: Translation failed, skipping paragraph.")
-            return
         target, _, _, model = translation_result
         if not target:
             print("Error: Translation failed, skipping paragraph.")
