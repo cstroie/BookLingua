@@ -2563,7 +2563,7 @@ class BookTranslator:
         # Check cache first
         if use_cache and self.conn:
             cached_result = self.db_check_cache(text, source_lang, target_lang)
-            if cached_result:
+            if cached_result[0]:
                 return cached_result
 
         # Strip markdown formatting for cleaner translation
@@ -2610,7 +2610,7 @@ class BookTranslator:
         # Check cache first
         if use_cache and self.conn:
             cached_result = self.db_check_cache(text, source_lang, target_lang)
-            if cached_result and cached_result[0]:
+            if cached_result[0]:
                 return cached_result
 
         # Strip markdown formatting for cleaner proofreading
@@ -2648,19 +2648,17 @@ class BookTranslator:
             target_lang (str): Target language code
 
         Returns:
-            tuple: Cached translation result (target, duration, fluency)
+            tuple: Cached translation result (target, duration, fluency, model) if found,
+                   (None, -1, -1, None) otherwise
         """
         try:
             cached_result = self.db_get_translation(text, source_lang, target_lang)
             if cached_result[0]:
                 # Push to context list for continuity
                 self.context_add(text, cached_result[0])
-                if self.verbose:
-                    print("✓ Using cached translation")
                 return cached_result
         except Exception as e:
-            if self.verbose:
-                print(f"Cache check failed: {e}")
+            raise Exception(f"Cache check failed: {e}")
         return None, -1, -1, None
 
     def translate_with_bleeding_detection(self, stripped_text: str, source_lang: str, target_lang: str) -> tuple:
@@ -3089,15 +3087,14 @@ class BookTranslator:
                 
             # Retry translation
             retry_result = self.translate_text(source, source_lang, target_lang)
-            if retry_result and len(retry_result) >= 4:
-                retry_target, _, _, retry_model = retry_result
-                if retry_target:
-                    # Check if retry translation is better
-                    retry_adequacy = self.calculate_adequacy_score(source, retry_target, source_lang, target_lang)
-                    if retry_adequacy > adequacy:
-                        print(f"Retry improved adequacy from {adequacy}% to {retry_adequacy}%")
-                        target, model = retry_target, retry_model
-                        adequacy = retry_adequacy
+            retry_target, _, _, retry_model = retry_result
+            if retry_target:
+                # Check if retry translation is better
+                retry_adequacy = self.calculate_adequacy_score(source, retry_target, source_lang, target_lang)
+                if retry_adequacy > adequacy:
+                    print(f"Retry improved adequacy from {adequacy}% to {retry_adequacy}%")
+                    target, model = retry_target, retry_model
+                    adequacy = retry_adequacy
         
         end_time = datetime.now()
 
