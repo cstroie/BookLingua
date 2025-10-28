@@ -2607,22 +2607,26 @@ class BookTranslator:
         # Check cache first
         if use_cache and self.conn:
             cached_result = self.db_check_cache(text, source_lang, target_lang)
-            if cached_result:
-                return cached_result[0]
+            if cached_result and cached_result[0]:
+                return cached_result
 
         # Strip markdown formatting for cleaner proofreading
         stripped_text, prefix, suffix = self.strip_markdown_formatting(text)
         # Return empty if empty after stripping
         if not stripped_text.strip():
-            return "", -1, -1, model
+            return "", 0, 100, 'copy'
 
         # Call the API with retry logic
         response = self.proofread_with_bleeding_detection(stripped_text, source_lang, target_lang)
+        # Check if response is None
+        if not response:
+            return text, -1, -1, self.model if hasattr(self, 'model') else 'unknown'
+        
         # Extract the resulting text and model
         result, model = response
         # Check for identical response when proofreading
         if result == stripped_text:
-            return "", -1, -1, model
+            return text, -1, -1, model
 
         # Update context for this language pair, already stripped of markdown
         self.context_add(stripped_text, result, False)
