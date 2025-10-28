@@ -619,7 +619,7 @@ class BookTranslator:
 
         if self.verbose:
             # Show fluency score and timing stats
-            print(f"Fluency: {fluency}% | Time: {elapsed/1000:.2f}s")
+            print(f"Fluency: {fluency}% | Time: {elapsed/1000:.2f}s", " | Skipped" if not proofread_text)
 
     def phase_build(self, output_dir: str = "output",
                    source_lang: str = "English", target_lang: str = "Romanian",
@@ -2620,12 +2620,12 @@ class BookTranslator:
         response = self.proofread_with_bleeding_detection(stripped_text, source_lang, target_lang)
         # Check if response is None
         if not response:
-            return text, -1, -1, self.model if hasattr(self, 'model') else 'unknown'
+            return text, -1, -1, ""
         
         # Extract the resulting text and model
         result, model = response
         # Check for identical response when proofreading
-        if result == stripped_text:
+        if result.split == stripped_text:
             return text, -1, -1, model
 
         # Update context for this language pair, already stripped of markdown
@@ -2710,7 +2710,7 @@ class BookTranslator:
                     time.sleep(wait_time)
                 else:
                     print(f"Error during translation after {max_retries} attempts: {e}")
-                    return None
+                    return None, None
 
     def proofread_with_bleeding_detection(self, stripped_text: str, source_lang: str, target_lang: str) -> tuple:
         """Proofread text with context bleeding detection and retry logic.
@@ -2762,7 +2762,7 @@ class BookTranslator:
                     time.sleep(wait_time)
                 else:
                     print(f"Error during proofreading after {max_retries} attempts: {e}")
-                    return None
+                    return None, None
 
     def translate_api_call(self, stripped_text: str, source_lang: str, target_lang: str, prompt_type: str = "translate") -> str:
         """Call the translation API with the given text.
@@ -2852,8 +2852,8 @@ class BookTranslator:
             result_text = self.remove_xml_tags(result_text, 'think').strip()
             match = re.search(pattern, result_text, re.DOTALL)
             if not match:
-                # If still no XML tags, use the raw translation
-                return result_text
+                # If still no XML tags, use empty translation
+                return ""
 
         return match.group(1).strip()
 
