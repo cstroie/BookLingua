@@ -494,7 +494,7 @@ class BookTranslator:
             raise Exception("Database connection not available")
 
         print(f"{self.sep1}")
-        print(f"Proofreading from {source_lang} to {target_lang}")
+        print(f"Proofreading {target_lang}")
 
         # Get filtered chapter list including metadata
         edition_number, chapter_list = self.filter_chapters(source_lang, target_lang, chapter_numbers, by_length=True, with_metadata=True)
@@ -542,7 +542,7 @@ class BookTranslator:
         chapter_start_time = datetime.now()
 
         # Pre-fill context with chapter-specific data
-        self.context_prefill(source_lang, target_lang, chapter_number)
+        #self.context_prefill(source_lang, target_lang, chapter_number)
 
         # Proofread all paragraphs in the chapter
         self.proofread_one_chapter(edition_number, chapter_number, source_lang, target_lang, total_chapters, total_count)
