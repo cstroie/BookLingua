@@ -563,10 +563,13 @@ class BookTranslator:
         par = -1
         while True:
             # Get the next chapter's paragraph from database
-            par, source, target = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
+            par, source, target, proofread = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
             if par is not None:
                 # Skip empty paragraphs
                 if not target.strip():
+                    continue
+                # Skip already proofread paragraphs
+                if proofread:
                     continue
                 # Proofread paragraph
                 if target.strip() and len(target.split()) < 1000:
@@ -2979,11 +2982,11 @@ class BookTranslator:
         par = -1
         while True:
             # Get the next chapter's paragraph from database
-            par, source, target = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
+            par, source, target, proofread = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
             if par is not None:
                 # Handle already translated paragraphs
                 if target.strip():
-                    self.display_cached_paragraph(chapter_number, total_chapters, par, total_count, source, target)
+                    self.display_cached_paragraph(chapter_number, total_chapters, par, total_count, source, target, proofread)
                     continue
 
                 # Translate paragraph if needed
@@ -3019,7 +3022,7 @@ class BookTranslator:
         print(f"\n{self.sep1}")
         self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, {total_count} paragraphs", fully_translated_text, self.console_width, 0, 4)
 
-    def display_cached_paragraph(self, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, target: str):
+    def display_cached_paragraph(self, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, target: str, proofread: str):
         """Handle already translated paragraphs from cache.
 
         Args:
@@ -3029,12 +3032,19 @@ class BookTranslator:
             total_count (int): Total paragraphs in chapter
             source (str): Source text
             target (str): Translated text
+            proofread (str): Proofread text (if any)
         """
         if self.verbose:
+            if proofread and proofread.strip():
+                translated = proofread
+                translated_message = "✓ Using cached proofread translation"
+            else:
+                translated = target
+                translated_message = "✓ Using cached translation"
             print()
-            self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, paragraph {par}/{total_count}", "✓ Using cached paragraph translation", self.console_width, 0, 4)
+            self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, paragraph {par}/{total_count}", translated_message, self.console_width, 0, 4)
             print(f"{self.sep3}")
-            self.display_side_by_side(source, target)
+            self.display_side_by_side(source, translated)
             print(f"{self.sep3}")
 
     def translate_paragraph(self, edition_number: int, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, source_lang: str, target_lang: str):
