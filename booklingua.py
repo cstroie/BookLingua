@@ -2168,8 +2168,8 @@ class BookTranslator:
             target_lang (str): Target language code
 
         Returns:
-            tuple: (target, duration, fluency) of the best translation if found,
-                   (None, None, None) otherwise
+            tuple: (target, duration, fluency, model) of the best translation if found,
+                   (None, None, None, None) otherwise
 
         Raises:
             Exception: If database connection is not available
@@ -2661,7 +2661,7 @@ class BookTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Cache check failed: {e}")
-        return None, -1, -1
+        return None, -1, -1, None
 
     def translate_with_bleeding_detection(self, stripped_text: str, source_lang: str, target_lang: str) -> tuple:
         """Translate text with context bleeding detection and retry logic.
