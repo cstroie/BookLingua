@@ -619,7 +619,7 @@ class BookTranslator:
 
         if self.verbose:
             # Show fluency score and timing stats
-            print(f"Fluency: {fluency}% | Time: {elapsed/1000:.2f}s" + (" | Skipped" if not proofread_text else ""))
+            print(("Skipped" if not proofread_text else f"Fluency: {fluency}%") + " | Time: {elapsed/1000:.2f}s")
 
     def phase_build(self, output_dir: str = "output",
                    source_lang: str = "English", target_lang: str = "Romanian",
@@ -2620,13 +2620,13 @@ class BookTranslator:
         response = self.proofread_with_bleeding_detection(stripped_text, source_lang, target_lang)
         # Check if response is None
         if not response:
-            return text, -1, -1, ""
+            return "", -1, -1, ""
         
         # Extract the resulting text and model
         result, model = response
         # Check for identical response when proofreading (ignoring whitespace differences)
         if re.sub(r'\s+', ' ', result.strip()) == re.sub(r'\s+', ' ', stripped_text.strip()):
-            return text, -1, -1, model
+            return "", -1, -1, model
 
         # Update context for this language pair, already stripped of markdown
         self.context_add(stripped_text, result, False)
@@ -3881,7 +3881,7 @@ class BookTranslator:
 
     def strip_spaces_between_tags(self, xml_text: str) -> str:
         """
-        Remove all spaces and newlines between the end of an XML tag and the beginning of the next one.
+        Remove all spaces and newlines between the end of an XML tag and the beginning of the text or next one.
 
         Args:
             xml_text (str): The input XML text
@@ -3895,7 +3895,7 @@ class BookTranslator:
         #   \s+ - One or more whitespace characters (including newlines)
         #   < - The start of the next tag
         # Replacement: $1$3 - Keeps only the closing > and opening < tags
-        return re.sub(r'(>)(\s+)(<)', r'\1\3', xml_text)
+        return re.sub(r'(>)(\s+)(<|[A-Z])', r'\1\3', xml_text)
 
     def strip_markdown_formatting(self, text: str) -> tuple:
         """Strip markdown formatting and return clean text with prefix/suffix.
