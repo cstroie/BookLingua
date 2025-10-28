@@ -2896,15 +2896,20 @@ class BookTranslator:
         # Select the appropriate prompt based on prompt_type
         if prompt_type == "proofread":
             system_prompt = PROOFREAD_PROMPT
+            # For proofreading, both source and target languages are the same
+            prompt_source_lang = target_lang
+            prompt_target_lang = target_lang
         else:
             system_prompt = TRANSLATE_PROMPT
+            prompt_source_lang = source_lang
+            prompt_target_lang = target_lang
             
         messages = [
             {
                 "role": "system",
                 "content": self.strip_spaces_between_tags(system_prompt).format(
-                    source_lang=source_lang,
-                    target_lang=target_lang
+                    source_lang=prompt_source_lang,
+                    target_lang=prompt_target_lang
                 )
             }
         ]
