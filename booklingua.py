@@ -2228,7 +2228,8 @@ class BookTranslator:
         """Get all translated texts in a chapter from the database.
 
         This helper function retrieves all translated paragraphs for a specific chapter
-        from the database, ordered by paragraph number.
+        from the database, ordered by paragraph number. It returns proofread text if
+        available, otherwise the target translation.
 
         Args:
             edition_number (int): Edition number to retrieve translations for
@@ -2243,12 +2244,18 @@ class BookTranslator:
             Exception: If database connection is not available
         """
         query = '''
-            SELECT target FROM translations
-            WHERE edition = ? AND chapter = ?
-                  AND source_lang = ? AND target_lang = ?
-            ORDER BY paragraph ASC
+            SELECT COALESCE(t2.target, t1.target) as target
+            FROM translations t1
+            LEFT JOIN translations t2 ON t1.edition = t2.edition 
+                AND t1.chapter = t2.chapter 
+                AND t1.paragraph = t2.paragraph
+                AND t2.source_lang = ?
+                AND t2.target_lang = ?
+            WHERE t1.edition = ? AND t1.chapter = ?
+                  AND t1.source_lang = ? AND t1.target_lang = ?
+            ORDER BY t1.paragraph ASC
         '''
-        results = self.db_execute_query(query, (edition_number, chapter_number, source_lang, target_lang), 'all')
+        results = self.db_execute_query(query, ("@", target_lang, edition_number, chapter_number, source_lang, target_lang), 'all')
         # Return list of translated texts
         return [result[0] for result in results if result[0] is not None] if results else []
 
