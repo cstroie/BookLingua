@@ -629,7 +629,7 @@ class BookTranslator:
 
         # Insert the proofread into database only if there was something returned
         if proofread_text:
-            self.db_insert_translation(target, proofread_text, target_lang, target_lang,
+            self.db_insert_translation(target, proofread_text, f"@{target_lang}", target_lang,
                                        edition_number, chapter_number, par, elapsed, fluency, self.model)
 
         if self.verbose:
