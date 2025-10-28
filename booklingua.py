@@ -376,7 +376,7 @@ class BookTranslator:
         print(f"Translating from {source_lang} to {target_lang}")
 
         # Get filtered chapter list including metadata
-        edition_number, chapter_list = self.filter_chapters(source_lang, target_lang, chapter_numbers, True, with_metadata=True)
+        edition_number, chapter_list = self.filter_chapters(source_lang, target_lang, chapter_numbers, by_length=True, with_metadata=True)
 
         if edition_number == 0:
             print("No content found in database. Please run extract phase first.")
@@ -429,7 +429,7 @@ class BookTranslator:
         print(f"Building translated EPUB from {source_lang} to {target_lang}")
 
         # Get filtered chapter list (without metadata)
-        edition_number, chapter_list = self.filter_chapters(source_lang, target_lang, chapter_numbers, False, with_metadata=False)
+        edition_number, chapter_list = self.filter_chapters(source_lang, target_lang, chapter_numbers, by_length=False, with_metadata=False)
 
         if edition_number == 0:
             print("No translations found in database. Please run translation phase first.")
