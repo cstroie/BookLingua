@@ -204,7 +204,6 @@ TRANSLATE_PROMPT = """<translation_system>
 # System prompt template for proofreading - will be formatted with actual languages when used
 PROOFREAD_PROMPT = """<proofreading_system>
   <metadata>
-    <source_language>{source_lang}</source_language>
     <target_language>{target_lang}</target_language>
     <role>Literary Proofreader</role>
   </metadata>
@@ -282,7 +281,7 @@ PROOFREAD_PROMPT = """<proofreading_system>
 
 
 class BookTranslator:
-    def __init__(self, api_key: str = None, base_url: str = None, model: str = "gpt-4o", verbose: bool = False, book_path: str = None, throttle: float = 0.0):
+    def __init__(self, api_key: str = None, url: str = None, model: str = "gpt-4o", verbose: bool = False, book_path: str = None, throttle: float = 0.0):
         """
         Initialize the BookTranslator with an OpenAI-compatible API.
 
@@ -295,7 +294,7 @@ class BookTranslator:
             api_key (str, optional): API key for the translation service.
                 If not provided, will use OPENAI_API_KEY environment variable.
                 Defaults to 'dummy-key' for testing.
-            base_url (str, optional): Base URL for the API endpoint.
+            url (str, optional): Base URL for the API endpoint.
                 Examples:
                 - "https://api.openai.com/v1" for OpenAI
                 - "http://localhost:11434/v1" for Ollama
@@ -317,7 +316,7 @@ class BookTranslator:
 
         Attributes:
             api_key (str): The API key used for authentication
-            base_url (str): The base URL for the API endpoint
+            url (str): The base URL for the API endpoint
             model (str): The model name used for translation
             verbose (bool): Whether verbose output is enabled
             context (list): Translation context cache to maintain consistency
@@ -329,7 +328,7 @@ class BookTranslator:
         Example:
             >>> translator = BookTranslator(
             ...     api_key="your-api-key",
-            ...     base_url="https://api.openai.com/v1",
+            ...     url="https://api.openai.com/v1",
             ...     model="gpt-4o",
             ...     verbose=True,
             ...     book_path="book.epub"
@@ -340,7 +339,7 @@ class BookTranslator:
             ... )
         """
         self.api_key = api_key or os.environ.get('OPENAI_API_KEY', 'dummy-key')
-        self.base_url = base_url or "https://api.openai.com/v1"
+        self.url = url or "https://api.openai.com/v1"
         self.model = model
         self.verbose = verbose
         self.context = []
@@ -363,8 +362,8 @@ class BookTranslator:
             self.db_init()
 
         print(f"Initialized with model: {model}")
-        if base_url:
-            print(f"Using API endpoint: {base_url}")
+        if url:
+            print(f"Using API endpoint: {url}")
         if self.db_path:
             print(f"Using database: {self.db_path}")
 
@@ -2866,7 +2865,7 @@ class BookTranslator:
             Exception: If API call fails
         """
         response = requests.post(
-            f"{self.base_url}/chat/completions",
+            f"{self.url}/chat/completions",
             headers=headers,
             json=payload
         )
@@ -3224,7 +3223,7 @@ class BookTranslator:
         """
         # Run all three phases in sequence
         self.phase_translate(source_lang, target_lang, chapter_numbers)
-        self.phase_proofread(source_lang=target_lang, target_lang=target_lang, chapter_numbers=chapter_numbers)
+        self.phase_proofread(source_lang=source_lang, target_lang=target_lang, chapter_numbers=chapter_numbers)
         self.phase_build(output_dir, source_lang, target_lang, chapter_numbers)
 
     def translate_context(self, texts: List[str], source_lang: str, target_lang: str):
@@ -3985,49 +3984,49 @@ def get_ai_provider_config(args):
         args: Parsed command line arguments
 
     Returns:
-        tuple: (api_key, base_url, model)
+        tuple: (api_key, url, model)
     """
     api_key = args.api_key
-    base_url = args.base_url
+    url = args.url
     model = args.model
 
     # Handle preset configurations
     if args.openai:
-        base_url = base_url or "https://api.openai.com/v1"
+        url = url or "https://api.openai.com/v1"
         model = model or "gpt-4o"
     elif args.ollama:
-        base_url = base_url or "http://localhost:11434/v1"
+        url = url or "http://localhost:11434/v1"
         model = model or "gemma3n:e4b"
     elif args.mistral:
-        base_url = base_url or "https://api.mistral.ai/v1"
+        url = url or "https://api.mistral.ai/v1"
         model = model or "mistral-large-latest"
         if not api_key:
             api_key = os.environ.get('MISTRAL_API_KEY')
     elif args.deepseek:
-        base_url = base_url or "https://api.deepseek.com/v1"
+        url = url or "https://api.deepseek.com/v1"
         model = model or "deepseek-chat"
         if not api_key:
             api_key = os.environ.get('DEEPSEEK_API_KEY')
     elif args.lmstudio:
-        base_url = base_url or "http://localhost:1234/v1"
+        url = url or "http://localhost:1234/v1"
         model = model or "qwen2.5-72b"
     elif args.together:
-        base_url = base_url or "https://api.together.xyz/v1"
+        url = url or "https://api.together.xyz/v1"
         model = model or "openai/gpt-oss-20b"
         if not api_key:
             api_key = os.environ.get('TOGETHER_API_KEY')
     elif args.openrouter:
-        base_url = base_url or "https://openrouter.ai/api/v1"
+        url = url or "https://openrouter.ai/api/v1"
         model = model or "openai/gpt-4o"
         if not api_key:
             api_key = os.environ.get('OPENROUTER_API_KEY')
     # Set defaults if still not specified
-    if not base_url:
-        base_url = "http://localhost:11434/v1"
+    if not url:
+        url = "http://localhost:11434/v1"
     if not model:
         model = "gemma3n:e4b"
     # Return the configuration
-    return api_key, base_url, model
+    return api_key, url, model
 
 def main():
     """Command-line interface for BookLingua EPUB translation tool.
@@ -4160,7 +4159,7 @@ def main():
     args = parser.parse_args()
 
     # Get AI provider configuration
-    api_key, base_url, model = get_ai_provider_config(args)
+    api_key, url, model = get_ai_provider_config(args)
     # Set default output directory to filename without extension if not specified
     output_dir = args.output
     if output_dir is None:
@@ -4168,7 +4167,7 @@ def main():
     # Initialize translator
     translator = BookTranslator(
         api_key=api_key,
-        base_url=base_url,
+        url=url,
         model=model,
         verbose=args.verbose,
         book_path=args.input,
@@ -4217,8 +4216,8 @@ def main():
         )
     if args.phase_proofread or all_phases:
         translator.phase_proofread(
-            source_lang=target_lang,  # Source for proofreading is the target language of translation
-            target_lang=target_lang,  # Target remains the same language
+            source_lang=source_lang,
+            target_lang=target_lang,
             chapter_numbers=args.chapters
         )
     if args.phase_build or all_phases:
