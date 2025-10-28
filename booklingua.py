@@ -392,6 +392,9 @@ class BookTranslator:
     def handle_error(self, e, context="", default_return=None, raise_on_error=False):
         """Unified error handling wrapper.
 
+        Provides consistent error handling across the application with optional
+        verbose logging and exception re-raising capabilities.
+
         Args:
             e (Exception): The exception that occurred
             context (str): Context information about where the error occurred
@@ -424,6 +427,9 @@ class BookTranslator:
             source_lang (str, optional): Source language name. Defaults to "English".
             target_lang (str, optional): Target language name. Defaults to "Romanian".
             new_edition (bool, optional): Whether to create a new edition in the database.
+
+        Returns:
+            int: Edition number used for the extracted content
         """
         # Update database path if not set during initialization
         if not self.db_path and self.book_path:
@@ -587,6 +593,9 @@ class BookTranslator:
 
     def proofread_paragraph(self, edition_number: int, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, target: str, source_lang: str, target_lang: str):
         """Proofread a single paragraph and save to database.
+
+        Processes a single paragraph for proofreading, sends it to the AI model,
+        and saves the result to the database.
 
         Args:
             edition_number (int): Edition number of translations to proofread
@@ -811,6 +820,10 @@ class BookTranslator:
 
     def parse_markdown_content(self, markdown_content: str, source_lang: str) -> List[dict]:
         """Parse markdown content and extract chapters based on headings.
+
+        Processes markdown content by splitting it into paragraphs and organizing
+        them into chapters based on heading levels. The first heading is treated
+        as the document title.
 
         Args:
             markdown_content (str): Markdown content to parse
@@ -1063,6 +1076,8 @@ class BookTranslator:
     def extract_epub_toc(self, book) -> List:
         """Get table of contents items from EPUB book.
 
+        Recursively extracts all link items from the EPUB table of contents.
+
         Args:
             book: An opened EPUB book object
 
@@ -1085,6 +1100,9 @@ class BookTranslator:
 
     def extract_epub_content(self, item, source_lang: str) -> Optional[dict]:
         """Process a single TOC item and extract its content.
+
+        Extracts HTML content from an EPUB item, converts it to Markdown,
+        and structures it as a chapter dictionary.
 
         Args:
             item: EPUB item to process
@@ -1325,6 +1343,7 @@ class BookTranslator:
         joins them together, and creates an EPUB HTML item for the chapter.
 
         Args:
+            edition_number (int): Edition number for the translation
             chapter_number (int): Chapter number to create
             source_lang (str): Source language code
             target_lang (str): Target language code
@@ -1415,6 +1434,9 @@ class BookTranslator:
     def save_metadata_as_markdown(self, metadata_parts: List[str], source_lang: str):
         """Save metadata as markdown file.
 
+        Writes the extracted book metadata to a markdown file in the source
+        language directory for reference.
+
         Args:
             metadata_parts (List[str]): List of metadata parts to save
             source_lang (str): Source language code for directory naming
@@ -1435,6 +1457,9 @@ class BookTranslator:
 
     def save_chapter_as_markdown(self, chapter_data: dict, source_lang: str):
         """Save chapter content as markdown file.
+
+        Writes the extracted chapter content to a markdown file in the source
+        language directory for reference.
 
         Args:
             chapter_data (dict): Dictionary containing chapter data
@@ -1497,6 +1522,9 @@ class BookTranslator:
     def html_remove_script_style(self, soup):
         """Remove script and style elements from the soup.
 
+        Strips out script and style tags that are not needed for translation
+        to reduce noise in the content.
+
         Args:
             soup (BeautifulSoup): BeautifulSoup object to process
         """
@@ -1507,7 +1535,10 @@ class BookTranslator:
             print(f"Warning: Failed to remove script/style elements: {e}")
 
     def html_check_has_text(self, element) -> bool:
-        """ Check if an HTML element has significant text content.
+        """Check if an HTML element has significant text content.
+
+        Determines if an element contains meaningful text content by checking
+        for non-whitespace text nodes or inline elements.
 
         Args:
             element: BeautifulSoup element to check
@@ -1525,6 +1556,9 @@ class BookTranslator:
 
     def html_process_blocks(self, soup) -> List[str]:
         """Process block elements and convert them to markdown lines.
+
+        Iterates through all block-level elements in the HTML and converts
+        them to appropriate markdown formatting.
 
         Args:
             soup (BeautifulSoup): BeautifulSoup object containing HTML content
@@ -1560,6 +1594,9 @@ class BookTranslator:
     def html_convert_element(self, element) -> Optional[str]:
         """Convert a single HTML element to markdown format.
 
+        Processes individual HTML elements and converts them to their
+        corresponding markdown representation.
+
         Args:
             element: BeautifulSoup element to convert
 
@@ -1592,6 +1629,9 @@ class BookTranslator:
 
     def html_format_header(self, element_name: str, text: str) -> str:
         """Format header element to markdown header.
+
+        Converts HTML header tags to markdown header syntax with the
+        appropriate number of hash symbols.
 
         Args:
             element_name (str): HTML header element name (h1, h2, etc.)
@@ -1664,6 +1704,8 @@ class BookTranslator:
     def html_replace_inline_tag(self, tag):
         """Process a single inline tag and convert it to markdown.
 
+        Replaces an inline HTML tag with its markdown equivalent formatting.
+
         Args:
             tag: BeautifulSoup tag to process
         """
@@ -1678,6 +1720,8 @@ class BookTranslator:
 
     def html_get_replacement(self, tag, text: str) -> str:
         """Get the markdown replacement for a tag.
+
+        Determines the appropriate markdown formatting for different HTML tags.
 
         Args:
             tag: BeautifulSoup tag
@@ -1710,6 +1754,8 @@ class BookTranslator:
     def html_get_replacement_img(self, tag) -> str:
         """Format image tag to markdown syntax.
 
+        Converts HTML img tags to markdown image syntax.
+
         Args:
             tag: BeautifulSoup img tag
 
@@ -1725,6 +1771,9 @@ class BookTranslator:
 
     def html_get_replacement_span(self, tag, text: str) -> str:
         """Format span tag based on CSS styling.
+
+        Analyzes CSS styles and classes on span tags to determine
+        appropriate markdown formatting.
 
         Args:
             tag: BeautifulSoup span tag
@@ -1982,7 +2031,11 @@ class BookTranslator:
         return text
 
     def db_init(self):
-        """Initialize the SQLite database for storing translations."""
+        """Initialize the SQLite database for storing translations.
+
+        Creates the database connection and initializes the translations table
+        if it doesn't already exist.
+        """
         if not self.db_path:
             self.conn = None
             return
@@ -2012,6 +2065,9 @@ class BookTranslator:
     def db_execute_query(self, query: str, params: tuple = (), fetch_mode: str = 'all') -> Optional[list]:
         """Execute a database query and return results.
 
+        Executes a parameterized SQL query and returns results based on the
+        specified fetch mode.
+
         Args:
             query (str): SQL query to execute
             params (tuple): Query parameters
@@ -2040,6 +2096,9 @@ class BookTranslator:
     def db_execute_query_retry(self, query: str, params: tuple = (), max_retries: int = 3) -> Optional[int]:
         """Execute a database query with retry logic.
 
+        Executes a database query with exponential backoff retry logic in case
+        of failures.
+
         Args:
             query (str): SQL query to execute
             params (tuple): Query parameters
@@ -2063,6 +2122,9 @@ class BookTranslator:
 
     def db_export_csv(self, csv_path: str):
         """Export the database to CSV format.
+
+        Exports all translations from the database to a CSV file, ordered by
+        language pair, edition, chapter, and paragraph.
 
         Args:
             csv_path (str): Path to the output CSV file
@@ -2104,6 +2166,9 @@ class BookTranslator:
 
     def db_import_csv(self, csv_path: str):
         """Import translations from CSV format into the database.
+
+        Imports translations from a CSV file into the database, replacing
+        existing entries with the same primary key.
 
         Args:
             csv_path (str): Path to the input CSV file
@@ -2263,6 +2328,9 @@ class BookTranslator:
     def db_get_latest_edition(self, source_lang: str, target_lang: str) -> int:
         """Get the latest edition number from the database.
 
+        Retrieves the highest edition number for a given language pair from
+        the translations table.
+
         Args:
             source_lang (str): Source language code
             target_lang (str): Target language code
@@ -2283,6 +2351,9 @@ class BookTranslator:
 
     def db_get_chapters_list(self, source_lang: str, target_lang: str, edition_number: int, by_length: bool = False) -> List[int]:
         """Retrieve all chapter numbers from the database, ordered ascending.
+
+        Retrieves a list of chapter numbers for a given edition, optionally
+        sorted by paragraph count instead of chapter number.
 
         Args:
             source_lang (str): Source language code
@@ -2320,6 +2391,9 @@ class BookTranslator:
     def db_get_item(self, source_lang: str, target_lang: str, edition_number: int, chapter_number: int, paragraph_number: int) -> str:
         """Get a specific source and target text for a given edition, chapter, and paragraph.
 
+        Retrieves a specific paragraph's translation from the database, returning
+        proofread text when available.
+
         Args:
             source_lang (str): Source language code
             target_lang (str): Target language code
@@ -2352,6 +2426,9 @@ class BookTranslator:
 
     def db_get_next_paragraph(self, source_lang: str, target_lang: str, edition_number: int, chapter_number: int, paragraph_number: int) -> tuple:
         """Get the next paragraph in a chapter after the specified paragraph number.
+
+        Retrieves the next paragraph that needs translation or proofreading,
+        returning both original and proofread translations when available.
 
         Args:
             source_lang (str): Source language code
@@ -2389,6 +2466,8 @@ class BookTranslator:
     def db_count_total(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count total paragraphs in a chapter for a given edition.
 
+        Counts all paragraphs in a specific chapter of an edition.
+
         Args:
             edition_number (int): Edition number to count paragraphs for
             chapter_number (int): Chapter number to count paragraphs for
@@ -2410,6 +2489,8 @@ class BookTranslator:
 
     def db_count_untranslated(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count the number of untranslated paragraphs in a chapter.
+
+        Counts paragraphs that have not yet been translated (empty or null target).
 
         Args:
             edition_number (int): Edition number to check
@@ -2435,6 +2516,9 @@ class BookTranslator:
 
     def db_chapter_stats(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> tuple:
         """Get chapter translation statistics for a given edition.
+
+        Calculates translation timing statistics for a specific chapter,
+        including average processing time and estimated remaining time.
 
         Args:
             edition_number (int): Edition number to get statistics for
@@ -2481,6 +2565,9 @@ class BookTranslator:
                               duration: int = None, fluency: int = None, model: str = ''):
         """Save a translation to the database.
 
+        Inserts or updates a translation entry in the database with timing
+        and quality metrics.
+
         Args:
             text (str): Source text
             translation (str): Translated text
@@ -2521,6 +2608,9 @@ class BookTranslator:
     def db_cleanup_empty(self, source_lang: str, target_lang: str):
         """Delete all entries with empty translations for this language pair.
 
+        Removes database entries that have empty or null target translations
+        for a specific language pair.
+
         Args:
             source_lang (str): Source language code
             target_lang (str): Target language code
@@ -2540,6 +2630,9 @@ class BookTranslator:
     def translate_text(self, text: str, source_lang: str, target_lang: str, use_cache: bool = True) -> str:
         """Translate a text chunk using OpenAI-compatible API with database caching.
 
+        Translates text using the configured AI model, with caching and context
+        management to ensure consistency.
+
         Args:
             text (str): The text chunk to translate
             source_lang (str): Source language code
@@ -2557,7 +2650,6 @@ class BookTranslator:
         Raises:
             Exception: If translation fails
         """
-
         # If source and target languages are identical, simply return the text
         if source_lang.lower() == target_lang.lower():
             return text, 0, 100, 'copy'
@@ -2591,6 +2683,9 @@ class BookTranslator:
 
     def proofread_text(self, text: str, source_lang: str, target_lang: str, use_cache: bool = True) -> tuple:
         """Proofread a text chunk using OpenAI-compatible API.
+
+        Proofreads text using the configured AI model to improve fluency
+        and correctness while preserving meaning.
 
         Args:
             text (str): The text chunk to proofread
@@ -2644,6 +2739,9 @@ class BookTranslator:
     def db_check_cache(self, text: str, source_lang: str, target_lang: str) -> tuple:
         """Check database for existing translation.
 
+        Looks up a translation in the database cache and updates the context
+        if found.
+
         Args:
             text (str): Text to look up
             source_lang (str): Source language code. For proofread text, use '@' as the source language.
@@ -2665,6 +2763,9 @@ class BookTranslator:
 
     def translate_with_bleeding_detection(self, stripped_text: str, source_lang: str, target_lang: str) -> tuple:
         """Translate text with context bleeding detection and retry logic.
+
+        Translates text with automatic retry logic when context bleeding
+        is detected, temporarily reducing context size to improve results.
 
         Args:
             stripped_text (str): Text to translate (without markdown)
@@ -2718,6 +2819,9 @@ class BookTranslator:
     def proofread_with_bleeding_detection(self, stripped_text: str, source_lang: str, target_lang: str) -> tuple:
         """Proofread text with context bleeding detection and retry logic.
 
+        Proofreads text with automatic retry logic when context bleeding
+        is detected, temporarily reducing context size to improve results.
+
         Args:
             stripped_text (str): Text to proofread (without markdown)
             source_lang (str): Source language code (same as target for proofreading)
@@ -2769,6 +2873,9 @@ class BookTranslator:
 
     def translate_api_call(self, stripped_text: str, source_lang: str, target_lang: str, prompt_type: str = "translate") -> str:
         """Call the translation API with the given text.
+
+        Makes the actual API call to the configured translation service with
+        appropriate headers, messages, and parameters.
 
         Args:
             stripped_text (str): Text to translate (without markdown)
@@ -2863,6 +2970,9 @@ class BookTranslator:
     def make_api_request(self, headers: dict, payload: dict) -> str:
         """Make the actual API request and handle the response.
 
+        Performs the HTTP POST request to the translation API and processes
+        the JSON response.
+
         Args:
             headers (dict): Request headers
             payload (dict): Request payload
@@ -2891,6 +3001,9 @@ class BookTranslator:
 
     def translate_api_prepare_chat(self, stripped_text: str, source_lang: str, target_lang: str, prompt_type: str = "translate") -> list:
         """Build messages for translation API call.
+
+        Prepares the complete message history for the API call, including
+        system prompt, similar examples from database, context, and current text.
 
         Args:
             stripped_text (str): Text to translate (without markdown)
@@ -3016,6 +3129,9 @@ class BookTranslator:
     def display_chapter_header(self, chapter_number: int, total_chapters: int, total_count: int, untranslated_count: int):
         """Display the chapter header with translation status.
 
+        Shows chapter progress information including translation status
+        and paragraph counts.
+
         Args:
             chapter_number (int): Current chapter number
             total_chapters (int): Total number of chapters
@@ -3031,6 +3147,8 @@ class BookTranslator:
 
     def display_cached_paragraph(self, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, target: str, proofread: str):
         """Handle already translated paragraphs from cache.
+
+        Displays cached translation information when verbose mode is enabled.
 
         Args:
             chapter_number (int): Current chapter number
@@ -3056,6 +3174,9 @@ class BookTranslator:
 
     def translate_paragraph(self, edition_number: int, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, source_lang: str, target_lang: str):
         """Translate a single paragraph and save to database.
+
+        Processes a single paragraph for translation, handles adequacy checking
+        with retry logic, and saves results to the database.
 
         Args:
             edition_number (int): Edition number for this translation
@@ -3125,6 +3246,9 @@ class BookTranslator:
 
     def display_chapter_checks(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str):
         """Run quality checks at the end of chapter translation.
+
+        Performs quality assessment including fluency scoring, error detection,
+        and consistency checking after chapter translation is complete.
 
         Args:
             edition_number (int): Edition number for this translation
@@ -3227,6 +3351,9 @@ class BookTranslator:
     def translate_context(self, texts: List[str], source_lang: str, target_lang: str):
         """Translate texts and add them to context without storing in database.
 
+        Translates a list of texts to pre-fill the translation context, used
+        during context prefilling operations.
+
         Args:
             texts (List[str]): List of texts to translate
             source_lang (str): Source language code
@@ -3266,7 +3393,7 @@ class BookTranslator:
         Args:
             source_lang (str): Source language code
             target_lang (str): Target language code
-            chapter_number (int, optional): Current chapter number for prioritized search
+            chapter_number (int): Current chapter number for prioritized search
         """
         # If context already has enough entries, skip
         if len(self.context) >= DEFAULT_PREFILL_CONTEXT_SIZE:
@@ -3341,7 +3468,8 @@ class BookTranslator:
         do not reset the context.
 
         Args:
-            current_chapter_size (int, optional): The size of the current chapter.        """
+            current_chapter_size (int, optional): The size of the current chapter.
+        """
         # Check if we should preserve context for small chapters
         if current_chapter_size is not None:
             # If chapter is small and context texts are substantial, preserve context
@@ -3393,6 +3521,9 @@ class BookTranslator:
     def calculate_fluency_score(self, text: str) -> int:
         """Calculate fluency score based on linguistic patterns.
 
+        Evaluates text quality based on sentence length variation and word
+        repetition patterns to determine fluency.
+
         Args:
             text (str): Text to evaluate for fluency
 
@@ -3418,6 +3549,9 @@ class BookTranslator:
 
     def calculate_adequacy_score(self, original: str, translated: str, source_lang: str, target_lang: str) -> int:
         """Calculate adequacy score based on content preservation metrics.
+
+        Measures how well the translation preserves the meaning and content
+        of the original text through various linguistic metrics.
 
         Args:
             original (str): Original text
@@ -3485,6 +3619,9 @@ class BookTranslator:
     def calculate_consistency_score(self, chapters: List[dict]) -> int:
         """Check terminology consistency across chapters.
 
+        Evaluates consistency of term usage across all chapters to ensure
+        uniform translation of key terms.
+
         Args:
             chapters (List[dict]): List of chapter dictionaries
 
@@ -3514,6 +3651,10 @@ class BookTranslator:
     def detect_context_bleeding(self, source: str, translation: str) -> bool:
         """Detect if translation shows signs of context bleeding.
 
+        Identifies when the translation may be influenced by previous context
+        rather than the current source text, typically indicated by length
+        discrepancies or similarity to context examples.
+
         Args:
             source (str): Original source text
             translation (str): Translated text
@@ -3542,6 +3683,9 @@ class BookTranslator:
     def text_similarity(self, text1: str, text2: str) -> float:
         """Calculate simple similarity between two texts based on common words.
 
+        Computes Jaccard similarity coefficient between two texts based on
+        their word sets.
+
         Args:
             text1 (str): First text
             text2 (str): Second text
@@ -3562,6 +3706,10 @@ class BookTranslator:
 
     def detect_translation_errors(self, original: str, translated: str, source_lang: str) -> Dict[str, int]:
         """Detect common translation errors.
+
+        Identifies various types of translation issues including untranslated
+        segments, repeated phrases, formatting problems, and potential
+        mistranslations.
 
         Args:
             original (str): Original text
@@ -3656,6 +3804,9 @@ class BookTranslator:
     def generate_quality_report(self, chapters: List[dict], source_lang: str, target_lang: str) -> Dict:
         """Generate comprehensive quality assessment report.
 
+        Creates a detailed quality report including fluency scores, adequacy
+        scores, consistency metrics, and error summaries.
+
         Args:
             chapters (List[dict]): List of chapter dictionaries
             source_lang (str): Source language code
@@ -3698,6 +3849,9 @@ class BookTranslator:
     def filter_chapters(self, source_lang: str, target_lang: str, chapter_numbers: str = None,
                        by_length: bool = False, with_metadata: bool = False) -> tuple:
         """Filter and process chapter list based on user input.
+
+        Processes chapter filtering requests and returns appropriate chapter
+        lists based on user specifications and database contents.
 
         Args:
             source_lang (str): Source language code
@@ -3875,6 +4029,9 @@ class BookTranslator:
         """
         Remove all spaces and newlines between the end of an XML tag and the beginning of the text or next one.
 
+        Cleans up XML/HTML text by removing unnecessary whitespace between tags
+        to improve processing efficiency.
+
         Args:
             xml_text (str): The input XML text
 
@@ -3981,6 +4138,9 @@ class BookTranslator:
 
 def get_ai_provider_config(args):
     """Get AI provider configuration based on command line arguments.
+
+    Processes command line arguments to determine the appropriate AI provider
+    configuration including API key, URL, and model name.
 
     Args:
         args: Parsed command line arguments
