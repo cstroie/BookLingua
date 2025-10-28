@@ -30,7 +30,7 @@ Features:
 - Progress tracking and verbose output options
 - CSV export/import for translation data
 - Chapter-level translation control
-- Four-phase workflow (extract → translate → proofread → build)
+- Four-phase workflow (extract → translate → proofread → build) - proofread phase is optional
 
 Usage:
     python booklingua.py input.epub [options]
@@ -38,7 +38,7 @@ Usage:
     python booklingua.py input.md [options]
 
 Examples:
-    # Run all phases (extract, translate, proofread, build)
+    # Run all phases (extract, translate, build) - proofread is optional
     python booklingua.py book.epub
 
     # Run specific phases
