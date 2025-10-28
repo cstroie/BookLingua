@@ -133,15 +133,15 @@ python booklingua.py input.epub --throttle 1.0
 
 ## Supported Services
 
-| Service      | Flag        | Default Model                     | Default URL                     |
-|--------------|-------------|-----------------------------------|---------------------------------|
-| OpenAI       | `--openai`  | `gpt-4o`                          | https://api.openai.com/v1       |
-| Ollama       | `--ollama`  | `gemma3n:e4b`                     | http://localhost:11434/v1       |
-| Mistral AI   | `--mistral` | `mistral-large-latest`            | https://api.mistral.ai/v1       |
-| DeepSeek     | `--deepseek`| `deepseek-chat`                   | https://api.deepseek.com/v1     |
-| Together AI  | `--together`| `Qwen/Qwen2.5-72B-Instruct-Turbo` | https://api.together.xyz/v1     |
-| LM Studio    | `--lmstudio`| `qwen2.5-72b`                     | http://localhost:1234/v1        |
-| OpenRouter   | `--openrouter`| `openai/gpt-4o`                 | https://openrouter.ai/api/v1    |
+| Service      | Flag          | Default Model                     | Default URL                     |
+|--------------|---------------|-----------------------------------|---------------------------------|
+| OpenAI       | `--openai`    | `gpt-4o`                          | https://api.openai.com/v1       |
+| Ollama       | `--ollama`    | `gemma3n:e4b`                     | http://localhost:11434/v1       |
+| Mistral AI   | `--mistral`   | `mistral-large-latest`            | https://api.mistral.ai/v1       |
+| DeepSeek     | `--deepseek`  | `deepseek-chat`                   | https://api.deepseek.com/v1     |
+| Together AI  | `--together`  | `Qwen/Qwen2.5-72B-Instruct-Turbo` | https://api.together.xyz/v1     |
+| LM Studio    | `--lmstudio`  | `qwen2.5-72b`                     | http://localhost:1234/v1        |
+| OpenRouter   | `--openrouter`| `openai/gpt-4o`                   | https://openrouter.ai/api/v1    |
 
 ## Output Files
 
