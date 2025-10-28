@@ -570,7 +570,7 @@ class BookTranslator:
                     continue
                 # Proofread paragraph
                 if target.strip() and len(target.split()) < 1000:
-                    self.proofread_one_paragraph(edition_number, chapter_number, total_chapters, par, total_count, source, target, source_lang, target_lang)
+                    self.proofread_paragraph(edition_number, chapter_number, total_chapters, par, total_count, source, target, source_lang, target_lang)
             else:
                 # No more paragraphs to proofread
                 break
@@ -582,7 +582,7 @@ class BookTranslator:
         avg_time_per_paragraph = chapter_duration_ms / total_count if total_count > 0 else 0
         print(f"Proofreading completed in {chapter_duration_ms/1000:.2f}s (avg {avg_time_per_paragraph/1000:.2f}s/paragraph)")
 
-    def proofread_one_paragraph(self, edition_number: int, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, target: str, source_lang: str, target_lang: str):
+    def proofread_paragraph(self, edition_number: int, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, target: str, source_lang: str, target_lang: str):
         """Proofread a single paragraph and save to database.
 
         Args:
@@ -1209,9 +1209,20 @@ class BookTranslator:
                 for par, text in enumerate(texts):
                     # Only save non-empty texts
                     if text and text.strip():
-                        # Get an existing translation
-                        translation_data = self.translate_paragraph(text, source_lang, target_lang)
-                        target, duration, fluency, model = translation_data
+                        # If source and target languages are identical, simply return the text
+                        if source_lang.lower() == target_lang.lower():
+                            target, duration, fluency, model = text, 0, 100, 'copy'
+
+                        # Check if the source contains no letters
+                        if re.match(r'^[^a-zA-Z]+$', text, re.UNICODE):
+                            # Copy as-is with perfect fluency and zero duration
+                            target, duration, fluency, model = text, 0, 100, 'copy'
+                        else:
+                            # Get an existing translation for this text if it exists
+                            translation_data = self.db_get_translation(text, source_lang, target_lang)
+                            target, duration, fluency, model = translation_data
+                            if target is None:
+                                target, duration, fluency, model = "", -1, -1, ""
 
                         # Insert with translation if not already there
                         query = '''
@@ -2506,33 +2517,6 @@ class BookTranslator:
         except Exception as e:
             self.handle_error(e, "database cleanup empty translations")
 
-    def translate_paragraph(self, text: str, source_lang: str, target_lang: str) -> tuple:
-        """Process a paragraph text and determine its translation data.
-
-        Args:
-            text (str): The text to process
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-
-        Returns:
-            tuple: (target, duration, fluency, model) translation data
-        """
-        # If source and target languages are identical, simply return the text
-        if source_lang.lower() == target_lang.lower():
-            return text, 0, 100, 'copy'
-
-        # Check if the source contains no letters
-        if re.match(r'^[^a-zA-Z]+$', text, re.UNICODE):
-            # Copy as-is with perfect fluency and zero duration
-            return text, 0, 100, 'copy'
-        else:
-            # Get an existing translation for this text if it exists
-            translation_data = self.db_get_translation(text, source_lang, target_lang)
-            target, duration, fluency, model = translation_data
-            if target is None:
-                return '', -1, -1, ''
-            return target, duration, fluency, model
-
     def translate_text(self, text: str, source_lang: str, target_lang: str, use_cache: bool = True) -> str:
         """Translate a text chunk using OpenAI-compatible API with database caching.
 
@@ -2996,7 +2980,7 @@ class BookTranslator:
 
                 # Translate paragraph if needed
                 if source.strip() and len(source.split()) < 1000:
-                    self.translate_one_paragraph(edition_number, chapter_number, total_chapters, par, total_count, source, source_lang, target_lang)
+                    self.translate_paragraph(edition_number, chapter_number, total_chapters, par, total_count, source, source_lang, target_lang)
             else:
                 # No more paragraphs to translate
                 break
@@ -3045,7 +3029,7 @@ class BookTranslator:
             self.display_side_by_side(source, target)
             print(f"{self.sep3}")
 
-    def translate_one_paragraph(self, edition_number: int, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, source_lang: str, target_lang: str):
+    def translate_paragraph(self, edition_number: int, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, source_lang: str, target_lang: str):
         """Translate a single paragraph and save to database.
 
         Args:
@@ -3110,7 +3094,7 @@ class BookTranslator:
 
         # Save to database with timing and fluency info
         self.db_insert_translation(source, target, source_lang, target_lang,
-                                 edition_number, chapter_number, par, elapsed, fluency, model)
+                                   edition_number, chapter_number, par, elapsed, fluency, model)
 
         # Calculate statistics for current chapter only
         avg_time, elapsed_time, remaining_time = self.db_chapter_stats(edition_number, chapter_number, source_lang, target_lang)
