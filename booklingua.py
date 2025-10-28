@@ -2624,8 +2624,8 @@ class BookTranslator:
         
         # Extract the resulting text and model
         result, model = response
-        # Check for identical response when proofreading
-        if result.split == stripped_text:
+        # Check for identical response when proofreading (ignoring whitespace differences)
+        if re.sub(r'\s+', ' ', result.strip()) == re.sub(r'\s+', ' ', stripped_text.strip()):
             return text, -1, -1, model
 
         # Update context for this language pair, already stripped of markdown
