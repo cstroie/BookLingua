@@ -559,26 +559,6 @@ class BookTranslator:
         #self.context_prefill(source_lang, target_lang, chapter_number)
 
         # Proofread all paragraphs in the chapter
-        self.proofread_one_chapter(edition_number, chapter_number, source_lang, target_lang, total_chapters, total_count)
-
-        # Show chapter completion time
-        chapter_end_time = datetime.now()
-        chapter_duration_ms = int((chapter_end_time - chapter_start_time).total_seconds() * 1000)
-        # Average calculation
-        avg_time_per_paragraph = chapter_duration_ms / total_count if total_count > 0 else 0
-        print(f"Proofreading completed in {chapter_duration_ms/1000:.2f}s (avg {avg_time_per_paragraph/1000:.2f}s/paragraph)")
-
-    def proofread_one_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int, total_count: int):
-        """Proofread all paragraphs in a chapter.
-
-        Args:
-            edition_number (int): Edition number of translations to proofread
-            chapter_number (int): Chapter number to proofread
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-            total_chapters (int): Total number of chapters in the book
-            total_count (int): Total paragraphs in this chapter
-        """
         # Start before first paragraph
         par = -1
         while True:
@@ -588,13 +568,19 @@ class BookTranslator:
                 # Skip empty paragraphs
                 if not target.strip():
                     continue
-
                 # Proofread paragraph
                 if target.strip() and len(target.split()) < 1000:
                     self.proofread_one_paragraph(edition_number, chapter_number, total_chapters, par, total_count, source, target, source_lang, target_lang)
             else:
                 # No more paragraphs to proofread
                 break
+
+        # Show chapter completion time
+        chapter_end_time = datetime.now()
+        chapter_duration_ms = int((chapter_end_time - chapter_start_time).total_seconds() * 1000)
+        # Average calculation
+        avg_time_per_paragraph = chapter_duration_ms / total_count if total_count > 0 else 0
+        print(f"Proofreading completed in {chapter_duration_ms/1000:.2f}s (avg {avg_time_per_paragraph/1000:.2f}s/paragraph)")
 
     def proofread_one_paragraph(self, edition_number: int, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, target: str, source_lang: str, target_lang: str):
         """Proofread a single paragraph and save to database.
@@ -629,7 +615,7 @@ class BookTranslator:
 
         # Insert the proofread into database only if there was something returned
         if proofread_text:
-            self.db_insert_translation(target, proofread_text, f"@{target_lang}", target_lang,
+            self.db_insert_translation(target, proofread_text, "@", target_lang,
                                        edition_number, chapter_number, par, elapsed, fluency, self.model)
 
         if self.verbose:
@@ -2998,7 +2984,22 @@ class BookTranslator:
         self.context_prefill(source_lang, target_lang, chapter_number)
 
         # Translate all paragraphs in the chapter
-        self.translate_one_chapter(edition_number, chapter_number, source_lang, target_lang, total_chapters, total_count)
+        par = -1
+        while True:
+            # Get the next chapter's paragraph from database
+            par, source, target = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
+            if par is not None:
+                # Handle already translated paragraphs
+                if target.strip():
+                    self.display_cached_paragraph(chapter_number, total_chapters, par, total_count, source, target)
+                    continue
+
+                # Translate paragraph if needed
+                if source.strip() and len(source.split()) < 1000:
+                    self.translate_one_paragraph(edition_number, chapter_number, total_chapters, par, total_count, source, source_lang, target_lang)
+            else:
+                # No more paragraphs to translate
+                break
 
         # Show chapter completion time
         chapter_end_time = datetime.now()
@@ -3025,35 +3026,6 @@ class BookTranslator:
             fully_translated_text = f"Needs translating ({untranslated_count} paragraphs)"
         print(f"\n{self.sep1}")
         self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, {total_count} paragraphs", fully_translated_text, self.console_width, 0, 4)
-
-    def translate_one_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int, total_count: int):
-        """Translate all paragraphs in a chapter.
-
-        Args:
-            edition_number (int): Edition number for this translation
-            chapter_number (int): Chapter number to translate
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-            total_chapters (int): Total number of chapters in the book
-            total_count (int): Total paragraphs in this chapter
-        """
-        # Start before first paragraph
-        par = -1
-        while True:
-            # Get the next chapter's paragraph from database
-            par, source, target = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
-            if par is not None:
-                # Handle already translated paragraphs
-                if target.strip():
-                    self.display_cached_paragraph(chapter_number, total_chapters, par, total_count, source, target)
-                    continue
-
-                # Translate paragraph if needed
-                if source.strip() and len(source.split()) < 1000:
-                    self.translate_one_paragraph(edition_number, chapter_number, total_chapters, par, total_count, source, source_lang, target_lang)
-            else:
-                # No more paragraphs to translate
-                break
 
     def display_cached_paragraph(self, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, target: str):
         """Handle already translated paragraphs from cache.
