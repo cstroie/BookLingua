@@ -2649,7 +2649,7 @@ class BookTranslator:
                 self.context = self.context[:-1]  # Remove last context entry
 
             # Retry the API call with reduced context
-            messages = self.translate_api_prepare_chat(stripped_text, source_lang, target_lang, "translate")
+            messages = self.translate_api_prepare_chat(stripped_text, source_lang, target_lang, prompt_type)
             payload["messages"] = messages
             result_text = self.make_api_request(headers, payload)
 
