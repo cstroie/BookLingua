@@ -2350,15 +2350,16 @@ class BookTranslator:
             paragraph_number (int): Current paragraph number
 
         Returns:
-            tuple: (paragraph_number, source, target) of the next paragraph,
-                   or (None, None, None) if there is no next paragraph
+            tuple: (paragraph_number, source, target, proofread) of the next paragraph,
+                   or (None, None, None, None) if there is no next paragraph
 
         Raises:
             Exception: If database connection is not available
         """
         query = '''
             SELECT t1.paragraph, t1.source, 
-                   COALESCE(t2.target, t1.target) as target
+                   t1.target,
+                   t2.target as proofread
             FROM translations t1
             LEFT JOIN translations t2 ON t1.edition = t2.edition 
                 AND t1.chapter = t2.chapter 
@@ -2371,7 +2372,7 @@ class BookTranslator:
         '''
         result = self.db_execute_query(query, ("@", target_lang, edition_number, chapter_number, paragraph_number, source_lang, target_lang), 'one')
         # Return the result or None if not found
-        return result if result else (None, None, None)
+        return result if result else (None, None, None, None)
 
     def db_count_total(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str) -> int:
         """Count total paragraphs in a chapter for a given edition.
