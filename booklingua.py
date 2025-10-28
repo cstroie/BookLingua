@@ -2484,7 +2484,7 @@ class BookTranslator:
         Args:
             text (str): Source text
             translation (str): Translated text
-            source_lang (str): Source language code
+            source_lang (str): Source language code. For proofread text, use '@' as the source language.
             target_lang (str): Target language code
             edition_number (int, optional): Edition number for this translation
             chapter_number (int, optional): Chapter number for this translation
@@ -2646,7 +2646,7 @@ class BookTranslator:
 
         Args:
             text (str): Text to look up
-            source_lang (str): Source language code
+            source_lang (str): Source language code. For proofread text, use '@' as the source language.
             target_lang (str): Target language code
 
         Returns:
