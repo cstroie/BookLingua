@@ -474,6 +474,196 @@ class BookTranslator:
         print(f"Translation phase completed.")
         print(f"{self.sep1}")
 
+    def phase_proofread(self, source_lang: str = "English", target_lang: str = "Romanian",
+                       chapter_numbers: str = None):
+        """Proofread phase: Proofread translated content from database using AI.
+
+        This method handles the proofreading phase of the workflow, which includes:
+        1. Loading translated content from the database
+        2. Proofreading chapters using the AI model
+        3. Saving proofread translations to the same edition in the database
+
+        Args:
+            source_lang (str, optional): Source language name. Defaults to "English".
+            target_lang (str, optional): Target language name. Defaults to "Romanian".
+            chapter_numbers (str, optional): Comma-separated list of chapter numbers or ranges to proofread.
+                Examples: "1,3,5" or "3-7" or "1,3-5,8-10"
+        """
+        # We need the database connection
+        if not self.conn:
+            raise Exception("Database connection not available")
+
+        print(f"{self.sep1}")
+        print(f"Proofreading from {source_lang} to {target_lang}")
+
+        # Get filtered chapter list including metadata
+        edition_number, chapter_list = self.filter_chapters(source_lang, target_lang, chapter_numbers, by_length=True, with_metadata=True)
+
+        if edition_number == 0:
+            print("No translations found in database. Please run translation phase first.")
+            return
+
+        if not chapter_list:
+            print("No chapters found to proofread.")
+            return
+
+        if chapter_numbers is not None:
+            print(f"Proofreading chapters: {', '.join(map(str, chapter_list))}")
+
+        # Process each chapter
+        for chapter_num in chapter_list:
+            self.proofread_chapter(edition_number, chapter_num, source_lang, target_lang, len(chapter_list))
+        print(f"Proofreading phase completed.")
+        print(f"{self.sep1}")
+
+    def proofread_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int):
+        """Proofread a single chapter and save to the same edition.
+
+        This method handles the proofreading of a single chapter, including
+        database lookups, progress tracking, and timing statistics.
+
+        Args:
+            edition_number (int): Edition number of translations to proofread
+            chapter_number (int): Chapter number (1-based index)
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            total_chapters (int): Total number of chapters in the book
+        """
+        # Get chapter statistics
+        total_count = self.db_count_total(edition_number, chapter_number, source_lang, target_lang)
+
+        # Display chapter header
+        print(f"\n{self.sep1}")
+        self.display_side_by_side(f"Chapter {chapter_number}/{total_chapters}, {total_count} paragraphs", "Proofreading", self.console_width, 0, 4)
+
+        print(f"{self.sep2}")
+
+        # Initialize timing statistics for this chapter
+        chapter_start_time = datetime.now()
+
+        # Pre-fill context with chapter-specific data
+        self.context_prefill(source_lang, target_lang, chapter_number)
+
+        # Proofread all paragraphs in the chapter
+        self.proofread_one_chapter(edition_number, chapter_number, source_lang, target_lang, total_chapters, total_count)
+
+        # Show chapter completion time
+        chapter_end_time = datetime.now()
+        chapter_duration_ms = int((chapter_end_time - chapter_start_time).total_seconds() * 1000)
+        # Average calculation
+        avg_time_per_paragraph = chapter_duration_ms / total_count if total_count > 0 else 0
+        print(f"Proofreading completed in {chapter_duration_ms/1000:.2f}s (avg {avg_time_per_paragraph/1000:.2f}s/paragraph)")
+
+    def proofread_one_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int, total_count: int):
+        """Proofread all paragraphs in a chapter.
+
+        Args:
+            edition_number (int): Edition number of translations to proofread
+            chapter_number (int): Chapter number to proofread
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            total_chapters (int): Total number of chapters in the book
+            total_count (int): Total paragraphs in this chapter
+        """
+        # Start before first paragraph
+        par = -1
+        while True:
+            # Get the next chapter's paragraph from database
+            par, source, target = self.db_get_next_paragraph(source_lang, target_lang, edition_number, chapter_number, par)
+            if par is not None:
+                # Skip empty paragraphs
+                if not target.strip():
+                    continue
+
+                # Proofread paragraph
+                if target.strip() and len(target.split()) < 1000:
+                    self.proofread_one_paragraph(edition_number, chapter_number, total_chapters, par, total_count, source, target, source_lang, target_lang)
+            else:
+                # No more paragraphs to proofread
+                break
+
+    def proofread_one_paragraph(self, edition_number: int, chapter_number: int, total_chapters: int, par: int, total_count: int, source: str, target: str, source_lang: str, target_lang: str):
+        """Proofread a single paragraph and save to database.
+
+        Args:
+            edition_number (int): Edition number of translations to proofread
+            chapter_number (int): Chapter number
+            total_chapters (int): Total number of chapters
+            par (int): Paragraph number
+            total_count (int): Total paragraphs in chapter
+            source (str): Source text (unused in proofreading)
+            target (str): Translated text to proofread
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+        """
+        print(f"\nChapter {chapter_number}/{total_chapters}, paragraph {par}/{total_count}, {len(target.split())} words.")
+
+        # Time the proofreading
+        start_time = datetime.now()
+        proofread_text = self.proofread_text(target, source_lang, target_lang)
+        if not proofread_text:
+            print("Error: Proofreading failed, skipping paragraph.")
+            return
+        end_time = datetime.now()
+
+        print(f"{self.sep3}")
+        self.display_side_by_side(target, proofread_text)
+        print(f"{self.sep3}")
+
+        # Calculate and store timing
+        elapsed = int((end_time - start_time).total_seconds() * 1000)  # Convert to milliseconds
+
+        # Calculate fluency score for proofread text
+        fluency = self.calculate_fluency_score(proofread_text)
+
+        # Save to database with timing and fluency info in same edition
+        self.db_insert_translation(target, proofread_text, target_lang, target_lang,
+                                 edition_number, chapter_number, par, elapsed, fluency, self.model)
+
+        if self.verbose:
+            # Show fluency score and timing stats
+            print(f"Fluency: {fluency}% | Time: {elapsed/1000:.2f}s")
+
+    def proofread_text(self, text: str, source_lang: str, target_lang: str) -> str:
+        """Proofread a text chunk using OpenAI-compatible API.
+
+        Args:
+            text (str): The text chunk to proofread
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+
+        Returns:
+            str: Proofread text in the target language
+
+        Process:
+            1. Strip markdown formatting for cleaner proofreading
+            2. Call the API with retry logic
+            3. Add back the markdown formatting
+
+        Raises:
+            Exception: If proofreading fails
+        """
+        # Strip markdown formatting for cleaner proofreading
+        stripped_text, prefix, suffix = self.strip_markdown_formatting(text)
+        # Return original if empty after stripping
+        if not stripped_text.strip():
+            return text
+
+        # Call the API with retry logic
+        proofread_result = self.translate_text(stripped_text, source_lang, target_lang, prompt_type="proofread")
+
+        if not proofread_result:
+            return text
+
+        proofread_text, _, _, _ = proofread_result
+
+        # Update proofreading context for this language pair, already stripped of markdown
+        self.context_add(stripped_text, proofread_text, False)
+        # Add back the markdown formatting
+        proofread_text = prefix + proofread_text + suffix
+        # Return the proofread text
+        return proofread_text
+
     def phase_build(self, output_dir: str = "output",
                    source_lang: str = "English", target_lang: str = "Romanian",
                    chapter_numbers: str = None):
