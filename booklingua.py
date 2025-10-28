@@ -30,7 +30,7 @@ Features:
 - Progress tracking and verbose output options
 - CSV export/import for translation data
 - Chapter-level translation control
-- Three-phase workflow (extract → translate → build)
+- Four-phase workflow (extract → translate → proofread → build)
 
 Usage:
     python booklingua.py input.epub [options]
@@ -38,8 +38,14 @@ Usage:
     python booklingua.py input.md [options]
 
 Examples:
-    # Basic translation
+    # Run all phases (extract, translate, proofread, build)
     python booklingua.py book.epub
+
+    # Run specific phases
+    python booklingua.py book.epub --extract
+    python booklingua.py book.epub --translate
+    python booklingua.py book.epub --proofread
+    python booklingua.py book.epub --build
 
     # Translation with custom languages
     python booklingua.py book.epub -s English -t Spanish -v
@@ -55,6 +61,9 @@ Examples:
 
     # Translate Markdown file
     python booklingua.py document.md
+
+    # Translate specific chapters only
+    python booklingua.py book.epub -c "1,3,5-10"
 """
 
 import warnings
