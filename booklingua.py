@@ -599,10 +599,7 @@ class BookTranslator:
 
         # Time the proofreading
         start_time = datetime.now()
-        proofread_text = self.proofread_text(target, source_lang, target_lang)
-        if not proofread_text:
-            print("Error: Proofreading failed, skipping paragraph.")
-            return
+        proofread_text, _, _, model = self.proofread_text(target, source_lang, target_lang)
         end_time = datetime.now()
 
         print(f"{self.sep3}")
@@ -615,53 +612,14 @@ class BookTranslator:
         # Calculate fluency score for proofread text
         fluency = self.calculate_fluency_score(proofread_text)
 
-        # Save to database with timing and fluency info in same edition
-        self.db_insert_translation(target, proofread_text, target_lang, target_lang,
-                                 edition_number, chapter_number, par, elapsed, fluency, self.model)
+        # Insert the proofread into database only if there was something returned
+        if proofread_text:
+            self.db_insert_translation(target, proofread_text, target_lang, target_lang,
+                                       edition_number, chapter_number, par, elapsed, fluency, self.model)
 
         if self.verbose:
             # Show fluency score and timing stats
             print(f"Fluency: {fluency}% | Time: {elapsed/1000:.2f}s")
-
-    def proofread_text(self, text: str, source_lang: str, target_lang: str) -> str:
-        """Proofread a text chunk using OpenAI-compatible API.
-
-        Args:
-            text (str): The text chunk to proofread
-            source_lang (str): Source language code
-            target_lang (str): Target language code
-
-        Returns:
-            str: Proofread text in the target language
-
-        Process:
-            1. Strip markdown formatting for cleaner proofreading
-            2. Call the API with retry logic
-            3. Add back the markdown formatting
-
-        Raises:
-            Exception: If proofreading fails
-        """
-        # Strip markdown formatting for cleaner proofreading
-        stripped_text, prefix, suffix = self.strip_markdown_formatting(text)
-        # Return original if empty after stripping
-        if not stripped_text.strip():
-            return text
-
-        # Call the API with retry logic
-        proofread_result = self.translate_text(stripped_text, source_lang, target_lang, prompt_type="proofread")
-
-        if not proofread_result:
-            return text
-
-        proofread_text, _, _, _ = proofread_result
-
-        # Update proofreading context for this language pair, already stripped of markdown
-        self.context_add(stripped_text, proofread_text, False)
-        # Add back the markdown formatting
-        proofread_text = prefix + proofread_text + suffix
-        # Return the proofread text
-        return proofread_text
 
     def phase_build(self, output_dir: str = "output",
                    source_lang: str = "English", target_lang: str = "Romanian",
@@ -2574,7 +2532,7 @@ class BookTranslator:
                 return '', -1, -1, ''
             return target, duration, fluency, model
 
-    def translate_text(self, text: str, source_lang: str, target_lang: str, use_cache: bool = True, prompt_type: str = "translate") -> str:
+    def translate_text(self, text: str, source_lang: str, target_lang: str, use_cache: bool = True) -> str:
         """Translate a text chunk using OpenAI-compatible API with database caching.
 
         Args:
@@ -2582,7 +2540,6 @@ class BookTranslator:
             source_lang (str): Source language code
             target_lang (str): Target language code
             use_cache (bool): Whether to use cached translations from the database
-            prompt_type (str): Type of operation ("translate" or "proofread")
 
         Returns:
             str: Translated text in the target language
@@ -2600,8 +2557,8 @@ class BookTranslator:
         if source_lang.lower() == target_lang.lower():
             return text, 0, 100, 'copy'
 
-        # Check cache first (only for translation, not proofreading)
-        if use_cache and self.conn and prompt_type == "translate":
+        # Check cache first
+        if use_cache and self.conn:
             cached_result = self.db_check_cache(text, source_lang, target_lang)
             if cached_result:
                 return cached_result
@@ -2613,22 +2570,67 @@ class BookTranslator:
             return text, 0, 100, 'copy'
 
         # No cached translation, call the API with retry logic and context bleeding detection
-        if prompt_type == "proofread":
-            result = self.proofread_with_bleeding_detection(stripped_text, source_lang, target_lang)
-        else:
-            result = self.translate_with_bleeding_detection(stripped_text, source_lang, target_lang)
-
+        response = self.translate_with_bleeding_detection(stripped_text, source_lang, target_lang)
+        # Extract the resulting text and model
+        result, model = response
+        # Return early if no result
         if not result:
-            return ""
-
-        translation, model = result
+            return result, -1, -1, model
 
         # Update translation context for this language pair, already stripped of markdown
-        self.context_add(stripped_text, translation, False)
+        self.context_add(stripped_text, result, False)
         # Add back the markdown formatting
-        translation = prefix + translation + suffix
+        translation = prefix + result + suffix
         # Return the translated text
         return translation, -1, -1, model
+
+    def proofread_text(self, text: str, source_lang: str, target_lang: str, use_cache: bool = True) -> tuple:
+        """Proofread a text chunk using OpenAI-compatible API.
+
+        Args:
+            text (str): The text chunk to proofread
+            source_lang (str): Source language code
+            target_lang (str): Target language code
+            use_cache (bool): Whether to use cached translations from the database
+
+        Returns:
+            tuple: Proofread text in the target language, fluency, duration, model
+
+        Process:
+            1. Strip markdown formatting for cleaner proofreading
+            2. Call the API with retry logic
+            3. Add back the markdown formatting
+
+        Raises:
+            Exception: If proofreading fails
+        """
+        # Check cache first
+        if use_cache and self.conn:
+            cached_result = self.db_check_cache(text, source_lang, target_lang)
+            if cached_result:
+                return cached_result[0]
+
+        # Strip markdown formatting for cleaner proofreading
+        stripped_text, prefix, suffix = self.strip_markdown_formatting(text)
+        # Return empty if empty after stripping
+        if not stripped_text.strip():
+            return "", -1, -1, model
+
+        # Call the API with retry logic
+        response = self.proofread_with_bleeding_detection(stripped_text, source_lang, target_lang)
+        # Extract the resulting text and model
+        result, model = response
+        # Check for identical response when proofreading
+        if result == stripped_text:
+            return "", -1, -1, model
+
+        # Update context for this language pair, already stripped of markdown
+        self.context_add(stripped_text, result, False)
+        # Add back the markdown formatting
+        proofread = prefix + result + suffix
+
+        # Return the proofread text
+        return proofread, -1, -1, model
 
     def db_check_cache(self, text: str, source_lang: str, target_lang: str) -> tuple:
         """Check database for existing translation.
@@ -2639,7 +2641,7 @@ class BookTranslator:
             target_lang (str): Target language code
 
         Returns:
-            tuple: Cached translation result or None
+            tuple: Cached translation result (target, duration, fluency)
         """
         try:
             cached_result = self.db_get_translation(text, source_lang, target_lang)
@@ -2652,7 +2654,7 @@ class BookTranslator:
         except Exception as e:
             if self.verbose:
                 print(f"Cache check failed: {e}")
-        return None
+        return None, -1, -1
 
     def translate_with_bleeding_detection(self, stripped_text: str, source_lang: str, target_lang: str) -> tuple:
         """Translate text with context bleeding detection and retry logic.
@@ -2907,17 +2909,17 @@ class BookTranslator:
             {
                 "role": "system",
                 "content": self.strip_spaces_between_tags(system_prompt).format(
-                    source_lang=prompt_source_lang,
-                    target_lang=prompt_target_lang
+                    source_lang=source_lang,
+                    target_lang=target_lang
                 )
             }
         ]
         # Find similar texts and add them to context
         try:
-            similar_texts = self.db_search(stripped_text, source_lang, target_lang)
+            similar_texts = self.db_search(stripped_text, prompt_source_lang, prompt_target_lang)
             for source, target, _ in similar_texts:
-                messages.append({"role": "user", "content": f"<{source_lang.lower()}>{source}</{source_lang.lower()}>"})
-                messages.append({"role": "assistant", "content": f"<{target_lang.lower()}>{target}</{target_lang.lower()}>"})
+                messages.append({"role": "user", "content": f"<{prompt_source_lang.lower()}>{source}</{prompt_source_lang.lower()}>"})
+                messages.append({"role": "assistant", "content": f"<{prompt_target_lang.lower()}>{target}</{prompt_target_lang.lower()}>"})
         except Exception as e:
             if self.verbose:
                 print(f"Warning: Search failed: {e}")
@@ -2939,10 +2941,10 @@ class BookTranslator:
         
         # Add the limited context in chronological order
         for user_msg, assistant_msg in reversed(limited_context):
-            messages.append({"role": "user", "content": f"<{source_lang.lower()}>{user_msg}</{source_lang.lower()}>"})
-            messages.append({"role": "assistant", "content": f"<{target_lang.lower()}>{assistant_msg}</{target_lang.lower()}>"})
+            messages.append({"role": "user", "content": f"<{prompt_source_lang.lower()}>{user_msg}</{prompt_source_lang.lower()}>"})
+            messages.append({"role": "assistant", "content": f"<{prompt_target_lang.lower()}>{assistant_msg}</{prompt_target_lang.lower()}>"})
         # Add current text to translate
-        messages.append({"role": "user", "content": f"<{source_lang.lower()}>{stripped_text}</{source_lang.lower()}>"})
+        messages.append({"role": "user", "content": f"<{prompt_source_lang.lower()}>{stripped_text}</{prompt_source_lang.lower()}>"})
         return messages
 
     def translate_chapter(self, edition_number: int, chapter_number: int, source_lang: str, target_lang: str, total_chapters: int):
@@ -4138,7 +4140,7 @@ def main():
     parser.add_argument("-s", "--source-lang", default="English", help="Source language (default: English)")
     parser.add_argument("-t", "--target-lang", default="Romanian", help="Target language (default: Romanian)")
     parser.add_argument("-c", "--chapters", type=str, help="Comma-separated list of chapter numbers to translate (default: all chapters)")
-    parser.add_argument("-u", "--base-url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
+    parser.add_argument("-u", "--url", help="Base URL for the API (e.g., https://api.openai.com/v1)")
     parser.add_argument("-m", "--model", help="Model name to use (default: gpt-4o)")
     parser.add_argument("-k", "--api-key", help="API key for the translation service")
     parser.add_argument("--throttle", type=float, default=0.0, help="Minimum time between API requests in seconds (default: 0.0)")
