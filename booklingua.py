@@ -2229,7 +2229,7 @@ class BookTranslator:
 
         This helper function retrieves all translated paragraphs for a specific chapter
         from the database, ordered by paragraph number. It returns proofread text if
-        available, otherwise the target translation.
+        available (stored with '@' as source_lang), otherwise the target translation.
 
         Args:
             edition_number (int): Edition number to retrieve translations for
@@ -2238,7 +2238,8 @@ class BookTranslator:
             target_lang (str): Target language code
 
         Returns:
-            List[str]: List of translated texts in chapter order
+            List[str]: List of translated texts in chapter order. Proofread versions
+                       are returned when available, otherwise target translations.
 
         Raises:
             Exception: If database connection is not available
@@ -2361,7 +2362,8 @@ class BookTranslator:
 
         Returns:
             tuple: (paragraph_number, source, target, proofread) of the next paragraph,
-                   or (None, None, None, None) if there is no next paragraph
+                   or (None, None, None, None) if there is no next paragraph.
+                   The proofread field contains proofread text if available, otherwise None.
 
         Raises:
             Exception: If database connection is not available
