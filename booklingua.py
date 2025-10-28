@@ -4172,21 +4172,20 @@ def main():
         OPENROUTER_API_KEY: API key for OpenRouter preset
 
     Usage Examples:
-        # Basic direct translation
+        # Run all phases (extract, translate, build) - proofread is optional
         python booklingua.py book.epub
+
+        # Run specific phases
+        python booklingua.py book.epub --extract
+        python booklingua.py book.epub --translate
+        python booklingua.py book.epub --proofread
+        python booklingua.py book.epub --build
 
         # Translation with custom languages and verbose output
         python booklingua.py book.epub -s English -t Spanish -v
 
         # Translate specific chapters only
-        # Translate specific chapters only
         python booklingua.py book.epub -c "1,3,5-10"
-
-        # Translate chapter ranges
-        python booklingua.py book.epub -c "3-7"
-
-        # Translate individual chapters and ranges
-        python booklingua.py book.epub -c "1,3-5,8-10"
 
         # Using OpenAI API with custom model
         python booklingua.py book.epub --openai -m gpt-4-turbo
