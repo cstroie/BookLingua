@@ -3892,10 +3892,14 @@ class BookTranslator:
         # Pattern explanation:
         # (>)(\s+)(<) - Captures:
         #   > - The end of a tag
-        #   \s+ - One or more whitespace characters (including newlines)
+        #   \s+ - One or more whitespace characters (including newlines and spaces after newlines)
         #   < - The start of the next tag
         # Replacement: $1$3 - Keeps only the closing > and opening < tags
-        return re.sub(r'(>)(\s+)(<|[A-Z])', r'\1\3', xml_text)
+        # First remove spaces and newlines between tags
+        result = re.sub(r'(>)(\s+)(<|[A-Z])', r'\1\3', xml_text)
+        # Also strip spaces that follow newlines in text
+        result = re.sub(r'\n\s+', '\n', result)
+        return result
 
     def strip_markdown_formatting(self, text: str) -> tuple:
         """Strip markdown formatting and return clean text with prefix/suffix.
