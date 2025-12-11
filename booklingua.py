@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # BookLingua - Translate EPUB books using AI models
 # Copyright (C) 2025 Costin Stroie <costinstroie@eridu.eu.org>
 #
@@ -86,8 +86,8 @@ from typing import List, Dict, Optional
 from datetime import datetime
 
 # Constants for configurable values
-TRANSLATION_TEMPERATURE = 0.2
-PROOFREAD_TEMPERATURE = 0.5
+TRANSLATION_TEMPERATURE = 0.5
+PROOFREAD_TEMPERATURE = 0.6
 DEFAULT_MAX_TOKENS = 4 * 1024
 DEFAULT_CONTEXT_SIZE = 5
 DEFAULT_PREFILL_CONTEXT_SIZE = 3
@@ -2928,7 +2928,7 @@ class BookTranslator:
             "temperature": prompt_type == "proofread" and PROOFREAD_TEMPERATURE or TRANSLATION_TEMPERATURE,
             "min_p": 0.05,
             "top_k": 40,
-            "top_p": 0.95,
+            "top_p": 0.9,
             "repeat_last_n": 64,
             "repeat_penalty": 1,
             "cache_prompt": True,
@@ -2943,7 +2943,7 @@ class BookTranslator:
             provider = model_parts[0]
             payload["model"] = model_name
             payload["provider"] = {
-                "order": [provider]
+                "only": [provider]
             }
 
         # Make the API call
